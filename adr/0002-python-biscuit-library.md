@@ -61,6 +61,12 @@ by G-2 and G-3.
 accepted — 2026-07-14 (supersedes the "proposed" version of this ADR recorded at commit
 `dca755b`)
 
+**Partially superseded by [0003](0003-capability-commitment-scheme.md) — on the commitment
+scheme only.** The `H(P_i)` definition below (hash over raw container bytes, fields 2 + 3) was
+found unsound: protobuf is not a canonical encoding. ADR 0003 replaces it with a commitment over
+signature-derived `BlockID_i`. **The library selection (`biscuit-python==0.4.0`) and the seal
+decision (G-1.G′; this design never seals) stand unchanged.**
+
 ## Consequences
 
 - **The pin is exact; any version bump of `biscuit-python` re-triggers G-1.**

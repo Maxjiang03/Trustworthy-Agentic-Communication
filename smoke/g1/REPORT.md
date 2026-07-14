@@ -34,7 +34,7 @@ wheel. No other Python Biscuit implementation was found.
 | Offline append `P_{i−1} → P_i` | `token.append(BlockBuilder('check if …;'))` — takes **no key argument**; returns a new `Biscuit` |
 | `crypto_chain_ok(P_n; κ)` (§A.6.1) | `Biscuit.from_bytes(data, root_public_key)` — verifies the signature chain at parse time; raises `BiscuitValidationError` on failure. **No `Authorizer` was constructed** (that is `Γ`, gate G-2). |
 | Serialize / deserialize | `token.to_bytes()` / `Biscuit.from_bytes(data, root)` |
-| Canonical `SignedBlock_i` bytes (§A.0.1) | Not exposed as a dedicated accessor, but **directly sliceable from `to_bytes()`**: the container is `Biscuit { rootKeyId=1; authority=2 (SignedBlock); blocks=3 (repeated SignedBlock); proof=4 }` **[VERIFIED against the format spec `schema.proto`, eclipse-biscuit/biscuit]**. Fields 2/3 are exactly the §A.0.1 `SignedBlock_i` serializations; field 4 is exactly the mutable proof tail §A.0.1 excludes (`Proof = oneof { nextSecret, finalSignature }`). |
+| Block identity for commitments (§A.0.1, ADR 0003) | `token.revocation_ids` — the spec-defined per-block **revocation identifiers** (= block signatures **[VERIFIED, SPECIFICATIONS.md]**), extracted from the verified token; empirically byte-equal to the wire `SignedBlock.signature` (container field 3 of each block; container layout **[VERIFIED against `schema.proto`]**: `{ rootKeyId=1; authority=2; blocks=3; proof=4 }`, field 4 = the mutable proof tail). *A raw hash over the container block bytes themselves was the superseded ADR 0002 scheme — unsound because protobuf is not canonical (§5a).* |
 | Stable per-block identifier (corroboration) | `token.revocation_ids` — hex per-block identifiers, prefix-stable under append |
 | Block introspection | `token.block_count()`, `token.block_source(i)` |
 | Seal | **Not exposed** by biscuit-python 0.4.0 (runtime surface, upstream `src/lib.rs`, `.pyi` stubs; no upstream issue requests it). **No longer a criterion:** this design never seals (ADR 0002); recorded as an upstream contribution opportunity, deliberately not pursued now. |
@@ -56,13 +56,52 @@ are within-run values from the passing run.
 | G-1.A discovery/maintainability | info | PASS | §2: official, active (pushed the day of this gate), Eclipse-governed |
 | G-1.H API stability | info | PASS | typed (`py.typed` + stubs), pinnable, full wheel coverage, no build toolchain needed |
 
-`id(P_i)` = SHA-256 over the length-framed canonical `SignedBlock` bytes `0..i` extracted from
-the container (fields 2, 3 in order; field 4 excluded) — the §A.0.1 rule implemented verbatim:
-*hash the signed-block prefix, never the mutable proof tail.*
+`id(P_i)` in the spike table above = SHA-256 over length-framed raw `SignedBlock` container
+bytes. **Superseded (ADR 0003):** protobuf is not canonical, so that identity binds an encoding.
+The normative commitment is now `commit_prefix(BlockID_0..BlockID_i)` over signature-derived
+revocation identifiers (§5a); the spike's structural conclusions (prefix-stable,
+terminal-sensitive) hold unchanged under the corrected commitment (regression tests 1–2).
 
 ## 5. Outcome
 
-**PASS.** All six mandatory checks (B, C, D, E, F, G′) pass; the spike exits zero. *G-1.G (seal
+**CONDITIONAL PASS** *(status change 2026-07-14, corrective pass, ADR 0003)*: the PASS below
+rested on an **unsound commitment** — `H(P_i)` was computed over **raw protobuf container
+bytes** (fields 2 + 3). Protobuf is **not a canonical encoding**: a semantically equivalent
+re-encoding (field reordering, non-minimal varints) changes the bytes, so the old commitment
+bound an *encoding*, not the ordered block sequence, and a benign re-encoding in the path would
+cause a false rejection. The spike's `re-serialization byte-identical=True` is a property of
+this library's encoder, not of the format. G-1 returns to PASS only when every corrective test
+in the ADR 0003 suite passes.
+
+Original (superseded) outcome: all six mandatory checks (B, C, D, E, F, G′) pass; the spike exits zero.
+
+## 5a. Corrective pass (ADR 0003) — the BlockID commitment and its regression suite
+
+The commitment was reimplemented oracle-side in `src/harness/oracle/commitment.py`:
+`BlockID_i` = block `i`'s signature (the Biscuit **revocation identifier**, [VERIFIED:
+SPECIFICATIONS.md "Revocation identifiers"]; empirically byte-equal to the wire
+`SignedBlock.signature`), and `H(P_i)` = `commit_prefix(BlockID_0..BlockID_i)` — SHA-256 over
+`"AASC-CAP-COMMIT" ‖ 0x01 ‖ 0x01 ‖ u32be(count) ‖ (u32be(len) ‖ BlockID)…`, failing closed on
+unsupported version/algorithm, non-Ed25519 keys, and third-party blocks.
+
+Permanent regression suite `tests/test_capability_commitment.py` (10 tests, each with positive
+and negative arms — plus the placeholder, 11 total in the repo):
+
+| Test | Result | Key evidence (one representative run) |
+|---|---|---|
+| 1 encoding-independence | PASS | three semantically equivalent re-encodings (top-level reorder, inner SignedBlock reorder, non-minimal varint) all parse+verify; BlockID commitment identical across all four encodings: `0f31ccf3299f2bb0cb60cf940ee8bae93a2fea8f2cb9a0a36c1d6e7520950245`; superseded raw-byte hash differed: `1d2b8af6…` vs `09daddc9…` (inner) / `65a6c702…` (non-minimal) |
+| 2 append preserves prior prefixes (depth 3) | PASS | every `commit(P_j)`, j<k, unchanged after each of three appends; terminal commitment changes each time; `commit(P_0) ≠ commit(P_1)` |
+| 3 mutation fails closed | PASS | flipped byte in signed Datalog → `BiscuitValidationError`, no commitment |
+| 4 truncation fails closed | PASS | terminal block dropped → verification fails closed (and coverage check would reject against the original count) |
+| 5 block reordering fails closed | PASS | swapped appended blocks → `BiscuitValidationError` (chain binds position); library did NOT accept the reordering |
+| 6 missing HTC coverage | PASS | `check_htc_coverage(n+1 ids, n)` raises `CoverageError`; `n+1` passes |
+| 7 unsupported version | PASS | `version=2` raises `UnsupportedVersionError`; `version=1` works |
+| 8 unsupported algorithm | PASS | real Secp256r1-minted token (library verifies it) rejected at extraction with `UnsupportedAlgorithmError`; Ed25519 accepted |
+| 9 signer/verifier process separation | PASS | subprocess verifier (raw bytes + root pub hex only) reproduces the signer's commitment exactly; tampered token → exit 1, `BiscuitValidationError` |
+| 10 non-vacuity | PASS | `commit([]) ≠ commit([A]) ≠ commit([B])`; `commit([A,B]) ≠ commit([B,A])`; deterministic |
+
+The library **accepting** the re-encodings (test 1) is the empirical proof that the raw-byte
+scheme was unsound in practice, not just in principle. *G-1.G (seal
 terminality) was replaced by G-1.G′ (append-detection) by author decision; see ADR 0002. Seal is
 not used by this design:* further delegation is governed by the HTC chain, further attenuation is
 harmless (monotone), and a post-hoc appended block is rejected by the `INV.capability_hash`
@@ -94,9 +133,9 @@ make gate GATE=g1                                                # equivalent, v
 
 - `biscuit-python` is at **0.4.0 — a 0.x API**. The pin is exact; **any version bump requires
   re-running G-1.**
-- `H(P_i)` is computed by parsing the Biscuit **wire format** (container fields 2 + 3, excluding
-  the proof field 4), so it depends on the **format specification** (stable, versioned) rather
-  than on the 0.x Python API. A **format** version change would require re-verification.
+- `H(P_i)` commits to spec-defined **revocation identifiers** (block signatures, ADR 0003), so it
+  depends on the **format specification** (stable, versioned) rather than on the 0.x Python API.
+  A **format** version change (e.g. signature payload v0 → v1) would require re-verification.
 - Biscuit's format has had informal cryptographic review but is **not formally audited** (project
   FAQ). This is a disclosed limitation of the study, not a blocker for a measurement
   contribution.

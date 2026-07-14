@@ -19,7 +19,7 @@ Run a gate: `make gate GATE=g1`
 
 | Gate | Depends on | Status | Report | ADR |
 |------|-----------|--------|--------|-----|
-| G-1 | — | **PASS** — biscuit-python==0.4.0 pinned; G-1.G′ (append-detection) replaced the seal check by author decision | [g1/REPORT.md](g1/REPORT.md) | [0002](../adr/0002-python-biscuit-library.md) |
+| G-1 | — | **CONDITIONAL PASS** — commitment scheme unsound (raw protobuf bytes); corrective pass in progress; ADR 0003. Returns to PASS only when every corrective test passes. | [g1/REPORT.md](g1/REPORT.md) | [0002](../adr/0002-python-biscuit-library.md), 0003 (in progress) |
 | G-2 | G-6/G-7 | blocked — requires frozen authorizer Γ and H(Γ) (`docs/frozen_parameters.md` item 8, UNSET) | — | — |
 | G-3 | G-1 (threshold fixed beforehand) | not started | — | — |
 | G-4 | G-6/G-7 | not started | — | — |
