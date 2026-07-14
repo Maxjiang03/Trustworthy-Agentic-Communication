@@ -13,10 +13,12 @@ check fails. Token bytes legitimately differ between runs (Biscuit
 chains blocks with single-use keypairs); every comparison here is
 within a single run, never across runs.
 
-Reproduction (library is intentionally NOT pinned in pyproject.toml
-until the gate outcome is decided):
+Reproduction (biscuit-python==0.4.0 is pinned in pyproject.toml per
+ADR 0002; the --with form reproduces the original pre-pin ephemeral
+run and works either way):
 
     uv run --with biscuit-python==0.4.0 python smoke/g1/spike.py
+    uv run python smoke/g1/spike.py
 """
 
 import hashlib

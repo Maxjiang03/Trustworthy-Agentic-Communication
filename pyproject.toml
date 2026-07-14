@@ -12,13 +12,14 @@ dependencies = [
   "cryptography>=42.0",
   "numpy>=1.26",
   "scipy>=1.11",
+  # Exact pin — verified by gate G-1 (ADR 0002); any version bump re-triggers G-1.
+  "biscuit-python==0.4.0",
 ]
 
 [dependency-groups]
 dev = ["pytest>=8.0"]
 
 # PENDING GATE — do not pin until the gate decides:
-#   Python Biscuit library            -> gate G-1 / G-2
 #   authlib (RFC 8693 + RFC 9396)     -> gate G-4
 #   DPoP / JOSE library               -> gate G-5
 
