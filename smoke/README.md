@@ -19,7 +19,7 @@ Run a gate: `make gate GATE=g1`
 
 | Gate | Depends on | Status | Report | ADR |
 |------|-----------|--------|--------|-----|
-| G-1 | — | **in progress** | [g1/REPORT.md](g1/REPORT.md) | 0002 (pending) |
+| G-1 | — | **FAILED — fallback pending author decision** (5/6 mandatory checks pass; `seal` not exposed by biscuit-python 0.4.0) | [g1/REPORT.md](g1/REPORT.md) | [0002](../adr/0002-python-biscuit-library.md) |
 | G-2 | G-6/G-7 | blocked — requires frozen authorizer Γ and H(Γ) (`docs/frozen_parameters.md` item 8, UNSET) | — | — |
 | G-3 | G-1 (threshold fixed beforehand) | not started | — | — |
 | G-4 | G-6/G-7 | not started | — | — |
