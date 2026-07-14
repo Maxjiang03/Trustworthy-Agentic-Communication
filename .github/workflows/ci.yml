@@ -20,8 +20,8 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Sync pinned environment
-        run: uv sync
+      - name: Sync pinned environment (locked)
+        run: uv sync --frozen
 
       - name: Lint (pre-commit — ruff + ruff-format)
         run: uvx pre-commit run --all-files
