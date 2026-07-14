@@ -10,7 +10,8 @@ test:
 	pytest -q
 
 gate:
-	@echo "Smoke gates run in the smoke-test phase; see docs/EXPERIMENT_ARCHITECTURE_FINAL.md Part G"
+	@test -n "$(GATE)" || (echo "usage: make gate GATE=g1"; exit 1)
+	python smoke/$(GATE)/spike.py
 
 reproduce:
 	@echo "Available only after sealing; regenerates tables/figures from results/raw/"
