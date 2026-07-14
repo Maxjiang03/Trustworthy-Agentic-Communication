@@ -64,14 +64,17 @@ terminal-sensitive) hold unchanged under the corrected commitment (regression te
 
 ## 5. Outcome
 
-**CONDITIONAL PASS** *(status change 2026-07-14, corrective pass, ADR 0003)*: the PASS below
-rested on an **unsound commitment** — `H(P_i)` was computed over **raw protobuf container
-bytes** (fields 2 + 3). Protobuf is **not a canonical encoding**: a semantically equivalent
-re-encoding (field reordering, non-minimal varints) changes the bytes, so the old commitment
-bound an *encoding*, not the ordered block sequence, and a benign re-encoding in the path would
-cause a false rejection. The spike's `re-serialization byte-identical=True` is a property of
-this library's encoder, not of the format. G-1 returns to PASS only when every corrective test
-in the ADR 0003 suite passes.
+**PASS** *(restored 2026-07-14 after the ADR 0003 corrective suite passed — all 10 regression
+tests green, §5a; the interim status was CONDITIONAL PASS)*.
+
+History of the status: the first PASS rested on an **unsound commitment** — `H(P_i)` was
+computed over **raw protobuf container bytes** (fields 2 + 3). Protobuf is **not a canonical
+encoding**: a semantically equivalent re-encoding (field reordering, non-minimal varints)
+changes the bytes, so the old commitment bound an *encoding*, not the ordered block sequence,
+and a benign re-encoding in the path would have caused a false rejection. The spike's
+`re-serialization byte-identical=True` is a property of this library's encoder, not of the
+format. G-1 was set to CONDITIONAL PASS on recognition (SMOKE_G1_CORRECTIVE_TASK STEP 0) and
+returned to PASS only once every corrective test passed.
 
 Original (superseded) outcome: all six mandatory checks (B, C, D, E, F, G′) pass; the spike exits zero.
 
