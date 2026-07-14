@@ -1,0 +1,37 @@
+# CLAUDE.md — Project Overview & Working Rules
+
+## What this is
+Trustworthy Agentic Communication: a pre-registered, reproducible testbed that measures authorization-scope propagation and its cost at the A2A→MCP boundary (the cross-protocol confused-deputy problem, TV23). MSc Cybersecurity dissertation, University of Glasgow.
+
+## Authoritative design
+`docs/EXPERIMENT_ARCHITECTURE_FINAL.md` is the SINGLE source of truth (baselines, capability/HTC/INV, oracle, smoke-gate DAG, freeze/seal loop, workflow). Do not contradict it. If a change is needed, record an ADR in `adr/` and update the doc — never silently diverge.
+
+## Current phase
+Repository skeleton, pre-smoke-test. Implementation logic has NOT begun. Next phase: the feasibility smoke gates (design Part G), pilot corpus only.
+
+## Pre-registration status
+Not yet authored. Per Part H, the pre-registration is written and sealed only AFTER the smoke gates pass, and is derived from the architecture doc. `docs/PRE_REGISTRATION.md` is a stub. Any earlier draft is superseded and must not be reused.
+
+## Evidence grades (use these tags in code comments, docs, ADRs, commit bodies)
+- [VERIFIED]      — checked against a primary source (RFC / protocol spec / Biscuit spec or FAQ).
+- [DESIGN]        — a project decision; internally consistent, not externally mandated.
+- [UNVERIFIED-IA] — a property a library/environment must have, not yet confirmed in code. NEVER state one as fact; each is gated by a smoke test (design Part F.4 / Part G).
+
+## Red lines (do not cross without an explicit instruction from the author)
+1. Do NOT create or populate `fixtures/confirmatory/` before sealing (Part H). It stays empty.
+2. Do NOT run a confirmatory campaign, seal, or generate v0.5 until every in-scope smoke gate passes on the pilot corpus.
+3. Gates G-2, G-6, G-7 are construct-validity life-or-death (Biscuit monotonicity under the frozen authorizer Γ; complete mediation; independent effect ledger). If any fails, STOP and apply the gate-outcome fallback; do not proceed on that branch.
+4. The oracle NEVER reads a SUT-computed verdict or digest; it recomputes from raw evidence + sealed truth + the external effect ledger.
+5. `τ_gt` is oracle-only; no system-under-test principal may read it.
+6. `src/sut/` must never import from `src/harness/`. The dependency is one-way.
+7. Never `git push --force`; never rewrite remote history.
+8. No credentials, tokens, or secrets in the repo or in code. If a push needs auth you cannot access, STOP and ask the author.
+
+## Layout
+`src/sut/` measured system · `src/harness/` instrument · `docs/` design + threat model + frozen parameters · `adr/` one file per decision · `fixtures/pilot` vs `fixtures/confirmatory` strictly disjoint.
+
+## Commit convention (Conventional Commits)
+`type: summary`, type ∈ {feat, fix, docs, test, build, ci, chore, refactor}. Logically scoped commits (not one giant commit, not one per file). Reference an ADR in the body when a commit encodes a decision. Run `make lint` and `make test` before committing. Push to `origin main` after a coherent unit of work. Never force-push.
+
+## Setup
+`make setup` (uv sync) · `make lint` (pre-commit) · `make test` (pytest). Python 3.11+. Determinism: fixed `PYTHONHASHSEED`, single seed source, Ed25519 for signing, RFC 8785 JCS for digests.
