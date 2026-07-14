@@ -24,6 +24,9 @@ venv/
 .DS_Store
 Thumbs.db
 
-# Keep the results tree placeholders tracked; raw results are added
-# deliberately at campaign time (write-once, design Part J.4), never by accident.
+# Generated experiment outputs: ignore contents, keep the tree placeholders
+# tracked. Raw traces are added deliberately at campaign time (write-once,
+# design Part J.4) via an explicit .gitignore change, never by accident.
+results/**
+!results/**/
 !results/**/.gitkeep

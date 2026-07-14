@@ -12,8 +12,10 @@ dependencies = [
   "cryptography>=42.0",
   "numpy>=1.26",
   "scipy>=1.11",
-  "pytest>=8.0",
 ]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
 
 # PENDING GATE — do not pin until the gate decides:
 #   Python Biscuit library            -> gate G-1 / G-2
