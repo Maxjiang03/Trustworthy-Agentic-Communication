@@ -2,8 +2,9 @@
 
 Tests ONLY the library mechanics of `crypto_chain_ok` (architecture doc
 SS A.6.1): mint, offline append, root-public-key verification, wire
-round-trip, stable prefix identity (SS A.0.1 hashing rule), and seal
-terminality (D22). It does NOT run an authorizer with policies (that is
+round-trip, stable prefix identity (SS A.0.1 hashing rule), and
+append-detection (G-1.G', which replaces the seal check per ADR 0002:
+this design never seals). It does NOT run an authorizer with policies (that is
 Gamma / gate G-2), does NOT test monotonicity C_i subset-of C_{i-1}
 (G-2), and does NOT measure performance (G-3).
 
@@ -224,30 +225,39 @@ def g1_f_stable_prefix_identity(p0_bytes: bytes, p1_bytes: bytes, root_pub: Publ
     )
 
 
-def g1_g_seal_terminality(p1_bytes: bytes, root_pub: PublicKey) -> None:
-    """G-1.G: seal, then assert a further append fails. Requires a seal API."""
-    from biscuit_auth import UnverifiedBiscuit
+def g1_gprime_append_detection(p1_bytes: bytes, root_pub: PublicKey) -> None:
+    """G-1.G': the TERMINAL prefix hash changes under append (replaces G-1.G).
 
-    token = Biscuit.from_bytes(p1_bytes, root_pub)
-    exposed = [name for name in dir(token) + dir(UnverifiedBiscuit) if "seal" in name.lower()]
-    if not exposed:
-        record(
-            "G-1.G",
-            True,
-            False,
-            "NOT EXPOSED: biscuit-python 0.4.0 has no seal API on Biscuit or "
-            "UnverifiedBiscuit (runtime introspection; upstream src/lib.rs and "
-            "biscuit_auth.pyi contain no seal wrapper; no upstream issue requests it). "
-            "The underlying biscuit-rust implements seal, but it is not callable from "
-            "Python, so seal-then-append-must-fail cannot be exercised.",
-        )
-        return
-    sealed = token.seal()  # only reachable if a future version exposes it
-    try:
-        sealed.append(BlockBuilder(PILOT_ATTENUATION_CHECK))
-        record("G-1.G", True, False, "append after seal unexpectedly succeeded")
-    except Exception as exc:  # noqa: BLE001 — record whatever the library raises
-        record("G-1.G", True, True, f"append after seal rejected with {type(exc).__name__}")
+    Author decision, ADR 0002: this design never seals. Post-hoc appends
+    are rejected because INV.capability_hash = H(P_n) no longer matches
+    (SS F.2). This check proves that detection property at the hash
+    level; it does NOT implement INV (forbidden before the gates).
+    """
+    h_pn = prefix_identity(p1_bytes, 1)
+
+    # Negative control (re-asserts G-1.F5 adjacent to G'): H(P_n) from a
+    # round-trip of the UNMODIFIED token equals the signer-side value, so
+    # the identity function is neither always-equal nor always-different.
+    revived_bytes = bytes(Biscuit.from_bytes(p1_bytes, root_pub).to_bytes())
+    control_equal = prefix_identity(revived_bytes, 1) == h_pn
+
+    # Adversarial post-hoc append, from the P_n token alone (no keys).
+    tampered = Biscuit.from_bytes(p1_bytes, root_pub).append(BlockBuilder(PILOT_ATTENUATION_CHECK))
+    tampered_bytes = bytes(tampered.to_bytes())
+    h_pn1 = prefix_identity(tampered_bytes, 2)
+    detected = h_pn != h_pn1
+
+    ok = control_equal and detected and tampered.block_count() == 3
+    record(
+        "G-1.G'",
+        True,
+        ok,
+        f"H(P_n)={h_pn}, H(P_n+1)={h_pn1}, different={detected}; negative control: "
+        f"H(P_n) recomputed after a round-trip of the unmodified token equals the "
+        f"signer-side value={control_equal}. An INV assertion binding "
+        f"capability_hash=H(P_n) will not match a capability that has been appended "
+        f"to, so a post-hoc append is detected and rejected without any need for seal.",
+    )
 
 
 def g1_h_api_stability() -> None:
@@ -275,7 +285,7 @@ def main() -> int:
     g1_d_pubkey_only_verification(p1_bytes, root_pub)
     g1_e_round_trip(p1_bytes, root_pub)
     g1_f_stable_prefix_identity(p0_bytes, p1_bytes, root_pub)
-    g1_g_seal_terminality(p1_bytes, root_pub)
+    g1_gprime_append_detection(p1_bytes, root_pub)
     g1_h_api_stability()
 
     mandatory_failures = [c for c, mandatory, passed, _ in RESULTS if mandatory and not passed]
