@@ -124,6 +124,16 @@ not observed findings** (Part 0 item 5).
 DPoP closes T-reuse but not T-tool/T-args at a shared endpoint — the gap B3's canonical body/args
 binding fills; the residual difference is credited to **INV**, not the capability (Part D.3).
 
+## Known residual: append-induced rejection (availability)
+
+An adversary positioned between the terminal holder and the boundary verifier can append a block
+to the presented capability. Because attenuation is monotone, this **cannot escalate authority**;
+and because appending changes `H(P_n)`, the `INV.capability_hash` binding **rejects** the request.
+The residual effect is therefore a **rejection** — an availability effect — not an authorization
+breach. An adversary in that position could equally drop or corrupt the message, so sealing the
+capability would not close this residual. Availability effects are not among the scored families
+F1–F5; this residual is recorded for completeness. `[Gate G-1; ADR 0002]`
+
 ## Out of scope
 
 **Out of scope.** The study concerns authorization-scope propagation. The following are out of scope, and are named so the exclusion is deliberate rather than an omission: prompt injection and goal hijack against the language model; memory or context poisoning; tool-definition poisoning and supply-chain attacks on tool registries; unexpected code execution; and attacks on the enforcement code, the trust store, or the cryptographic primitives. Generalization of the results is claimed only for the threat model and the attack instances constructed here, not for a population of all possible attacks.
