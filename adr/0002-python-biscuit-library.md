@@ -1,79 +1,82 @@
-# 0002 — Python Biscuit library (gate G-1)
+# 0002 — Python Biscuit library: adopt biscuit-python 0.4.0; replace G-1.G with G-1.G′; this design never seals
 
 ## Context
 
 Gate G-1 (`docs/EXPERIMENT_ARCHITECTURE_FINAL.md` Part G; expanded criteria in
-`SMOKE_G1_TASK.md`) tests IA-1: whether a Python Biscuit library exists that supports the
-capability track (mint, offline append, root-public-key verification, stable §A.0.1 prefix
-identity, terminal seal). Full evidence: `smoke/g1/REPORT.md`.
+`SMOKE_G1_TASK.md`) tested IA-1. Candidates on PyPI: only **`biscuit-python`** is viable — the
+official PyO3 bindings over `biscuit-rust` 6.0.0, an Eclipse Foundation project
+(`eclipse-biscuit/biscuit-python`, formerly biscuit-auth org), actively maintained (repo pushed
+2026-07-14), typed (`py.typed` + `.pyi`), with prebuilt wheels for CPython 3.9–3.13 on
+manylinux/musllinux/macOS/Windows, so **no Rust toolchain** is needed locally, in CI, or in
+Docker. `biscuit-auth` and `pybiscuit` do not exist on PyPI; `biscuit` is an unrelated dead
+project. Full evidence: `smoke/g1/REPORT.md`.
 
-Candidates evaluated (PyPI JSON API, GitHub API, upstream source, runtime introspection):
-
-- **`biscuit-python` 0.4.0** — the official binding of the Rust reference implementation
-  (eclipse-biscuit org, formerly biscuit-auth; wraps biscuit-rust 6.0.0). Actively maintained
-  (repo pushed 2026-07-14), typed, full pre-built wheel coverage (no Rust toolchain needed).
-- `biscuit-auth`, `pybiscuit` — do not exist on PyPI. `biscuit` — unrelated dead project.
-- No other Python implementation found.
+Five of six mandatory checks passed on the first run (mint; offline append with the root secret
+structurally out of scope; verification with `κ_pub` alone; byte-identical wire round-trip; and
+the make-or-break G-1.F stable prefix identity). **G-1.G (seal terminality) was unexecutable**:
+the binding exposes no seal API (absent from the runtime surface, upstream `src/lib.rs`, and the
+`.pyi` stubs; no upstream issue requests it). The gate was reported FAIL and stopped for the
+author's decision, per the task's gate-outcome rules.
 
 ## Decision
 
-**No adoption decision is taken here — the gate FAILED and the choice rests with the author.**
-This ADR records the evidence and the options.
+[DESIGN] **Adopt `biscuit-python==0.4.0`, pinned exactly**, in `[project].dependencies`.
 
-Post-gate status of each tested capability (valid for exactly what ran, nothing more):
+[DESIGN] **Replace criterion G-1.G (seal terminality) with G-1.G′ (append-detection).** Sealing,
+in Biscuit, exists to stop further delegation. In this design that function is already performed
+by two project-owned mechanisms, so seal is redundant:
 
-- [VERIFIED by gate G-1] mint `P_0`; **offline** append `P_{i−1} → P_i` (no root secret in
-  scope, enforced structurally in the spike); verification with **only** `κ_pub`
-  (`crypto_chain_ok`, §A.6.1), wrong key rejected with `BiscuitValidationError`; wire round-trip
-  (byte-identical re-serialization).
-- [VERIFIED by gate G-1] **stable prefix identity** (G-1.F): the §A.0.1 hashing rule is
-  implementable **verbatim** — the canonical `SignedBlock_i` bytes are container protobuf fields
-  2/3 of `to_bytes()` and the mutable proof tail is field 4 ([VERIFIED against the biscuit
-  format `schema.proto`]); `id(P_0)` is append-invariant and signer/verifier agree on `id(P_1)`.
-  Corroborated by the library's `revocation_ids` (prefix-stable per-block identifiers). **No
-  refinement of the §A.0.1 hashing rule is needed.**
-- [FAILED — NOT EXPOSED] **seal** (G-1.G): biscuit-python 0.4.0 exposes no seal API (absent
-  from every class at runtime, from upstream `src/lib.rs`, and from `biscuit_auth.pyi`; no
-  upstream issue requests it). biscuit-rust implements sealing, but it is not callable from
-  Python, so "seal, then append must fail" (D22 terminality) cannot be exercised.
-- [UNVERIFIED-IA, unchanged] IA-1 as a whole; monotonicity under a frozen `Γ` (IA-2, gate G-2);
-  performance (IA-3, gate G-3).
+1. **Further attenuation is harmless** — attenuation is monotone (`C_i ⊆ C_{i−1}`, §A.6.1): any
+   party appending a block can only narrow authority, never escalate it.
+2. **Further delegation is governed by the HTC chain, not by seal** — adding a hop requires a new
+   `HTC_i` signed by the **current holder's identity key** (§F.2). An attacker without that key
+   cannot produce one; a compromised holder gains nothing by narrowing authority it already
+   holds.
+3. **A block appended after the terminal hop is rejected by the INV binding** —
+   `INV.capability_hash = H(P_n)` (§F.2); the verifier recomputes `H(P_{n+1}) ≠ H(P_n)` and
+   refuses the request.
 
-Options for the author, in the order the evidence supports:
+[DESIGN] **This design never seals.** What the design depends on is the pair proved by the gate:
+*prefix-stable* (G-1.F: `H(P_0)` unchanged after append, so HTC parent bindings survive a
+legitimate append) and *terminal-sensitive* (G-1.G′: `H(P_n) ≠ H(P_{n+1})`, so
+`INV.capability_hash` detects an illegitimate post-hoc append). Both hold; the re-run passes all
+six mandatory checks (exit 0).
 
-1. **[proposed] Accept the narrow gap and refine the G-1.G criterion.** Analysis (from the
-   architecture document, not a new design): no Part C/E baseline flow *executes* seal; INV
-   already binds `capability_hash = H(P_n)`, so a post-INV append changes the terminal prefix
-   hash and the INV binding rejects it at the boundary — seal is defence-in-depth in transit,
-   not load-bearing for any hypothesis. Consequence if chosen: adopt `biscuit-python==0.4.0`,
-   pin it, update the Part G G-1 row (criterion notes seal-not-exposed with the residual
-   documented) and the §F.4/D22 wording ("seals only terminally" stays [VERIFIED] for the
-   Biscuit design; the binding cannot exercise it), and record the residual in the threat
-   model's assumptions. Optionally also file/contribute the ~small upstream PyO3 `seal()`
-   wrapper and revisit on the next release.
-2. **Fallback: Rust `biscuit-auth` via FFI (PyO3/maturin) or subprocess bridge.** Preserves
-   every property including seal. Cost: Rust toolchain in dev/CI/Docker, build complexity,
-   slower iteration.
-3. **Fallback: Macaroon-style caveat chain (symmetric HMAC).** **Loses the root-public-key
-   verification property** (§F.2, §A.6.1): the verifier must hold the root secret. §C and the
-   trust model would need rewriting. Disproportionate to a missing-seal gap; listed because the
-   Part G gate-outcome policy names it.
+**Rejected fallbacks:**
 
-Per SMOKE_G1_TASK STEP 6/8 (FAIL branch): no fallback implemented, no `pyproject.toml` pin, no
-architecture-document edit. The `# PENDING GATE` block is unchanged.
+- *Rust FFI (PyO3/maturin or subprocess bridge)* — **rejected as disproportionate**: it would put
+  a Rust toolchain into CI and Docker to preserve a property (seal) this design does not use.
+- *Macaroon-style caveat chain (symmetric HMAC)* — **strongly rejected**: it would surrender
+  root-**public**-key verification (a real, load-bearing property, §A.6.1/§F.2) to close a gap
+  that is not a gap.
+
+Post-gate capability statuses (valid for exactly what ran): mint, offline append, `κ_pub`-only
+verification, wire round-trip, stable prefix identity per §A.0.1 (verbatim — no hashing-rule
+refinement needed), and append-detection — **verified by gate G-1** for `biscuit-python==0.4.0`.
+Monotonicity under a frozen `Γ` (IA-2) and performance (IA-3) remain **[UNVERIFIED-IA]**, gated
+by G-2 and G-3.
 
 ## Status
 
-proposed — 2026-07-14 (gate outcome FAIL recorded; adoption/fallback decision pending the
-author; supersede or accept via a follow-up entry once decided)
+accepted — 2026-07-14 (supersedes the "proposed" version of this ADR recorded at commit
+`dca755b`)
 
 ## Consequences
 
-- The capability track (B-cap, B3, B3⁺) stays blocked until the author decides among the
-  options above; G-6/G-7 (next DAG tier) are independent of this decision and could proceed.
-- Whichever option is chosen updates: Part G G-1 row, §F.4 IA-1 status, and (options 2/3) §C,
-  the threat model, Dockerfile/CI — in the same commit as this ADR's acceptance, never
-  silently (CLAUDE.md).
-- The G-1.F result stands on its own: `H(P_i)` per §A.0.1 is implementable without any rule
-  change, whichever Biscuit substrate is chosen (it is a property of the wire format, verified
-  against `schema.proto`).
+- **The pin is exact; any version bump of `biscuit-python` re-triggers G-1.**
+- `H(P_i)` is computed by parsing the Biscuit **wire format** (container fields 2 + 3, excluding
+  the mutable proof field 4, `[VERIFIED against schema.proto]`), so it depends on the versioned
+  format specification rather than the 0.x Python API. A **format** version change would require
+  re-verification.
+- The Biscuit format has had informal cryptographic review but is **not formally audited**
+  (project FAQ) — a disclosed limitation of the study, not a blocker for a measurement
+  contribution.
+- The availability residual (an in-path adversary can append a block and force a *rejection*,
+  never an escalation) is recorded in `docs/threat_model.md`; sealing would not close it.
+- Architecture-document edits applied with this decision (same-day commits, never silent):
+  D22 note (Part B.2), Part G G-1 row (criterion = F + G′), §F.4 IA-1 status, §F.2 HTC-count
+  conjunct (fail-fast defence in depth).
+- An upstream `seal()` PyO3 wrapper is an open, **non-blocking** contribution opportunity —
+  deliberately not pursued now (off the critical path).
+- The capability track (B-cap, B3, B3⁺) is unblocked; next gates in the DAG batch: G-5 (DPoP)
+  and G-8 (JCS canonicalisation), each with its own task file.

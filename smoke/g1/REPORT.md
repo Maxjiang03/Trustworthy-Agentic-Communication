@@ -6,15 +6,17 @@
 - **Assumption tested:** IA-1 — *"The chosen Python Biscuit library exists, is maintainable, and
   exposes append-block attenuation + root-public-key verification with a stable API"*
   (`docs/EXPERIMENT_ARCHITECTURE_FINAL.md` §F.4), plus the expanded criteria G-1.F (stable prefix
-  identity, §A.0.1 hashing rule) and G-1.G (seal terminality, D22) required by `SMOKE_G1_TASK.md`.
-- **Date:** 2026-07-14
+  identity, §A.0.1 hashing rule) and G-1.G′ (append-detection — **replaces** G-1.G seal
+  terminality by author decision, ADR 0002).
+- **Dates:** 2026-07-14 (first run: FAIL on G-1.G, recorded at commit `dca755b`; resolution and
+  passing re-run: same day).
 - **Blocks on failure:** the whole capability track (B-cap, B3, B3⁺).
 
 ## 2. Library discovery (STEP 3)
 
 | Candidate | Verdict |
 |---|---|
-| **`biscuit-python`** | **Chosen.** Official Python bindings for the reference Rust implementation (PyO3/maturin wrapper of `biscuit-rust`; 0.4.0 wraps biscuit-rust 6.0.0 per its CHANGELOG). Latest 0.4.0, released 2025-09-26; 7 stable releases since 2023-06. Repo `eclipse-biscuit/biscuit-python` (project moved from the `biscuit-auth` org into the Eclipse Foundation; the old URL redirects). Repo pushed 2026-07-14 (the day of this gate); `biscuit-rust` pushed 2026-07-13 — the ecosystem is actively maintained. Typed API (`py.typed` + `__init__.pyi`). Pre-built wheels for CPython 3.9–3.13 on manylinux/musllinux/macOS/Windows and an sdist — **no Rust toolchain needed at install time** on any platform this project targets (Windows dev box, Ubuntu CI, `python:3.11-slim` Docker). |
+| **`biscuit-python`** | **Chosen and adopted (ADR 0002).** Official Python bindings for the reference Rust implementation (PyO3/maturin wrapper of `biscuit-rust`; 0.4.0 wraps biscuit-rust 6.0.0 per its CHANGELOG). Latest 0.4.0, released 2025-09-26; 7 stable releases since 2023-06. Repo `eclipse-biscuit/biscuit-python` (project moved from the `biscuit-auth` org into the Eclipse Foundation; the old URL redirects). Repo pushed 2026-07-14 (the day of this gate); `biscuit-rust` pushed 2026-07-13 — actively maintained. Typed API (`py.typed` + `__init__.pyi`). Pre-built wheels for CPython 3.9–3.13 on manylinux/musllinux/macOS/Windows and an sdist — **no Rust toolchain needed at install time** on any platform this project targets (Windows dev box, Ubuntu CI, `python:3.11-slim` Docker). |
 | `biscuit-auth` (PyPI) | Does not exist (404). |
 | `pybiscuit` (PyPI) | Does not exist (404). |
 | `biscuit` (PyPI) | Unrelated dead web framework (single 0.0.1 release, 2020). |
@@ -35,13 +37,13 @@ wheel. No other Python Biscuit implementation was found.
 | Canonical `SignedBlock_i` bytes (§A.0.1) | Not exposed as a dedicated accessor, but **directly sliceable from `to_bytes()`**: the container is `Biscuit { rootKeyId=1; authority=2 (SignedBlock); blocks=3 (repeated SignedBlock); proof=4 }` **[VERIFIED against the format spec `schema.proto`, eclipse-biscuit/biscuit]**. Fields 2/3 are exactly the §A.0.1 `SignedBlock_i` serializations; field 4 is exactly the mutable proof tail §A.0.1 excludes (`Proof = oneof { nextSecret, finalSignature }`). |
 | Stable per-block identifier (corroboration) | `token.revocation_ids` — hex per-block identifiers, prefix-stable under append |
 | Block introspection | `token.block_count()`, `token.block_source(i)` |
-| **Seal (terminal)** | **NOT EXPOSED** — no `seal` on `Biscuit` or `UnverifiedBiscuit` (runtime introspection of every class); no wrapper in upstream `src/lib.rs`; absent from `biscuit_auth.pyi`; no upstream issue even requests it. The underlying `biscuit-rust` implements sealing, but it is not callable from Python. |
+| Seal | **Not exposed** by biscuit-python 0.4.0 (runtime surface, upstream `src/lib.rs`, `.pyi` stubs; no upstream issue requests it). **No longer a criterion:** this design never seals (ADR 0002); recorded as an upstream contribution opportunity, deliberately not pursued now. |
 
 ## 4. Results
 
-Run: `uv run --with biscuit-python==0.4.0 python smoke/g1/spike.py` (exit code 1).
-Token bytes legitimately differ between runs (single-use block keypairs); all identities below are
-within-run comparisons.
+Passing run: `uv run --with biscuit-python==0.4.0 python smoke/g1/spike.py` → **exit code 0**.
+Token bytes legitimately differ between runs (single-use block keypairs); all identities below
+are within-run values from the passing run.
 
 | Check | Mandatory | Result | Evidence |
 |---|:---:|:---:|---|
@@ -49,62 +51,67 @@ within-run comparisons.
 | G-1.C offline append | yes | **PASS** | `P_0 → P_1` inside a function that receives only token bytes + `κ_pub`; the root private key never leaves the minting function's frame (enforced structurally). `block_count 1 → 2`. |
 | G-1.D κ_pub-only verification | yes | **PASS** | Chain verifies with only the root **public** key; no authorizer, no policies. Wrong root key rejected with `BiscuitValidationError`. |
 | G-1.E round-trip | yes | **PASS** | serialize → deserialize → verify; block count preserved; re-serialization **byte-identical** |
-| G-1.F stable prefix identity | yes | **PASS** | `id(P_0)_before = 32ebafa84c247c2824abda62b684e9b10ed4f831425c19e1552fe1caf385e97d`; `id(P_0)_after` (re-derived from the `P_1` token) = **same value**; signer-side and verifier-side `id(P_1)` agree (`534f2867a2887be3ef4a60b5baffdef68f59e55c399060b7f03cd3237c78f2df`); proof tail (container field 4) **mutates** under append while the signed-block prefix does not. Corroboration: `revocation_ids` are prefix-stable under append. |
-| G-1.G seal terminality | yes | **FAIL — NOT EXPOSED** | No seal API exists in biscuit-python 0.4.0 (evidence in §3). "Seal, then append must fail" cannot be exercised from Python. |
+| G-1.F stable prefix identity | yes | **PASS** | `id(P_0)_before = id(P_0)_after = d8d3458b1e2b435545cc8b6bc4f4322ae75663d0667d97bf7101bd3c70a90516` (re-derived from the `P_1` token); signer-side and verifier-side `id(P_1)` agree (`7b1b962d10a8333d9c7212386ec12e4f7d57190bca7d9bef16902747d6435b8d`); proof tail (container field 4) mutates under append while the signed-block prefix does not; `revocation_ids` prefix-stable (`r0=b25052ce41f133ba…`). |
+| **G-1.G′ append-detection** | yes | **PASS** | `H(P_n) = 7b1b962d10a8333d9c7212386ec12e4f7d57190bca7d9bef16902747d6435b8d`; adversarial post-hoc append from the token alone → `H(P_{n+1}) = b79d58cd5dd3b3dd33913fa3c4dfee17d0d831193420483c72a0c8917df0c380`; **different = True**. Negative control: `H(P_n)` recomputed after a round-trip of the *unmodified* token equals the signer-side value (True) — the identity function is neither always-equal nor always-different. **What this establishes:** an `INV` assertion binding `capability_hash = H(P_n)` will not match a capability that has been appended to, so a post-hoc append is detected and rejected without any need for seal. |
 | G-1.A discovery/maintainability | info | PASS | §2: official, active (pushed the day of this gate), Eclipse-governed |
 | G-1.H API stability | info | PASS | typed (`py.typed` + stubs), pinnable, full wheel coverage, no build toolchain needed |
 
-`id(P_i)` here = SHA-256 over the length-framed canonical `SignedBlock` bytes `0..i` extracted
-from the container (fields 2, 3 in order; field 4 excluded) — i.e. the §A.0.1 rule implemented
-verbatim: *hash the signed-block prefix, never the mutable proof tail.*
+`id(P_i)` = SHA-256 over the length-framed canonical `SignedBlock` bytes `0..i` extracted from
+the container (fields 2, 3 in order; field 4 excluded) — the §A.0.1 rule implemented verbatim:
+*hash the signed-block prefix, never the mutable proof tail.*
 
 ## 5. Outcome
 
-**FAIL** — by the SMOKE_G1_TASK STEP 6 taxonomy, because mandatory check G-1.G cannot pass:
-the binding does not expose seal. Five of six mandatory checks pass, including the make-or-break
-G-1.F. The failure is **narrow and specific**: the only missing capability is the terminal seal
-operation. No fallback is implemented; per STEP 6 the fallback choice rests with the author
-(ADR 0002 records the options).
+**PASS.** All six mandatory checks (B, C, D, E, F, G′) pass; the spike exits zero. *G-1.G (seal
+terminality) was replaced by G-1.G′ (append-detection) by author decision; see ADR 0002. Seal is
+not used by this design:* further delegation is governed by the HTC chain, further attenuation is
+harmless (monotone), and a post-hoc appended block is rejected by the `INV.capability_hash`
+binding. IA-1 is **verified by gate G-1** for exactly `biscuit-python==0.4.0` and exactly what
+ran (§F.4 updated).
 
 ## 6. Consequences for the design
 
-- **What is now verified-by-gate (for exactly what was tested, nothing more):** offline
-  append-per-hop attenuation, root-public-key-only chain verification, wire round-trip, and a
-  stable, append-invariant, signer/verifier-consistent prefix identity `H(P_i)` per §A.0.1 — the
-  property the entire HTC/INV binding (`parent_prefix_hash`, `child_block_hash`,
-  `capability_hash`) rests on. **IA-1 remains formally `[UNVERIFIED-IA]`** because the gate did
-  not pass in full; no architecture-document edit is made on the FAIL branch.
-- **What the missing seal touches in the architecture:** §A.0.1 (the proof-tail definition
-  already covers the unsealed case: "the trailing single-use secret **or** final seal
-  signature"), D22 ("append per hop, seal only terminally" — remains a `[VERIFIED]` fact about
-  the Biscuit design; what fails is *exercising* seal from this binding), §F.4 `[VERIFIED]`
-  facts list (same phrase), Part G G-1 row. **Observation (analysis, not a decision):** no
-  baseline flow in Part C/E ever *executes* seal — B-cap/B3 append per hop and INV binds
-  `capability_hash = H(P_n)`, so a post-INV append changes `H(P_{n+1})` and the INV binding
-  itself rejects it at the boundary; seal is defence-in-depth for the capability in transit, not
-  the mechanism any hypothesis depends on. Whether that residual is acceptable is the author's
-  call (ADR 0002, options).
-- **If the author triggers a fallback instead** (Rust FFI / Macaroons): §C credential-flow
-  table, the trust model (Macaroons lose the root-public-key property), the Dockerfile/CI
-  (Rust toolchain), and the G-1 row would all change — detailed in ADR 0002.
+- `biscuit-python==0.4.0` **pinned exactly** in `pyproject.toml` (Biscuit line removed from the
+  `# PENDING GATE` block; `authlib`/DPoP lines remain — gates G-4/G-5 have not run). `uv.lock`
+  regenerated. **No Dockerfile or CI change**: wheels cover every target platform, so no Rust
+  toolchain enters the build.
+- The §A.0.1 hashing rule needed **no refinement** — `H(P_i)` is implementable verbatim.
+- Architecture-document edits applied (never silent; ADR 0002): D22 note "this design never
+  seals" (Part B.2); Part G G-1 row criterion now F + G′ with seal explicitly not a criterion;
+  §F.4 IA-1 status → verified-by-gate with residuals; §F.2 verification list gains the fail-fast
+  HTC-count conjunct. `docs/threat_model.md` gains the append-induced-rejection availability
+  residual.
 
 ## 7. Reproduction
 
 ```
-uv run --with biscuit-python==0.4.0 python smoke/g1/spike.py
+uv run --with biscuit-python==0.4.0 python smoke/g1/spike.py     # pre-pin form, works always
+uv run python smoke/g1/spike.py                                  # after the ADR 0002 pin
+make gate GATE=g1                                                # equivalent, via the venv
 ```
 
-The library is deliberately **not** pinned in `pyproject.toml` (STEP 8 forbids pinning on FAIL);
-the `# PENDING GATE` block is unchanged.
+## 8. Residual risks
 
-## 8. What this gate does NOT establish
+- `biscuit-python` is at **0.4.0 — a 0.x API**. The pin is exact; **any version bump requires
+  re-running G-1.**
+- `H(P_i)` is computed by parsing the Biscuit **wire format** (container fields 2 + 3, excluding
+  the proof field 4), so it depends on the **format specification** (stable, versioned) rather
+  than on the 0.x Python API. A **format** version change would require re-verification.
+- Biscuit's format has had informal cryptographic review but is **not formally audited** (project
+  FAQ). This is a disclosed limitation of the study, not a blocker for a measurement
+  contribution.
+- The library exposes no seal API. Recorded as an upstream contribution opportunity, deliberately
+  not pursued now (off the critical path).
 
+## 9. What this gate does NOT establish
+
+- **Not** that the library can seal a token — it cannot, **and the design does not require it**
+  (ADR 0002; D22 note).
 - **Not** monotonicity (`C_i ⊆ C_{i−1}` under a frozen `Γ`) — that is **G-2**, blocked until `Γ`
   exists and is hashed.
 - **Not** performance of signing/verification — that is **G-3**, whose threshold must be fixed
   externally before any timing.
 - **Not** the frozen ontology `Ω` or authorizer `Γ` — the spike used a throwaway pilot
   vocabulary (`right("calendar", "read")`, `right("notes", "write")`), clearly marked NOT `Ω`.
-- **Not** HTC/INV correctness (G-11), mediation (G-6), or the effect ledger (G-7).
-- IA-1 is **not** converted to a verified fact: the gate FAILED; the per-capability statuses
-  above hold only for exactly what ran.
+- **Not** HTC/INV correctness (G-11), mediation (G-6), or the effect ledger (G-7). G-1.G′ is a
+  hash-level assertion; HTC/INV are not implemented.
