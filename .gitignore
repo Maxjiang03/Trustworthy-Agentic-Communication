@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+
+# Secrets / local environment — never commit credentials (CLAUDE.md red line 8)
+.env
+.env.*
+
+# uv cache (if redirected into the project)
+.uv-cache/
+.uv_cache/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Keep the results tree placeholders tracked; raw results are added
+# deliberately at campaign time (write-once, design Part J.4), never by accident.
+!results/**/.gitkeep
