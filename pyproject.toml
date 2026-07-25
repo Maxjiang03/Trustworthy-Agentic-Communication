@@ -16,6 +16,9 @@ dependencies = [
   "biscuit-python==0.4.0",
   # Exact pin — verified by gate G-8 (ADR 0005); any version bump re-triggers G-8.
   "rfc8785==0.1.4",
+  # Exact pin — verified by gate G-5 (ADR 0006); any version bump re-triggers G-5.
+  # Verified for the JOSE/DPoP surface only (JWS Ed25519, OKP JWK, RFC 7638 thumbprint).
+  "joserfc==1.7.4",
 ]
 
 [dependency-groups]
@@ -23,7 +26,6 @@ dev = ["pytest>=8.0"]
 
 # PENDING GATE — do not pin until the gate decides:
 #   authlib (RFC 8693 + RFC 9396)     -> gate G-4
-#   DPoP / JOSE library               -> gate G-5
 
 [tool.ruff]
 target-version = "py311"
