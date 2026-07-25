@@ -264,7 +264,12 @@ def g5_e_htm_htu_mismatch(holder: OKPKey, cnf_jkt: str) -> None:
     htm_ok, htm_reason = verify_dpop_proof(htm_proof, HTM, HTU, cnf_jkt)
     htu_proof = make_dpop_proof(holder, HTM, "https://other.example/rpc")  # right method
     htu_ok, htu_reason = verify_dpop_proof(htu_proof, HTM, HTU, cnf_jkt)
-    ok = (not htm_ok) and htm_reason == "htm_mismatch" and (not htu_ok) and htu_reason == "htu_mismatch"
+    ok = (
+        (not htm_ok)
+        and htm_reason == "htm_mismatch"
+        and (not htu_ok)
+        and htu_reason == "htu_mismatch"
+    )
     record(
         "G-5.E",
         True,
