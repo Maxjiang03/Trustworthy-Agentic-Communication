@@ -23,9 +23,7 @@ import rfc8785
 # --- shared fixtures (JSON texts; parsed fresh in each test) -------------------
 
 ARGS_TEXT = '{"tool":"calendar.read","query":{"user":"A","day":"2026-07-25"},"limit":10}'
-ARGS_TEXT_REORDERED = (
-    '{"limit":10,"query":{"day":"2026-07-25","user":"A"},"tool":"calendar.read"}'
-)
+ARGS_TEXT_REORDERED = '{"limit":10,"query":{"day":"2026-07-25","user":"A"},"tool":"calendar.read"}'
 ARGS_TEXT_WHITESPACE = (
     '{\n  "tool" : "calendar.read" ,\n  "query" : {"user": "A", "day": "2026-07-25"},\n'
     '  "limit" : 10\n}'

@@ -212,7 +212,9 @@ def g8_c_rfc_vectors() -> None:
 def g8_d_value_sensitivity() -> None:
     """G-8.D: a genuine value difference yields a different digest (non-vacuity)."""
     base = canon(json.loads(ARGS_TEXT_1))
-    changed_value = canon(json.loads(ARGS_TEXT_1.replace('"day":"2026-07-25"', '"day":"2026-07-26"')))
+    changed_value = canon(
+        json.loads(ARGS_TEXT_1.replace('"day":"2026-07-25"', '"day":"2026-07-26"'))
+    )
     changed_number = canon(json.loads(ARGS_TEXT_1.replace("10", "11")))
     ok = digest(base) != digest(changed_value) and digest(base) != digest(changed_number)
     record(
