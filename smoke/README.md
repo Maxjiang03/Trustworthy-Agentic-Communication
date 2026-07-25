@@ -23,7 +23,7 @@ Run a gate: `make gate GATE=g1`
 | G-2 | G-6/G-7 | blocked — requires frozen authorizer Γ and H(Γ) (`docs/frozen_parameters.md` item 8, UNSET) | — | — |
 | G-3 | G-1 (threshold fixed beforehand) | not started | — | — |
 | G-4 | G-6/G-7 | not started | — | — |
-| G-5 | — | not started | — | — |
+| G-5 | — | **PASS** — `joserfc==1.7.4` pinned for the JOSE surface only (ADR 0006): cnf/jkt binding with the RFC 8037 A.3 known answer, RFC 9449 §4.3 subset verifier, wrong-holder rejected at the thumbprint comparison; AS simulated locally — the real AS stays gated on G-4 (authlib pending line unchanged) | [g5/REPORT.md](g5/REPORT.md) | [0006](../adr/0006-dpop-jose-library.md) |
 | G-6 | G-1/G-5/G-8 | not started | — | — |
 | G-7 | G-1/G-5/G-8 | not started | — | — |
 | G-8 | — | **PASS** — `rfc8785==0.1.4` pinned (ADR 0005): encoding-invariant, RFC-vector-conformant (Appendix B 24/24; `canonicaljson` demonstrated non-conformant and rejected), separate-process signer/verifier agreement, fail-closed; the frozen `H_JCS` construction (hash/tag/encoding) recorded as an open decision | [g8/REPORT.md](g8/REPORT.md) | [0005](../adr/0005-jcs-library.md) |
