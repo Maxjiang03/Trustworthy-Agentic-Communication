@@ -26,7 +26,7 @@ Run a gate: `make gate GATE=g1`
 | G-5 | — | not started | — | — |
 | G-6 | G-1/G-5/G-8 | not started | — | — |
 | G-7 | G-1/G-5/G-8 | not started | — | — |
-| G-8 | — | not started | — | — |
+| G-8 | — | **PASS** — `rfc8785==0.1.4` pinned (ADR 0005): encoding-invariant, RFC-vector-conformant (Appendix B 24/24; `canonicaljson` demonstrated non-conformant and rejected), separate-process signer/verifier agreement, fail-closed; the frozen `H_JCS` construction (hash/tag/encoding) recorded as an open decision | [g8/REPORT.md](g8/REPORT.md) | [0005](../adr/0005-jcs-library.md) |
 | G-9 | G-12/G-13 | not started | — | — |
 | G-10 | all prior DAG gates | not started | — | — |
 | G-11 | G-6/G-7 | not started | — | — |
