@@ -109,6 +109,10 @@ uv run pytest tests/test_jcs_canonicalization.py -q      # permanent suite
   `effect_request_digest` (hex vs base64url) is unspecified. Per the task's no-invention rule, no
   `src/harness/oracle/jcs_digest.py` was created; **open decision for the Commander** (spike and
   tests assert canonical bytes and use SHA-256 only as test-local evidence).
+  **2026-07-26 update: this open decision is now closed by ADR 0009** — `H_JCS` is frozen as
+  lowercase-hex SHA-256 over `b"AASC-JCS-DIGEST" ‖ 0x01 ‖ u32be(len(C)) ‖ C` (C = the RFC 8785
+  canonical bytes), implemented oracle-side in `src/harness/oracle/jcs_digest.py`. The gate's
+  findings and PASS record above are unchanged.
 - **Not** the full INV binding (`capability_hash`, `access_token_hash`, tool/method/audience,
   windows) — that is **G-11**; INV is not implemented.
 - **Not** mediation (G-6), the effect ledger (G-7), or any performance property (G-3).

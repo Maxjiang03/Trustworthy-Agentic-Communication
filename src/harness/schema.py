@@ -40,6 +40,8 @@ class EvidenceBundle(BaseModel):
 
 
 class LabelAssertion(BaseModel):
+    # Label join key over payload VALUE bytes; construction deferred - NOT
+    # H_JCS - settled by the F4 label-plumbing decision (ADR 0009 classification).
     payload_digest: str
     label: str
     issuer_kid: str
@@ -52,8 +54,12 @@ class DeclassificationArtifact(BaseModel):
     task_id: str
     audience: str
     tool: str
+    # Construction deferred to the F4 label-plumbing decision / G-15
+    # (ADR 0009 classification).
     request_digest: str
     recipient: str
+    # Join key against LabelAssertion.payload_digest; same deferred
+    # construction (ADR 0009 classification).
     payload_digest: str
     from_label: str
     to_label: str
@@ -93,7 +99,11 @@ class ToolIngressEvent(BaseModel):
     correlation_id: str
     tool: str
     audience: str
-    ingress_request_digest: str  # digest computed at the tool ingress, independently
+    # Digest computed at the tool ingress, independently; construction
+    # deferred to G-7 (ADR 0009 classification) - if it is ever compared
+    # against an H_JCS-governed digest it MUST be H_JCS-governed.
+    ingress_request_digest: str
+    # Label join key; deferred construction (ADR 0009 classification).
     payload_digest: Optional[str]
     value_id: Optional[str]
     ingress_ts_ns: int
@@ -108,7 +118,8 @@ class IntendedInvocation(BaseModel):
     audience: str
     method: str
     tool: str
-    intended_request_digest: str  # sealed expected JCS digest
+    # Sealed expected H_JCS digest (frozen construction, ADR 0009).
+    intended_request_digest: str
     intended_labels: list[str]
     requires_approval: bool
     U_task: frozenset[tuple[str, str]]
@@ -128,7 +139,10 @@ class EffectEvent(BaseModel):
     action: str
     resource: str
     recipient: Optional[str]
-    effect_request_digest: str  # digest of what the tool ACTUALLY acted on
+    # H_JCS (ADR 0009) of what the tool ACTUALLY acted on; ledger-side,
+    # independent implementation (D21).
+    effect_request_digest: str
+    # Label join key; deferred construction (ADR 0009 classification).
     payload_digest: Optional[str]
     value_id: Optional[str]
     data_labels_touched: list[str]

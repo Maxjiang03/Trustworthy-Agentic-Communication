@@ -140,7 +140,7 @@ This holds **by Biscuit's block-scoping semantics under the MSc profile**: later
 
 ## B.2 Decisions in force (consolidated)
 
-D1, D2 (real OAuth 2.1 baseline), D4–D10, D13/D21 (independent oracle: three sources, per-family predicates, log-integrity failure), D17 (three scopes), D18 (grant-preservation claim), D19 (three OAuth arms), D20 (`R ⊆ C` pre-execution rule), D22 (Biscuit appends per hop **[VERIFIED]**; the format defines sealing as a terminal operation, but the chosen binding does not expose it and this design never seals — see the D22 note below and ADR 0002), D24 (label provenance, MSc-narrowed), D25 (approval as verifiable artifact), D26 (security = exact counts, no CI; latency = the only CIs), D27 (per-hop online exchange is a deployment property, not an RFC necessity **[VERIFIED]**), D28–D40 (§B.1 and the new-decisions set: DPoP arm D34, rewritten H4 D35, matched ablations D36, B3⁺ jti semantics D37, pilot/confirmatory separation D38, unverified-assumption enumeration D39, frozen-benchmark scoping D40). Additional consolidated decisions from the errata: three-scope separation, identity-plane split (A.5.1), HTC full spec (§F.2), composite oracle (§F.1/Part I), F1 split and matched per-hop authority (§E), four-way DPoP taxonomy (§D), two-phase OAuth cost (§E), gate DAG and seal loop (Part G/H). Plus the build-vs-reuse rule (ADR 0004; note below); the corpus-seal rule — the sealed confirmatory corpus stores scenario specifications, deterministic key seeds, and the generator, never pre-minted token bytes (ADR 0007; Part H note); and the G-4 split — the AS construction spike may start ahead of G-6/G-7, while G-4 adjudication stays where the DAG puts it with unchanged criteria (ADR 0008).
+D1, D2 (real OAuth 2.1 baseline), D4–D10, D13/D21 (independent oracle: three sources, per-family predicates, log-integrity failure), D17 (three scopes), D18 (grant-preservation claim), D19 (three OAuth arms), D20 (`R ⊆ C` pre-execution rule), D22 (Biscuit appends per hop **[VERIFIED]**; the format defines sealing as a terminal operation, but the chosen binding does not expose it and this design never seals — see the D22 note below and ADR 0002), D24 (label provenance, MSc-narrowed), D25 (approval as verifiable artifact), D26 (security = exact counts, no CI; latency = the only CIs), D27 (per-hop online exchange is a deployment property, not an RFC necessity **[VERIFIED]**), D28–D40 (§B.1 and the new-decisions set: DPoP arm D34, rewritten H4 D35, matched ablations D36, B3⁺ jti semantics D37, pilot/confirmatory separation D38, unverified-assumption enumeration D39, frozen-benchmark scoping D40). Additional consolidated decisions from the errata: three-scope separation, identity-plane split (A.5.1), HTC full spec (§F.2), composite oracle (§F.1/Part I), F1 split and matched per-hop authority (§E), four-way DPoP taxonomy (§D), two-phase OAuth cost (§E), gate DAG and seal loop (Part G/H). Plus the build-vs-reuse rule (ADR 0004; note below); the corpus-seal rule — the sealed confirmatory corpus stores scenario specifications, deterministic key seeds, and the generator, never pre-minted token bytes (ADR 0007; Part H note); the G-4 split — the AS construction spike may start ahead of G-6/G-7, while G-4 adjudication stays where the DAG puts it with unchanged criteria (ADR 0008); and the frozen `H_JCS` construction with its digest-field classification (ADR 0009; §F.2).
 
 **D22 note — this design never seals.** Further delegation is governed by the HTC chain (a new hop requires an `HTC_i` signed by the current holder's identity key, §F.2); further attenuation by any party is harmless because attenuation is monotone (§A.6.1); and a block appended after the terminal hop is rejected because it changes `H(P_n)` and therefore fails the `INV.capability_hash` binding (§F.2). Sealing is consequently **not required** by this design, and the absence of a seal API in the chosen Python binding does not affect it. `[Gate G-1; ADR 0002]`
 
@@ -404,6 +404,8 @@ The three objects below are the `HolderTransitionCert` (HTC), the `InvocationAss
 
 **Domain separation and versioning (MUST).** Every signature is over a byte string prefixed with a fixed domain tag and schema version, so an HTC can never be reinterpreted as an INV or across versions. Tags: `"AASC-HTC-v1"`, `"AASC-INV-v1"`. Each object carries `schema_version` and a `kid` selecting the signer key from the identity-plane registry.
 
+**`H_JCS` construction (frozen) [DESIGN, ADR 0009].** `H_JCS(x) = lowercase_hex( SHA-256( b"AASC-JCS-DIGEST" ‖ 0x01 ‖ u32be(len(C)) ‖ C ) )`, where `C` is the RFC 8785 canonical UTF-8 bytes of `x` (`rfc8785==0.1.4`, ADR 0005). Same family as the §A.0.1 capability commitment — versioned, domain-separated, length-delimited, fail-closed on any unsupported version — with a distinct tag and no algorithm byte (the hash is fixed by the version), so the two constructions and a bare digest can never be confused. Output is 64 lowercase hex characters; this fixes the string encoding of every `H_JCS`-governed digest field (`intended_request_digest`, `effect_request_digest` — the full field classification is in ADR 0009). Oracle-side implementation: `src/harness/oracle/jcs_digest.py`; the SUT-side computation must be independent (D21), and the oracle never consumes a SUT-computed digest (§F.1).
+
 ```
 # Hop 0 (issuance), signed by the AS root key κ:
 HTC_0 = Sign_κ,"AASC-HTC-v1"(
@@ -431,7 +433,7 @@ INV = Sign_{holder_n},"AASC-INV-v1"(
     capability_hash: capability_commitment(P_n)   # = commit_prefix(BlockID_0..BlockID_n), ADR 0003
     access_token_hash: H(AT@aud)        # binds the presented OAuth token (§A.5.1)
     task_id; audience; method; tool
-    canonical_request_digest: H_JCS(raw_arguments)   # RFC 8785 JCS over arguments
+    canonical_request_digest: H_JCS(raw_arguments)   # RFC 8785 JCS over arguments; frozen construction ADR 0009
     label_assertions_digest
     invocation_id (jti); iat; nbf; exp )
 
@@ -611,7 +613,7 @@ written.
 
 # Part I — Independent oracle predicates (executable)
 
-Each reads only raw evidence, sealed `IntendedInvocation`, and the trusted mediation/ledger records. Reported quantities are **separated**: `reference_allow`, `observed_forwarded`, `admission_breach`, `realized_harm`, `false_block`, plus `log_integrity_failure`.
+Each reads only raw evidence, sealed `IntendedInvocation`, and the trusted mediation/ledger records. Reported quantities are **separated**: `reference_allow`, `observed_forwarded`, `admission_breach`, `realized_harm`, `false_block`, plus `log_integrity_failure`. `H_JCS` below is the frozen construction of ADR 0009 (defined in §F.2; oracle-side implementation `src/harness/oracle/jcs_digest.py`).
 
 ```python
 def effects_of(led, cid):      return [e for e in led if e.correlation_id == cid]
@@ -639,7 +641,7 @@ def realized_harm_F2(intent, cred_result, led, cid):
     return (not ok) and len(effects_of(led, cid)) > 0
 
 def realized_harm_F3(intent, obs, led, cid):
-    oracle_digest = H_JCS(obs.raw_arguments)       # oracle-computed, independent
+    oracle_digest = H_JCS(obs.raw_arguments)       # oracle-computed, independent (ADR 0009)
     for e in effects_of(led, cid):
         if e.effect_request_digest != intent.intended_request_digest: return True
         if e.effect_request_digest != oracle_digest:                  return True   # never compare
