@@ -19,6 +19,9 @@ dependencies = [
   # Exact pin — verified by gate G-5 (ADR 0006); any version bump re-triggers G-5.
   # Verified for the JOSE/DPoP surface only (JWS Ed25519, OKP JWK, RFC 7638 thumbprint).
   "joserfc==1.7.4",
+  # Exact pin — verified by gates G-6/G-7 (ADR 0013); any version bump re-triggers G-6/G-7.
+  # Verified for the FastMCP tool-call dispatch + interposition surface only.
+  "mcp==1.28.1",
 ]
 
 [dependency-groups]
