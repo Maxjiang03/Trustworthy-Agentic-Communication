@@ -140,7 +140,7 @@ This holds **by Biscuit's block-scoping semantics under the MSc profile**: later
 
 ## B.2 Decisions in force (consolidated)
 
-D1, D2 (real OAuth 2.1 baseline), D4–D10, D13/D21 (independent oracle: three sources, per-family predicates, log-integrity failure), D17 (three scopes), D18 (grant-preservation claim), D19 (three OAuth arms), D20 (`R ⊆ C` pre-execution rule), D22 (Biscuit appends per hop **[VERIFIED]**; the format defines sealing as a terminal operation, but the chosen binding does not expose it and this design never seals — see the D22 note below and ADR 0002), D24 (label provenance, MSc-narrowed), D25 (approval as verifiable artifact), D26 (security = exact counts, no CI; latency = the only CIs), D27 (per-hop online exchange is a deployment property, not an RFC necessity **[VERIFIED]**), D28–D40 (§B.1 and the new-decisions set: DPoP arm D34, rewritten H4 D35, matched ablations D36, B3⁺ jti semantics D37, pilot/confirmatory separation D38, unverified-assumption enumeration D39, frozen-benchmark scoping D40). Additional consolidated decisions from the errata: three-scope separation, identity-plane split (A.5.1), HTC full spec (§F.2), composite oracle (§F.1/Part I), F1 split and matched per-hop authority (§E), four-way DPoP taxonomy (§D), two-phase OAuth cost (§E), gate DAG and seal loop (Part G/H). Plus the build-vs-reuse rule (ADR 0004; note below).
+D1, D2 (real OAuth 2.1 baseline), D4–D10, D13/D21 (independent oracle: three sources, per-family predicates, log-integrity failure), D17 (three scopes), D18 (grant-preservation claim), D19 (three OAuth arms), D20 (`R ⊆ C` pre-execution rule), D22 (Biscuit appends per hop **[VERIFIED]**; the format defines sealing as a terminal operation, but the chosen binding does not expose it and this design never seals — see the D22 note below and ADR 0002), D24 (label provenance, MSc-narrowed), D25 (approval as verifiable artifact), D26 (security = exact counts, no CI; latency = the only CIs), D27 (per-hop online exchange is a deployment property, not an RFC necessity **[VERIFIED]**), D28–D40 (§B.1 and the new-decisions set: DPoP arm D34, rewritten H4 D35, matched ablations D36, B3⁺ jti semantics D37, pilot/confirmatory separation D38, unverified-assumption enumeration D39, frozen-benchmark scoping D40). Additional consolidated decisions from the errata: three-scope separation, identity-plane split (A.5.1), HTC full spec (§F.2), composite oracle (§F.1/Part I), F1 split and matched per-hop authority (§E), four-way DPoP taxonomy (§D), two-phase OAuth cost (§E), gate DAG and seal loop (Part G/H). Plus the build-vs-reuse rule (ADR 0004; note below) and the corpus-seal rule — the sealed confirmatory corpus stores scenario specifications, deterministic key seeds, and the generator, never pre-minted token bytes (ADR 0007; Part H note).
 
 **D22 note — this design never seals.** Further delegation is governed by the HTC chain (a new hop requires an `HTC_i` signed by the current holder's identity key, §F.2); further attenuation by any party is harmless because attenuation is monotone (§A.6.1); and a block appended after the terminal hop is rejected because it changes `H(P_n)` and therefore fails the `INV.capability_hash` binding (§F.2). Sealing is consequently **not required** by this design, and the absence of a seal API in the chosen Python binding does not affect it. `[Gate G-1; ADR 0002]`
 
@@ -575,11 +575,23 @@ G-3 (latency spike) may run any time after G-1, but its threshold is fixed befor
 **Order (MUST).**
 1. Implement, debug, and run the Part G gates on the **pilot** corpus only.
 2. Freeze hypotheses, oracle predicates, baseline configurations, latency estimands, and the **equivalence margin** (separate from, and set after, the G-3 smoke threshold; both fixed before any confirmatory result).
-3. Freeze and hash the **v0.5 candidate**: design document, implementation commit, oracle code, analysis code, all configuration (`Ω`, `Γ` with `H(Γ)`, identity-plane registry, `task_authorization_policy`, allowed-sink policy), the pinned dependency environment, and the **corpus generator** (code + seed that deterministically produces the confirmatory corpus).
+3. Freeze and hash the **v0.5 candidate**: design document, implementation commit, oracle code, analysis code, all configuration (`Ω`, `Γ` with `H(Γ)`, identity-plane registry, `task_authorization_policy`, allowed-sink policy), the pinned dependency environment, and the **corpus generator** — its code, the deterministic key seeds for every principal, the seed→keypair derivation rule, and the scenario specifications, the sealed inputs from which the confirmatory corpus is deterministically produced. The seal covers **generators and seeds, never pre-minted token bytes** (ADR 0007; note below).
 4. Run the corpus generator under the fixed rule to produce the confirmatory corpus (including the held-out third).
-5. Verify **disjointness** of pilot and confirmatory corpora (no shared scenario file; assert on content hashes).
+5. Verify **disjointness** of pilot and confirmatory corpora (no shared scenario file; assert on **scenario-specification and seed content hashes**, never on token bytes, which differ across mints even for the same logical scenario — ADR 0007).
 6. Emit a **detached** manifest (never written into a file it hashes; add a public temporal anchor — OpenTimestamps and/or an OSF registration — plus a signed git commit to a public remote), then perform the **final seal**.
 7. Execute the frozen campaign **once**.
+
+**Token non-reproducibility note [ADR 0007].** Biscuit tokens are **not byte-reproducible across
+mints**: the format uses a single-use ephemeral block key per append, so two mints of the same
+logical capability differ in bytes **[VERIFIED, gate G-1 corrective pass]**. Step 3 therefore
+seals scenario specifications, deterministic key seeds, and the generator — tokens are minted at
+campaign runtime from those sealed inputs. Determinism is unaffected: every oracle verdict is a
+function of `C_n = Allowed(P_n; Γ, κ, Ω)` and the sealed scenario, never of token bytes (§A.0.1,
+§F.1, Part I), and `INV.capability_hash` is computed over the runtime-presented token's BlockID
+commitment (§F.2, ADR 0003). **Seed-disclosure warning [DESIGN]:** publishing the corpus seeds
+publishes every private key derived from them; the corpus is a testbed artifact only and its keys
+MUST NOT be reused in any deployment — a binding obligation on the corpus generator when it is
+written.
 
 **What "once" means (MUST).** It governs the deterministic **security** verdicts: each sealed scenario is evaluated once for its verdict; no scenario is re-run to obtain a different verdict. It does **not** forbid the pre-registered **latency** repetitions (a random quantity), which are part of the single campaign.
 
