@@ -31,6 +31,12 @@ is committed.
 Without `make` (e.g. plain Windows), run the underlying commands directly:
 `uv sync`, `uvx pre-commit run --all-files`, `uv run pytest -q`.
 
+**Platform note (ADR 0014):** the effect-ledger suite (`tests/test_effect_ledger.py`) and the
+G-7 spike are **Windows-only** — the ledger's independence enforcement is Win32 share-mode
+locking, so on other platforms those tests are *skipped* (and the spike refuses to run). A
+green CI run on `ubuntu-latest` therefore does **not** verify the ledger; every other suite is
+cross-platform. Windows is the sealed measurement platform; the POSIX variant is deferred.
+
 ## Layout
 
 - `src/sut/` — the measured system (must never import from the harness)

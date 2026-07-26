@@ -14,6 +14,7 @@ import asyncio
 import os
 import secrets
 import shutil
+import sys
 import time
 from pathlib import Path
 
@@ -25,6 +26,14 @@ from src.harness.effect_ledger import LedgerWriter, install_ingress_recorder, re
 from src.harness.mediation.boundary import install_boundary
 from src.harness.oracle.jcs_digest import h_jcs
 from src.harness.schema import EffectEvent
+
+pytestmark = pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="ADR 0014 (recorded platform decision, not a gap): the ledger's independence "
+    "enforcement is Win32 share-mode locking (CreateFileW, FILE_SHARE_READ only), which has "
+    "no direct POSIX equivalent; Windows is the sealed measurement platform and the POSIX "
+    "variant is deferred to after submission",
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ARGS_MAIL = {"to": "x@example.test", "subject": "s", "body": "b"}

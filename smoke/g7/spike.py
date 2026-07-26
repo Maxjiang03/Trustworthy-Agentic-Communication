@@ -259,6 +259,15 @@ async def main(ledger_path: str) -> None:
 
 
 if __name__ == "__main__":
+    print(f"platform: {sys.platform} (the ledger enforcement mechanism requires win32)")
+    if sys.platform != "win32":
+        print(
+            "G-7 spike CANNOT RUN on this platform (ADR 0014): the enforcement under test "
+            "is Win32 share-mode locking (CreateFileW, FILE_SHARE_READ only), which does "
+            "not exist here. Windows is the sealed measurement platform; the POSIX variant "
+            "is deferred. This exit is NOT a gate pass."
+        )
+        sys.exit(1)
     tmp_dir = REPO_ROOT / "smoke" / "g7" / "_ledger_tmp"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     ledger_file = tmp_dir / f"ledger-{secrets.token_hex(4)}.jsonl"
