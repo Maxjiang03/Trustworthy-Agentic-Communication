@@ -22,7 +22,7 @@ Run a gate: `make gate GATE=g1`
 | G-1 | — | **PASS** — restored after the ADR 0003 corrective suite passed (10/10 regression tests): commitment is now the versioned BlockID scheme (encoding-independent, fail-closed); biscuit-python==0.4.0 pinned; G-1.G′ replaced the seal check (ADR 0002) | [g1/REPORT.md](g1/REPORT.md) | [0002](../adr/0002-python-biscuit-library.md), [0003](../adr/0003-capability-commitment-scheme.md) |
 | G-2 | G-6/G-7 | blocked — requires frozen authorizer Γ and H(Γ) (`docs/frozen_parameters.md` item 8, UNSET) | — | — |
 | G-3 | G-1 (threshold fixed beforehand) | not started | — | — |
-| G-4 | G-6/G-7 | not started | — | — |
+| G-4 | G-6/G-7 | not started — **construction spike authorised to start early** (ADR 0008): the behaviourally faithful AS build may proceed in parallel with G-6/G-7, inheriting the `ath` and DPoP-nonce items from G-5; **adjudication stays after G-6/G-7** with unchanged pass criteria; IA-4 stays [UNVERIFIED-IA]; authlib stays unpinned (`# PENDING GATE`) | — | [0008](../adr/0008-g4-spike-parallelisation.md) |
 | G-5 | — | **PASS** — `joserfc==1.7.4` pinned for the JOSE surface only (ADR 0006): cnf/jkt binding with the RFC 8037 A.3 known answer, RFC 9449 §4.3 subset verifier, wrong-holder rejected at the thumbprint comparison; AS simulated locally — the real AS stays gated on G-4 (authlib pending line unchanged) | [g5/REPORT.md](g5/REPORT.md) | [0006](../adr/0006-dpop-jose-library.md) |
 | G-6 | G-1/G-5/G-8 | not started | — | — |
 | G-7 | G-1/G-5/G-8 | not started | — | — |
