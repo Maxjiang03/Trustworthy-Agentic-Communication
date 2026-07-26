@@ -18,6 +18,7 @@ justification here.
 | 6 | Allowed-sink policy for F4 | ⟨UNSET — fix before Part H step 3⟩ | ⟨one line — record with the fixing ADR⟩ |
 | 7 | Reference LLM-turn denominators (full-turn primary + conservative TTFT) — secondary framing only | ⟨UNSET — fix before Part H step 3⟩ | ⟨one line — record with the fixing ADR⟩ |
 | 8 | `Ω` (action/resource ontology) and `Γ` (authorizer configuration) — frozen and hashed as `H(Γ)` | ⟨UNSET — fix before Part H step 3⟩ | ⟨one line — record with the fixing ADR⟩ |
+| 9 | Sealed measurement platform — OS + exact Windows version/build (decision: ADR 0014; the campaign runs on Windows, the ledger enforcement is Win32-only) | ⟨UNSET — fix before Part H step 3⟩ | ⟨one line — the exact build is read off the measurement box at seal time; record with the fixing ADR⟩ |
 
 Related frozen artifacts sealed alongside these values (Part F.2.1, Part H step 3): the
 identity-plane registry, and the hashes of all configuration in the v0.5 candidate manifest.
