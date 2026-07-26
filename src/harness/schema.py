@@ -123,7 +123,9 @@ class IntendedInvocation(BaseModel):
     intended_labels: list[str]
     requires_approval: bool
     U_task: frozenset[tuple[str, str]]
-    P_hashes: list[str]  # H(P_0)..H(P_n)
+    # H(P_0)..H(P_n): ADR 0003 BlockID prefix commitments (commit_prefix),
+    # NOT H_JCS - disposition (b), rendered lowercase hex (ADR 0011).
+    P_hashes: list[str]
     C_sets: list[frozenset[tuple[str, str]]]  # C_0..C_n over Omega
     R: frozenset[tuple[str, str]]  # required authority of the concrete request
     tau_gt: frozenset[tuple[str, str]]  # ground-truth task-required scope; ORACLE-ONLY
