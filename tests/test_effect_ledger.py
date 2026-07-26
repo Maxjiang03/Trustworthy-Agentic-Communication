@@ -98,7 +98,10 @@ def build_stack(writer: LedgerWriter) -> dict:
     )
     install_boundary(
         server,
-        decide=lambda tool, args: (tool not in deny, f"{'denied' if tool in deny else 'ok'}(pilot)"),
+        decide=lambda tool, args: (
+            tool not in deny,
+            f"{'denied' if tool in deny else 'ok'}(pilot)",
+        ),
         correlation_provider=lambda: corr["current"],
         emit=events.append,
     )

@@ -17,7 +17,6 @@ Omega. In-memory transport; the ledger file lives INSIDE the repo tree
 """
 
 import asyncio
-import json
 import os
 import secrets
 import shutil
@@ -31,7 +30,11 @@ from mcp.shared.memory import create_connected_server_and_client_session
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))  # repo root, for src.*
 
-from src.harness.effect_ledger import LedgerWriter, install_ingress_recorder, read_ledger  # noqa: E402
+from src.harness.effect_ledger import (  # noqa: E402
+    LedgerWriter,
+    install_ingress_recorder,
+    read_ledger,
+)
 from src.harness.mediation.boundary import install_boundary  # noqa: E402
 from src.harness.oracle.jcs_digest import h_jcs  # noqa: E402
 from src.harness.schema import EffectEvent  # noqa: E402
@@ -94,7 +97,10 @@ def build_stack(ledger_path: str) -> dict:
     )
     install_boundary(
         server,
-        decide=lambda tool, args: (tool not in deny, f"{'denied' if tool in deny else 'ok'}(pilot)"),
+        decide=lambda tool, args: (
+            tool not in deny,
+            f"{'denied' if tool in deny else 'ok'}(pilot)",
+        ),
         correlation_provider=lambda: corr["current"],
         emit=events.append,
     )
@@ -197,10 +203,11 @@ async def main(ledger_path: str) -> None:
         except (PermissionError, OSError) as exc:
             modified = False
             outcome = f"{type(exc).__name__}({getattr(exc, 'winerror', '')})"
+        unchanged = Path(ledger_path).read_bytes() == before_bytes
         record(
             "G-7.C in-place modification rejected, entries byte-identical",
-            not modified and Path(ledger_path).read_bytes() == before_bytes,
-            f"open('r+b') -> {outcome}; bytes unchanged={Path(ledger_path).read_bytes() == before_bytes}",
+            not modified and unchanged,
+            f"open('r+b') -> {outcome}; bytes unchanged={unchanged}",
         )
 
         # ---- G-7.D records survive SUT lying ---------------------------------
@@ -234,8 +241,7 @@ async def main(ledger_path: str) -> None:
             and count_after == count_before
             and ctx["events"][-1].admitted is False
             and all(e.get("correlation_id") != cid for e in read_ledger(ledger_path)),
-            f"isError={result.isError} ledger {count_before}->{count_after} "
-            f"boundary_event=denied",
+            f"isError={result.isError} ledger {count_before}->{count_after} boundary_event=denied",
         )
 
     writer.close()
@@ -246,8 +252,10 @@ async def main(ledger_path: str) -> None:
             post_close_appendable = True
     except OSError:
         pass
-    print(f"    (control: file appendable after writer.close() = {post_close_appendable} -- "
-          f"the immutability came from the live exclusive handle, not an attribute)")
+    print(
+        f"    (control: file appendable after writer.close() = {post_close_appendable} -- "
+        f"the immutability came from the live exclusive handle, not an attribute)"
+    )
 
 
 if __name__ == "__main__":

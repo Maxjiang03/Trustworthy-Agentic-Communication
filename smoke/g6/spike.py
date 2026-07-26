@@ -60,13 +60,18 @@ def build_server(with_boundary: bool) -> dict:
         return "queued(sandbox; nothing sent)"
 
     server.add_tool(calendar_read, name="calendar.read", description="benign pilot tool")
-    server.add_tool(mail_send, name="mail.send", description="sensitive pilot tool (sandboxed stub)")
+    server.add_tool(
+        mail_send, name="mail.send", description="sensitive pilot tool (sandboxed stub)"
+    )
 
     boundary = None
     if with_boundary:
         boundary = install_boundary(
             server,
-            decide=lambda tool, args: (tool not in deny, f"{'denied' if tool in deny else 'ok'}(pilot)"),
+            decide=lambda tool, args: (
+                tool not in deny,
+                f"{'denied' if tool in deny else 'ok'}(pilot)",
+            ),
             correlation_provider=lambda: corr["current"],
             emit=events.append,
         )
@@ -148,16 +153,23 @@ async def main() -> None:
                 outcome = f"raised {type(exc).__name__}"
             mediated = len(events) == before_ev + 1
             attempts.append((name, mediated, outcome))
+            after_w = witness[expect_witness_key]
             print(
                 f"    bypass[{name}]: {outcome}; mediated={mediated} "
-                f"(events {before_ev}->{len(events)}, witness {before_w}->{witness[expect_witness_key]})"
+                f"(events {before_ev}->{len(events)}, witness {before_w}->{after_w})"
             )
 
         # C1 FastMCP.call_tool (server-side convenience API)
-        await attempt("C1 FastMCP.call_tool", lambda: server.call_tool("calendar.read", args_cal), "calendar.read")
+        await attempt(
+            "C1 FastMCP.call_tool",
+            lambda: server.call_tool("calendar.read", args_cal),
+            "calendar.read",
+        )
         # C2 ToolManager.call_tool (internal dispatch API)
         await attempt(
-            "C2 ToolManager.call_tool", lambda: manager.call_tool("calendar.read", args_cal), "calendar.read"
+            "C2 ToolManager.call_tool",
+            lambda: manager.call_tool("calendar.read", args_cal),
+            "calendar.read",
         )
         # C3 Tool.run (terminal SDK dispatch step)
         await attempt(
@@ -165,8 +177,11 @@ async def main() -> None:
         )
         # C4 direct tool.fn invocation (the registered function object)
         await attempt(
-            "C4 tool.fn direct", lambda: manager.get_tool("calendar.read").fn(**args_cal), "calendar.read"
+            "C4 tool.fn direct",
+            lambda: manager.get_tool("calendar.read").fn(**args_cal),
+            "calendar.read",
         )
+
         # C5 post-install registration via FastMCP.add_tool (wrap-on-insert)
         def notes_read(q: str) -> str:
             witness["notes.read"] += 1
@@ -174,8 +189,11 @@ async def main() -> None:
 
         server.add_tool(notes_read, name="notes.read", description="registered after install")
         await attempt(
-            "C5 post-install add_tool", lambda: manager.call_tool("notes.read", {"q": "x"}), "notes.read"
+            "C5 post-install add_tool",
+            lambda: manager.call_tool("notes.read", {"q": "x"}),
+            "notes.read",
         )
+
         # C6 direct registry insertion (bypassing add_tool)
         def evil_tool(q: str) -> str:
             witness["evil.tool"] += 1
@@ -183,12 +201,15 @@ async def main() -> None:
 
         manager._tools["evil.tool"] = Tool.from_function(evil_tool, name="evil.tool")
         await attempt(
-            "C6 direct registry insertion", lambda: manager.call_tool("evil.tool", {"q": "x"}), "evil.tool"
+            "C6 direct registry insertion",
+            lambda: manager.call_tool("evil.tool", {"q": "x"}),
+            "evil.tool",
         )
         # C7 direct request-handler invocation (skip the transport)
         handler = server._mcp_server.request_handlers[types.CallToolRequest]
         req = types.CallToolRequest(
-            method="tools/call", params=types.CallToolRequestParams(name="calendar.read", arguments=args_cal)
+            method="tools/call",
+            params=types.CallToolRequestParams(name="calendar.read", arguments=args_cal),
         )
         await attempt("C7 request_handlers direct", lambda: handler(req), "calendar.read")
         # C8 denied tool via internal dispatch (transport bypass cannot un-deny)
@@ -199,7 +220,9 @@ async def main() -> None:
             c8_blocked = False
         except Exception:
             c8_blocked = True
-        attempts.append(("C8 denied via ToolManager", c8_blocked and len(events) == before_ev + 1, "raised"))
+        attempts.append(
+            ("C8 denied via ToolManager", c8_blocked and len(events) == before_ev + 1, "raised")
+        )
         print(
             f"    bypass[C8 denied via ToolManager]: blocked={c8_blocked}; "
             f"event={len(events) == before_ev + 1}; witness {before_w}->{witness['mail.send']}"
@@ -209,8 +232,10 @@ async def main() -> None:
             not hasattr(t.fn, "__wrapped__") and getattr(t.fn, "__aasc_mediated__", False)
             for t in manager._tools.values()
         )
-        attempts.append(("C9 no __wrapped__/unmediated fn in registry", no_wrapped_attr, "inspected"))
-        print(f"    bypass[C9 registry fns]: all mediated, none exposes __wrapped__ = {no_wrapped_attr}")
+        attempts.append(
+            ("C9 no __wrapped__/unmediated fn in registry", no_wrapped_attr, "inspected")
+        )
+        print(f"    bypass[C9 registry fns]: all mediated, no __wrapped__ = {no_wrapped_attr}")
 
         record(
             "G-6.C every enumerated bypass path is mediated or blocked",

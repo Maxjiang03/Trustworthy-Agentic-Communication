@@ -53,7 +53,9 @@ FILE_ATTRIBUTE_NORMAL = 0x80
 
 CreateFileW = ctypes.windll.kernel32.CreateFileW
 CreateFileW.restype = ctypes.c_void_p
-handle = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, None, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, None)
+handle = CreateFileW(
+    path, GENERIC_WRITE, FILE_SHARE_READ, None, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, None
+)
 if handle in (None, ctypes.c_void_p(-1).value):
     sys.exit(2)
 fd = msvcrt.open_osfhandle(handle, os.O_APPEND)
