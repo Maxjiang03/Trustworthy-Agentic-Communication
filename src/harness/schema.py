@@ -99,9 +99,9 @@ class ToolIngressEvent(BaseModel):
     correlation_id: str
     tool: str
     audience: str
-    # Digest computed at the tool ingress, independently; construction
-    # deferred to G-7 (ADR 0009 classification) - if it is ever compared
-    # against an H_JCS-governed digest it MUST be H_JCS-governed.
+    # H_JCS (ADR 0012, settling the ADR 0009 G-7 deferral) over the arguments
+    # mapping the tool is invoked with; recorder-side, independent of the
+    # SUT (D21).
     ingress_request_digest: str
     # Label join key; deferred construction (ADR 0009 classification).
     payload_digest: Optional[str]
