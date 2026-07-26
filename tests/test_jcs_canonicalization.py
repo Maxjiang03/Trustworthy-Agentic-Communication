@@ -1,11 +1,14 @@
-"""Regression suite for RFC 8785 JCS canonicalisation (gate G-8, ADR 0005).
+"""Regression suite for RFC 8785 JCS canonicalisation (gate G-8, ADR 0005)
+and the frozen H_JCS construction over it (ADR 0009).
 
 Every test has a positive arm and a negative arm so no assertion can pass
 vacuously. All RFC vectors are verbatim from RFC 8785 (sections 3.2.2-3.2.4,
 Appendix B), never invented. The library under test is rfc8785 (pinned by
-ADR 0005); the frozen H_JCS hash-function/domain-tag construction is an open
-decision (see smoke/g8/REPORT.md), so these tests assert canonical BYTES and
-use SHA-256 only as a test-local digest for agreement checks.
+ADR 0005). Digest comparisons go through the oracle-side h_jcs module
+(src/harness/oracle/jcs_digest.py, ADR 0009); canonical-BYTES assertions and
+the RFC vectors are unchanged from the G-8 pass. bare sha256 appears only as
+the domain-separation FOIL (what H_JCS must NOT equal) and in the layout
+known-answer.
 
 Source is pure ASCII; non-ASCII data appears only as escape sequences.
 Pilot vocabulary only — NOT the frozen ontology Omega.
@@ -16,9 +19,20 @@ import struct
 import subprocess
 import sys
 from hashlib import sha256
+from pathlib import Path
 
 import pytest
 import rfc8785
+
+from src.harness.oracle.jcs_digest import (
+    TAG,
+    VERSION,
+    UnsupportedVersionError,
+    canonicalize,
+    h_jcs,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # --- shared fixtures (JSON texts; parsed fresh in each test) -------------------
 
@@ -161,24 +175,24 @@ def test_rfc_number_vectors():
 
 
 def test_value_difference_sensitivity():
-    base = _canon(json.loads(ARGS_TEXT))
+    base = h_jcs(json.loads(ARGS_TEXT))
     # Positive: the same value re-parsed from a different encoding is stable.
-    assert sha256(base).digest() == sha256(_canon(json.loads(ARGS_TEXT_REORDERED))).digest()
+    assert base == h_jcs(json.loads(ARGS_TEXT_REORDERED))
     # Negative: string-value, number-value, and type changes each shift the digest.
     for changed_text in [
         ARGS_TEXT.replace('"2026-07-25"', '"2026-07-24"'),
         ARGS_TEXT.replace(":10", ":11"),
         ARGS_TEXT.replace(":10", ':"10"'),  # number -> string type change
     ]:
-        assert sha256(base).digest() != sha256(_canon(json.loads(changed_text))).digest()
+        assert base != h_jcs(json.loads(changed_text))
 
 
 # --- 6. separate-process signer/verifier agreement -----------------------------
 
 _VERIFIER_SNIPPET = (
-    "import sys, json, hashlib, rfc8785\n"
-    "data = rfc8785.dumps(json.loads(sys.stdin.read()))\n"
-    "print(hashlib.sha256(data).hexdigest())\n"
+    "import sys, json\n"
+    "from src.harness.oracle.jcs_digest import h_jcs\n"
+    "print(h_jcs(json.loads(sys.stdin.read())))\n"
 )
 
 
@@ -187,6 +201,7 @@ def _verifier_digest(json_text: str) -> str:
         [sys.executable, "-c", _VERIFIER_SNIPPET],
         input=json_text.encode(),
         capture_output=True,
+        cwd=REPO_ROOT,
         timeout=60,
     )
     assert proc.returncode == 0, proc.stderr.decode()
@@ -194,9 +209,9 @@ def _verifier_digest(json_text: str) -> str:
 
 
 def test_signer_verifier_separate_processes():
-    signer_digest = sha256(_canon(json.loads(ARGS_TEXT))).hexdigest()
+    signer_digest = h_jcs(json.loads(ARGS_TEXT))
     # Positive: a verifier subprocess fed only a REORDERED, whitespace-variant
-    # JSON text on stdin reproduces the signer's digest exactly.
+    # JSON text on stdin reproduces the signer's H_JCS digest exactly.
     assert _verifier_digest(ARGS_TEXT_WHITESPACE) == signer_digest
     # Negative: the same verifier on a genuinely different value disagrees.
     assert _verifier_digest(ARGS_TEXT.replace(":10", ":12")) != signer_digest
@@ -245,3 +260,71 @@ def test_determinism_and_non_vacuity():
     assert _canon({"a": 1}) != _canon({"a": 2})
     assert _canon({"a": 1}) != _canon({"b": 1})
     assert _canon([1, 2]) != _canon([2, 1])  # array order is significant (3.2.3)
+
+
+# --- 9. H_JCS layout known-answer and domain separation (ADR 0009) -------------
+
+
+def test_hjcs_domain_separation_non_vacuous():
+    obj = json.loads(ARGS_TEXT)
+    canonical = canonicalize(obj)
+    # Positive: h_jcs reproduces an independent computation of the documented
+    # byte layout — TAG || VERSION || u32be(len(C)) || C, SHA-256, lowercase hex.
+    independent = sha256(
+        TAG + bytes([VERSION]) + len(canonical).to_bytes(4, "big") + canonical
+    ).hexdigest()
+    assert h_jcs(obj) == independent
+    # Negative: domain separation is non-vacuous — h_jcs differs from a bare
+    # sha256 hex digest of the same canonical bytes.
+    assert h_jcs(obj) != sha256(canonical).hexdigest()
+    # canonicalize() is the module's own JCS surface: byte-identical to the
+    # library call the G-8 tests pin down.
+    assert canonical == _canon(obj)
+
+
+# --- 10. H_JCS tag/version fail-closed -----------------------------------------
+
+
+def test_hjcs_unsupported_version_fails_closed():
+    obj = json.loads(ARGS_TEXT)
+    # Positive: the supported version is exactly the default (VERSION = 0x01).
+    assert h_jcs(obj, version=VERSION) == h_jcs(obj)
+    # Negative: any other version raises the typed error; no digest is produced.
+    for bad_version in (0, 2, 255):
+        with pytest.raises(UnsupportedVersionError):
+            h_jcs(obj, version=bad_version)
+    # Out-of-model input still fails closed THROUGH h_jcs (the library's typed
+    # error propagates; nothing is swallowed on the digest path).
+    with pytest.raises(rfc8785.CanonicalizationError):
+        h_jcs([float("nan")])
+
+
+# --- 11. H_JCS output shape ----------------------------------------------------
+
+
+def test_hjcs_output_shape():
+    digest = h_jcs(json.loads(ARGS_TEXT))
+    # Positive: exactly 64 lowercase hexadecimal characters.
+    assert len(digest) == 64
+    assert set(digest) <= set("0123456789abcdef")
+    # The lowercase check is not vacuous: this fixed input's digest contains
+    # at least one alphabetic hex character (deterministic known answer).
+    assert any(c.isalpha() for c in digest)
+    # Negative: a different value keeps the shape but changes the digest.
+    other = h_jcs(json.loads(ARGS_TEXT.replace(":10", ":11")))
+    assert len(other) == 64 and set(other) <= set("0123456789abcdef")
+    assert other != digest
+
+
+# --- 12. H_JCS cross-process determinism ---------------------------------------
+
+
+def test_hjcs_cross_process_determinism():
+    obj = json.loads(ARGS_TEXT)
+    local = h_jcs(obj)
+    # Positive: a fresh interpreter reproduces the digest exactly — TAG and
+    # VERSION are stable constants, not process state (style of test 6).
+    assert _verifier_digest(ARGS_TEXT) == local
+    # Negative: the other process is applying the domain tag too — its output
+    # is not a bare sha256 hex digest of the canonical bytes.
+    assert _verifier_digest(ARGS_TEXT) != sha256(canonicalize(obj)).hexdigest()
