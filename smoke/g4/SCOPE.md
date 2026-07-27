@@ -102,6 +102,12 @@ required claim set, if the AS issues JWT access tokens (G-5's simulated mint use
 **RFC 8414 (AS metadata)** — not yet read, and **only if** the spike advertises discovery;
 otherwise explicitly out of scope, not silently skipped.
 
+**Corrections from the Phase 1 reading (2026-07-27), recorded rather than silently fixed.** The
+RFCs were read in [`DESIGN.md`](DESIGN.md) §1, and two section numbers listed above are wrong
+against the published text: RFC 8693 **§4.4** is `may_act` (§4.3 is the `client_id` claim), and in
+RFC 9396 the token response is **§7** (§5 is the authorization *error* response), introspection is
+**§9.2**, and AS metadata is **§10**. `DESIGN.md` §1 is authoritative for what was actually read.
+
 **Architecture-document sections to re-read alongside them** (not RFCs, but binding):
 §E.2 the pinned experiment AS profile (`AT_i` with exactly authority `C_i`, enforcing
 `C_i ⊆ C_{i−1}`, rejecting widening); §A.5.1 the three identity notions and the
