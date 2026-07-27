@@ -30,6 +30,8 @@ Not yet authored. Per Part H, the pre-registration is written and sealed only AF
 ## Layout
 `src/sut/` measured system · `src/harness/` instrument · `docs/` design + threat model + frozen parameters · `adr/` one file per decision · `fixtures/pilot` vs `fixtures/confirmatory` strictly disjoint.
 
+`src/sut/oauth_as/` (ADR 0015) is the pinned experiment OAuth 2.1 AS — built at G-4 Phase 2, run out-of-process on loopback, signing key never in an agent process. Two import rules travel with it: no other `src/sut/` module may import it (agents reach it over the wire), and **`src/harness/` may never import it**, notwithstanding the harness's general permission to import `sut` — the oracle and the G-13 verifier reimplement token verification independently (D13/D21). Red line 6 is unchanged.
+
 ## Commit convention (Conventional Commits)
 `type: summary`, type ∈ {feat, fix, docs, test, build, ci, chore, refactor}. Logically scoped commits (not one giant commit, not one per file). Reference an ADR in the body when a commit encodes a decision. Run `make lint` and `make test` before committing. Push to `origin main` after a coherent unit of work. Never force-push.
 

@@ -40,7 +40,12 @@ cross-platform. Windows is the sealed measurement platform; the POSIX variant is
 ## Layout
 
 - `src/sut/` — the measured system (must never import from the harness)
-- `src/harness/` — the instrument (imports `sut`, never the reverse)
+- `src/sut/oauth_as/` — the pinned experiment OAuth 2.1 AS (ADR 0015; built at G-4 Phase 2). Runs
+  out-of-process on loopback with its signing key never in an agent process. No other `src/sut/`
+  module may import it (agents reach it over the wire), and **`src/harness/` may never import it**
+  — the oracle and the G-13 verifier reimplement token verification independently (D13/D21)
+- `src/harness/` — the instrument (imports `sut`, never the reverse; except `src/sut/oauth_as/`,
+  which it may never import)
 - `docs/` — architecture, threat model, frozen parameters, pre-registration stub
 - `adr/` — one file per decision
 - `fixtures/pilot/` vs `fixtures/confirmatory/` — strictly disjoint; confirmatory stays **empty** until post-seal
