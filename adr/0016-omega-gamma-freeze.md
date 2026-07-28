@@ -271,7 +271,7 @@ artifact does.
 
 ## Status
 
-accepted — 2026-07-28
+accepted — 2026-07-29
 
 ## Consequences
 

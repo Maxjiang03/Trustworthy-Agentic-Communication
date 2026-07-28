@@ -495,7 +495,21 @@ None is closed by inventing a frozen value. Every stand-in is **spike-local, exp
 labelled, and never promoted to a frozen artifact**; each carries the event that re-triggers the
 affected limb, mirroring the standing pin rule that any bump re-triggers its gate.
 
-### C1 — `Ω` and `Γ` are UNSET (`frozen_parameters` row 8; G-2 is blocked on exactly this)
+### C1 — `Ω` and `Γ` were UNSET — **CLOSED 2026-07-29 by ADR 0016**
+
+> **Closed.** `Ω` (7 elements over 5 tools) and `Γ` (the MSc-profile authorizer plus its matched
+> `−attenuation` ablation) are frozen in `src/harness/authorizer/omega_gamma_v1.json` and hashed as
+> `H(Γ)`; `docs/frozen_parameters.md` row 8 is set. **Phase 2 needs no `Ω_spike`/`Γ_spike`**: the
+> effective-authority limb (**L2**, §10) runs against the frozen values, and the value-level
+> re-adjudication trigger below is discharged in advance — nothing in L2 is now provisional on a
+> spike vocabulary. Two things are unchanged: G-4's pass criteria (ADR 0008), and the fact that
+> **G-2 has still not run** — the freeze gives G-2 something to test, it does not test it, so IA-2
+> remains **[UNVERIFIED-IA]** and no claim about Biscuit monotonicity under `Γ` may be made from
+> this closure. A later amendment of `Ω`/`Γ` (permitted by ADR 0016 until Part H step 3) re-opens
+> this limb.
+>
+> The record of the stand-in that was planned, and of what it would and would not have
+> established, is kept below unchanged.
 
 - **Stand-in.** `Ω_spike` — a small enumerated action/resource-kind vocabulary defined inside
   `smoke/g4/`, and `Γ_spike` — a minimal authorizer sufficient to compute `Allowed(P_i)` for the
@@ -563,7 +577,7 @@ One row per G-4 pass-criterion limb, then the stand-ins, then the two G-5 hand-f
 |---|---|---|---|
 | L1 | *Task-narrowed token issues* | Exchange `AT_{i−1}` → `AT_i` with `AD_i ⊊ AD_{i−1}`; assert the response carries the granted RAR (RFC 9396 §7) and `scope` when narrowed (RFC 8693 §2.2.1); assert `expand(AT_i.AD) = C_i` | **Yes** |
 | L1′ | *Widening refused* | Four widening attempts — extra `actions`, extra `datatypes`, wider `resource`, longer `exp` — each rejected with the §6 error, **no token issued**, no silent clamp | **Yes** |
-| L2 | *Both layers enforced; OAuth-resource ∩ capability effective authority* | At the boundary, `Allowed(AT_i)` ∩ OAuth plane; a request inside RAR but outside `scope`/`aud` is denied, and vice versa | **Yes, over `Ω_spike`/`Γ_spike`** (C1) — value-level re-triggered by G-2 |
+| L2 | *Both layers enforced; OAuth-resource ∩ capability effective authority* | At the boundary, `Allowed(AT_i)` ∩ OAuth plane; a request inside RAR but outside `scope`/`aud` is denied, and vice versa | **Yes, over the frozen `Ω`/`Γ`** (ADR 0016 closed C1; no stand-in) — re-run only if `Ω`/`Γ` are amended |
 | L3 | *`actor→holder` mapping resolves* | Registry resolution for a valid actor; rejection for an unmapped actor; a negative test asserting the AS/boundary never requires `resource_owner = holder`; nested-`act` history present but **not** consulted (RFC 8693 §4.1) | **Yes, with the spike registry** (C3) — re-run at G-11 |
 | L4 | *`INV.access_token_hash` verified* | Precondition only: the presented AT byte string is observable and stable at the boundary; a swapped token is detectable | **No — scoped to a follow-on run after G-11** (C2) |
 | A1 | Delegation semantics | `sub` = resource_owner, outermost `act` = current actor, prior actor nested; impersonation-shaped issuance (actor written into `sub`) is absent | Yes |
@@ -587,3 +601,7 @@ taxonomy (**G-14**); the F4/F5 reference-monitor work (**G-15**); any performanc
 (**G-3**, whose threshold must be fixed externally first); freezing `Ω`, `Γ`, the registry, or
 the `task_authorization_policy`; and any change to G-4's pass criteria, dependency edges, or
 evidence grades.
+
+(Historical note, 2026-07-29: `Ω` and `Γ` were frozen afterwards, in a separate pass — **ADR
+0016** — which is what closed §9's C1. The registry and the `task_authorization_policy` remain
+unfrozen, and none of this changed a G-4 criterion.)

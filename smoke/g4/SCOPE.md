@@ -59,6 +59,9 @@ Neither may be described as working until this spike demonstrates it and G-4 adj
 - **Boundaries this spike does not cross:** it does not start G-2, G-11, or any other gate; it
   does not define or freeze `Ω` or `Γ` (`docs/frozen_parameters.md` item 8 stays UNSET); it
   does not touch `src/sut/`, `fixtures/confirmatory/`, Part H, or the pre-registration.
+  *(Update, 2026-07-29: `Ω` and `Γ` were frozen by **ADR 0016** in a later, separate pass — row 8
+  is now SET. The boundary above held for this spike: it froze nothing. Phase 2 therefore uses
+  the frozen values rather than the `DESIGN.md` §9 C1 stand-ins.)*
 
 ## 5. Primary sources to read **before any AS code is written**
 
