@@ -277,6 +277,15 @@ def test_frozen_parameters_row_8_records_the_current_digest(doc: dict) -> None:
     assert "0016" in row
 
 
+def test_h_gamma_survives_line_ending_conversion(tmp_path: Path, doc: dict) -> None:
+    """The repository checks out with CRLF on Windows and LF on the Linux CI.
+    The digest is taken over the parsed, canonicalized document, not the file
+    bytes, so the value recorded in row 8 must be identical on both."""
+    crlf = tmp_path / "crlf.json"
+    crlf.write_bytes(DOCUMENT_PATH.read_bytes().replace(b"\n", b"\r\n"))
+    assert h_gamma(load_document(crlf)) == h_gamma(doc)
+
+
 def test_digest_is_not_written_into_the_document_it_covers(doc: dict) -> None:
     """Part H step 6's detached-manifest rule, applied to H(Gamma)."""
     assert h_gamma(doc) not in DOCUMENT_PATH.read_text(encoding="utf-8")

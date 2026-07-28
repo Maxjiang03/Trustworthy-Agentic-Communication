@@ -91,12 +91,16 @@ def _validate_omega(doc: dict[str, Any]) -> None:
     seen: set[tuple[str, str]] = set()
     for element in doc["omega"]["elements"]:
         if len(element) != 2:
-            raise DocumentStructureError(f"omega element is not an (action, resource) pair: {element!r}")
+            raise DocumentStructureError(
+                f"omega element is not an (action, resource) pair: {element!r}"
+            )
         action, resource = element
         if not _ACTION_RE.match(action):
             raise DocumentStructureError(f"action {action!r} violates the frozen string encoding")
         if not _RESOURCE_RE.match(resource):
-            raise DocumentStructureError(f"resource {resource!r} violates the frozen string encoding")
+            raise DocumentStructureError(
+                f"resource {resource!r} violates the frozen string encoding"
+            )
         if action not in tools:
             # No phantom elements: every element must be producible by a real tool,
             # so the effect ledger can record it and the oracle can score it.
@@ -115,7 +119,9 @@ def _validate_ablations(doc: dict[str, Any]) -> None:
         if sorted(spec["override"]) != sorted(spec["differs_in_exactly"]):
             # A matched leave-one-out must differ in exactly the one respect it is
             # named for; anything else is not a matched control (SS E.6).
-            raise DocumentStructureError(f"ablation {name!r} override does not match its declaration")
+            raise DocumentStructureError(
+                f"ablation {name!r} override does not match its declaration"
+            )
         for path in spec["override"]:
             _resolve(doc["gamma"], path)  # the overridden path must already exist
 
@@ -148,7 +154,7 @@ def h_gamma(doc: dict[str, Any], *, version: int = 1) -> str:
 
 
 def omega(doc: dict[str, Any]) -> frozenset[tuple[str, str]]:
-    """`Omega` as the SS F.2 type: `frozenset[tuple[str, str]]` of (action, resource)."""
+    """`Omega` as the SS F.1 type: `frozenset[tuple[str, str]]` of (action, resource)."""
     return frozenset((action, resource) for action, resource in doc["omega"]["elements"])
 
 
