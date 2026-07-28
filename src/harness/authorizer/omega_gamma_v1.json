@@ -1,0 +1,65 @@
+{
+  "schema": "aasc.frozen-authorizer-config",
+  "config_version": 1,
+  "fixing_adr": "0016",
+  "omega": {
+    "encoding": {
+      "charset": "us-ascii",
+      "case": "lower",
+      "action_grammar": "namespace '.' verb, exactly one '.'",
+      "resource_grammar": "root '/' collection, exactly one '/'",
+      "comparison": "byte-exact RFC 8259 string equality, no normalization"
+    },
+    "tools": [
+      "calendar.read",
+      "notes.read",
+      "notes.write",
+      "notes.delete",
+      "mail.send"
+    ],
+    "elements": [
+      ["calendar.read", "calendar/work"],
+      ["calendar.read", "calendar/personal"],
+      ["notes.read", "notes/project"],
+      ["notes.read", "notes/meeting"],
+      ["notes.write", "notes/project"],
+      ["notes.delete", "notes/project"],
+      ["mail.send", "mail/outbox"]
+    ]
+  },
+  "gamma": {
+    "profile": "msc",
+    "trust": {
+      "trusted_keys": ["kappa"],
+      "trusted_key_count": 1,
+      "third_party_blocks": "reject",
+      "trusting_annotations": "forbidden",
+      "block_scoping": "default"
+    },
+    "evaluation": {
+      "prefix": "P_n",
+      "candidate_probe": "one authorizer run per element of omega",
+      "injected_facts": [
+        "operation(<action>, <resource>)",
+        "time(<now>)",
+        "request_audience(<audience>)",
+        "request_task(<task_id>)"
+      ],
+      "default_policy": "deny"
+    },
+    "datalog": {
+      "authorizer": "// AASC frozen authorizer Gamma, v1 (MSc profile; ADR 0016).\n// Facts injected per evaluation by the evaluating side, never by the token:\n//   operation(<action>, <resource>)   exactly one candidate x in Omega per run\n//   time(<now>), request_audience(<audience>), request_task(<task_id>)\ncheck if time($t), expiry($e), $t <= $e;\ncheck if request_audience($aud), token_audience($aud);\ncheck if request_task($task), token_task($task);\nallow if operation($action, $resource), right($action, $resource);\n",
+      "authority_block_template": "// Block 0, signed by kappa. One right/2 fact per element of C_0 = U_task.\nright(\"<action>\", \"<resource>\");\ntoken_audience(\"<audience>\");\ntoken_task(\"<task_id>\");\nexpiry(<instant>);\n",
+      "attenuation_block_template": "// Block i >= 1, appended offline by the holder of hop i-1.\n// One scope/2 fact per element of C_i, plus the check that consumes them.\n// The check and its facts sit in the SAME block, so default block scoping\n// trusts them; no later block's facts are visible to any earlier check.\nscope(\"<action>\", \"<resource>\");\ncheck if operation($action, $resource), scope($action, $resource);\n",
+      "placeholders": ["<action>", "<resource>", "<audience>", "<task_id>", "<instant>"]
+    }
+  },
+  "gamma_ablations": {
+    "minus_attenuation": {
+      "derived_from": "gamma",
+      "differs_in_exactly": ["evaluation.prefix"],
+      "override": {"evaluation.prefix": "P_0"},
+      "safety": "unsafe-control"
+    }
+  }
+}
