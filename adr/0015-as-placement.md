@@ -70,6 +70,14 @@ pass criteria**, explicitly not a criterion change (ADR 0008).
 - Phase 2 adds an import-boundary test for rules 3 and 4 alongside the runtime forge test (A4 in
   `DESIGN.md` §10).
 - No directory is created in this pass: Phase 1 writes **no AS code**, not even a skeleton.
+  *(Update, 2026-07-29: **Phase 2 created it and all four rules were implemented and tested.** The AS
+  runs out-of-process on loopback with TLS 1.3; the Ed25519 signing key is derived in-process from the
+  sealed seed, never written to disk, and only the public JWK leaves; both import rules were asserted
+  programmatically — `src/harness/` and every non-`oauth_as` `src/sut/` module import it **zero**
+  times — and a separate agent process started **without** the seed had its forged token rejected by
+  the boundary. One honest limit is recorded in `smoke/g4/REPORT.md` §3: isolation rests on the key
+  never leaving the process **and** the runner giving the seed to no agent process, since a principal
+  holding the seed can derive the key by construction. ADR 0017 records the profile as built.)*
 - Registered in Part B.2 of `docs/EXPERIMENT_ARCHITECTURE_FINAL.md`, same commit.
 
 ## Status

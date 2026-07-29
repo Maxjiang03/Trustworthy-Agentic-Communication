@@ -6,6 +6,16 @@
 > this document adds evidence and a build specification, it does not edit a criterion.
 > Parent scope: [`SCOPE.md`](SCOPE.md). Probe: [`probe_authlib.py`](probe_authlib.py).
 >
+> *(Update, 2026-07-29: **Phase 2 has since been executed.** The AS was built at
+> `src/sut/oauth_as/` and G-4 **PASSED over its adjudicable limbs** — `IA-4` is now verified by its
+> **second** limb, and `authlib` is still unpinned. The paragraph above stands as the state of this
+> document when it was written; the gate record is [`REPORT.md`](REPORT.md), the values §5.2 left
+> to "the Phase 2 ADR" are fixed in **ADR 0017**, and the title's "no AS code exists" describes
+> Phase 1 only. **Unchanged by that pass:** every pass criterion, dependency edge and evidence
+> grade (ADR 0008); §9 C2 — the `INV.access_token_hash` limb is **still not adjudicated** and is
+> scoped to a follow-on run after **G-11**, so G-4 is **not** fully closed; and §9 C3 — the
+> identity-registry stand-in re-triggers the `actor→holder` limb at G-11.)*
+>
 > **Adjudication precondition is now satisfied.** ADR 0008 placed G-4 adjudication "after
 > G-6/G-7"; both are **PASS** (§F.4 IA-6/IA-7, `smoke/README.md`), so Phase 2 may adjudicate —
 > subject to §9's limb-by-limb honesty about what is and is not yet adjudicable.

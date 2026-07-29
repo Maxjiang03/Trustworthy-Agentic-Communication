@@ -29,6 +29,12 @@ Constraints that do not change:
 
 - **No pass criterion, dependency edge, or evidence grade changes.** IA-4 stays
   `[UNVERIFIED-IA]` until G-4 adjudicates; spike progress is not evidence.
+  *(Update, 2026-07-29: **G-4 has since adjudicated** — Phase 2 built the AS and passed the
+  criterion's adjudicable limbs, so IA-4 is now verified by its **second** limb, `smoke/g4/REPORT.md`.
+  No pass criterion, dependency edge or evidence grade was changed by that pass, exactly as this
+  bullet requires; the `INV.access_token_hash` limb remains **unadjudicated**, scoped to a follow-on
+  run after G-11. The two G-5 hand-forwards below — `ath` and DPoP nonces — were exercised for the
+  first time and now hold for this build.)*
 - **Nothing may be pinned on spike progress alone.** The `authlib (RFC 8693 + RFC 9396) →
   gate G-4` line stays in the `# PENDING GATE` block of `pyproject.toml` until G-4 adjudicates
   (ADR 0004 discipline: a pin never precedes its gate).

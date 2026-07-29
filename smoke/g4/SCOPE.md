@@ -56,6 +56,11 @@ Neither may be described as working until this spike demonstrates it and G-4 adj
   evidence and produces no §F.4 status change and no smoke-board PASS.
 - **Grades.** IA-4 stays **[UNVERIFIED-IA]** for the whole life of the spike. No statement
   about RFC 8693/9396 support may be written as fact before adjudication.
+  *(Update, 2026-07-29: the spike's life ended with **Phase 2**, which built the AS and adjudicated
+  G-4 over its adjudicable limbs; **IA-4 is now verified by the assumption's second limb** —
+  `authlib` support was refuted, a faithful AS was built. The constraint above governed the spike
+  and held throughout it. `authlib` remains **unpinned**, so the pin-only-after-gate rule in the
+  first bullet is also unbroken. `smoke/g4/REPORT.md`; ADR 0017.)*
 - **Boundaries this spike does not cross:** it does not start G-2, G-11, or any other gate; it
   does not define or freeze `Ω` or `Γ` (`docs/frozen_parameters.md` item 8 stays UNSET); it
   does not touch `src/sut/`, `fixtures/confirmatory/`, Part H, or the pre-registration.
