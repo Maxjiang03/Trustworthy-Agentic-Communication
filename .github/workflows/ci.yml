@@ -28,3 +28,11 @@ jobs:
 
       - name: Test
         run: uv run pytest -q
+
+      # The G-4 spike stands up the experiment AS on a loopback TLS 1.3 socket
+      # and spawns a separate agent process, so unlike the Windows-only effect
+      # ledger (ADR 0014) it must hold on both platforms. Run here so that is
+      # confirmed rather than assumed. Other gates' spikes stay out: G-7's
+      # depends on Win32 exclusive-share semantics by decision.
+      - name: Gate G-4 spike (cross-platform)
+        run: uv run python smoke/g4/spike.py
