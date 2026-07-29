@@ -75,6 +75,13 @@ Adjacent digests **not** in `schema.py`, for completeness: `capability_hash` /
 `access_token_hash = H(AT@aud)` and `label_assertions_digest` (INV fields, §F.2) and
 `authz_context_hash` (approval artifact, §F.2) are **(c)** — fixed when INV/HTC are built and
 mutation-tested (**G-11**).
+*(Update, 2026-07-29: at G-11, **`access_token_hash` was fixed by ADR 0018** — the same tagged,
+versioned, length-delimited family under the new tag `b"AASC-AT-DIGEST"`, over the presented token's
+ASCII bytes, rendered lowercase hex, with a test pinning it distinct from both `ath` and `H_JCS`.
+`label_assertions_digest` and `authz_context_hash` **remain (c)**: both depend on the F4 label
+vocabulary and allowed-sink policy (`frozen_parameters` rows 4/6, still UNSET) and are verified at
+**G-15**, so G-11 could not honestly close them and did not. This row's classification stands; only
+the first of the three fields has been settled.)*
 
 ### D21 obligation (explicit)
 
