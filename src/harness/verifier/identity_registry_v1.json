@@ -1,0 +1,45 @@
+{
+  "schema": "aasc.identity-plane-registry",
+  "config_version": 1,
+  "fixing_adr": "0019",
+  "encoding": {
+    "principal": "us-ascii, lowercase, one word, no punctuation",
+    "actor_claim": "us-ascii, lowercase, 'agent-' prefix then one word",
+    "kid": "us-ascii, lowercase, hyphen-separated; unique across the whole registry",
+    "key_reference": "HKDF-SHA256 derivation label, NOT key bytes; bound at campaign start",
+    "public_key_wire": "base64url unpadded raw Ed25519 public key, 32 bytes -> 43 chars",
+    "comparison": "byte-exact RFC 8259 string equality, no normalization"
+  },
+  "as_root": {
+    "kid": "kid-as-root",
+    "key_reference": "kappa",
+    "necessity": "SS F.2: HTC_0 is signed by the AS root key kappa and carries kid_AS, and SS F.2's verification paragraph resolves every kid through this registry. Without an entry the root signature has no named key."
+  },
+  "principals": {
+    "supervisor": {
+      "kid": "kid-holder-supervisor",
+      "key_reference": "holder-supervisor",
+      "necessity": "The first delegating hop of the golden thread (ADR 0016 SS 1): holder of AT_0/P_0 and signer of HTC_1. A chain of depth >= 1 cannot exist without it."
+    },
+    "specialist": {
+      "kid": "kid-holder-specialist",
+      "key_reference": "holder-specialist",
+      "necessity": "The delegate of the golden thread and the terminal holder in the two-hop case, so it is the key INV must be signed by. Also the second principal F2 wrong_principal needs to be distinguishable from the first."
+    },
+    "worker": {
+      "kid": "kid-holder-worker",
+      "key_reference": "holder-worker",
+      "necessity": "A third principal, so depth-2 chains have a genuine nested act history and depth contiguity is exercised over more than one increment (SS F.2 depth rule; RFC 8693 SS 4.1 nesting)."
+    }
+  },
+  "actors": {
+    "agent-supervisor": "supervisor",
+    "agent-specialist": "specialist",
+    "agent-worker": "worker"
+  },
+  "resource_owners": [
+    "user-yixian"
+  ],
+  "resource_owner_note": "Recorded, and deliberately NOT part of the holder mapping (SS F.2.1). SS A.5.1 forbids requiring resource_owner = holder: delegation means the actor is not the resource owner, so a profile demanding equality would reject every legitimate delegated call.",
+  "scope_boundary": "This registry is the actor->holder mapping ONLY. It is NOT the task_authorization_policy (task -> authorized actor principals), which is docs/frozen_parameters.md row 5 and stays UNSET, so the F2 wrong_principal family stays unscored."
+}
