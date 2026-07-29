@@ -36,3 +36,8 @@ jobs:
       # depends on Win32 exclusive-share semantics by decision.
       - name: Gate G-4 spike (cross-platform)
         run: uv run python smoke/g4/spike.py
+
+      # The G-11 spike is pure signing and hashing, so it is platform-independent
+      # for the same reason: run it here rather than assume it.
+      - name: Gate G-11 spike (cross-platform)
+        run: uv run python smoke/g11/spike.py
