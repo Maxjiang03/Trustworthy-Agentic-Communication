@@ -450,7 +450,12 @@ uv run pytest -q tests/test_oauth_as.py  # 78 tests
 
 The regression suite is the durable form of this gate and is **platform-independent** — it drives a
 loopback TLS socket, so unlike the Windows-only effect-ledger tests (ADR 0014) it must pass on Linux
-CI too. The AS can also be run out-of-process as the runner will start it:
+CI too. **The spike itself is also run by CI** (`Gate G-4 spike (cross-platform)`), because CI
+previously ran `pytest` only: the spike is what stands up the AS on a real socket and spawns a
+separate agent process, so leaving those paths Windows-only would have made the cross-platform claim
+an assumption. Both the suite and the spike are green on `ubuntu-latest`.
+
+The AS can also be run out-of-process as the runner will start it:
 
 ```
 AASC_G4_AS_SEED=<hex> python -m src.sut.oauth_as <config.json>
