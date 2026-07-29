@@ -54,7 +54,9 @@ Post-gate capability statuses (valid for exactly what ran): mint, offline append
 verification, wire round-trip, stable prefix identity per §A.0.1 (verbatim — no hashing-rule
 refinement needed), and append-detection — **verified by gate G-1** for `biscuit-python==0.4.0`.
 Monotonicity under a frozen `Γ` (IA-2) and performance (IA-3) remain **[UNVERIFIED-IA]**, gated
-by G-2 and G-3.
+by G-2 and G-3. *(Update, 2026-07-29: IA-2 is now **verified by gate G-2** for this same pin,
+under the `Ω`/`Γ` frozen by ADR 0016 — `smoke/g2/REPORT.md`. IA-3 is still [UNVERIFIED-IA], gated
+by G-3. The sentence above stands as the state at the time of this ADR.)*
 
 ## Status
 

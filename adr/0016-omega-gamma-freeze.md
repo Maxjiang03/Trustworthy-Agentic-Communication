@@ -279,6 +279,11 @@ accepted — 2026-07-29
   G-2 is **not run and not adjudicated** by this decision, and the smoke board still shows it as
   not run; IA-2 remains **[UNVERIFIED-IA]**. Whether the frozen `Γ` actually yields
   `C_i ⊆ C_{i−1}` under `biscuit-python==0.4.0` is precisely what G-2 decides.
+  *(Update, 2026-07-29: G-2 has since run against this freeze and **PASSED** — criteria (a)–(d)
+  all hold with every `C_i` computed, and **IA-2 is now verified by G-2**; `smoke/g2/REPORT.md`.
+  The paragraph above stands as the state at the time of this decision. The amendability rule
+  below is unchanged: any later amendment of `Ω`/`Γ` re-triggers G-2 and invalidates that result
+  for the amended bytes.)*
 - **`smoke/g4/DESIGN.md` §9's C1 conflict is closed.** The G-4 effective-authority limb (L2) no
   longer needs `Ω_spike`/`Γ_spike`: Phase 2 runs against the frozen values. C2 (the
   `INV.access_token_hash` limb, awaiting G-11) and C3 (the identity-plane registry) are untouched

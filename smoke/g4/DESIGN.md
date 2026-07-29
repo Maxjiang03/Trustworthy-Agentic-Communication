@@ -508,6 +508,12 @@ affected limb, mirroring the standing pin rule that any bump re-triggers its gat
 > this closure. A later amendment of `Ω`/`Γ` (permitted by ADR 0016 until Part H step 3) re-opens
 > this limb.
 >
+> *(Update, 2026-07-29: G-2 has since run and **PASSED**; IA-2 is verified by that gate
+> (`smoke/g2/REPORT.md`). The sentence above stands as the state at closure. This changes nothing
+> for G-4: its pass criteria are unchanged (ADR 0008), **IA-4 remains [UNVERIFIED-IA]**, `authlib`
+> stays unpinned, and G-2's result speaks only to authorizer semantics over the frozen `Ω`/`Γ` —
+> not to the AS, the OAuth layer, or the `Allowed(AT_i) = C_i` equality, which is G-13's.)*
+>
 > The record of the stand-in that was planned, and of what it would and would not have
 > established, is kept below unchanged.
 
