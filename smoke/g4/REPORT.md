@@ -5,6 +5,17 @@
 (§9 C2), and only its AS-side precondition was tested here. **This is not a full four-limb
 closure**, and the smoke board must not be read as one.
 
+> *(Update, 2026-07-29 — **both residual limbs have since been closed by gate G-11**, so the
+> criterion is now fully adjudicated. **L4**: ADR 0018 fixed the `access_token_hash` construction and
+> G-11 verified `INV.access_token_hash == H(presented AT@aud)` through the real HTC/INV verifier, with
+> a swapped token rejected as `inv_access_token_hash`. **L3**: the `actor→holder` limb was re-run
+> against the registry frozen by ADR 0019 instead of the C3 stand-in, and the outcome was
+> **unchanged** — which is the useful result, since it confirms the stand-in had not flattered the
+> finding. The paragraph above stands as the state of this gate when it was written, and the sequence
+> matters: G-4 passed over its adjudicable limbs first, and G-11 closed the rest. `smoke/g11/REPORT.md`.
+> Unchanged by that pass: `may_act` is still spike-local pending `frozen_parameters` row 5, so F2
+> `wrong_principal` stays unscored, and the AT profile is still RFC 9068-**shaped**, not conformant.)*
+
 Built 2026-07-29. `smoke/g4/spike.py` exit 0, twelve mandatory checks; regression suite
 `tests/test_oauth_as.py`, 78 tests. The AS is `src/sut/oauth_as/` (ADR 0015); the boundary side is
 `src/sut/authz/boundary.py`; DPoP is shared at `src/sut/dpop.py`.
@@ -361,6 +372,10 @@ as settled, and the SHA-256 used above is illustrative only. Reporting a pass on
 would be a pass on a construction G-11 may replace — the same underspecification G-8 refused to
 invent and ADR 0009 later closed properly.
 
+*(Update, 2026-07-29: **G-11 closed this limb.** ADR 0018 adopted the `AASC-AT-DIGEST` proposal
+unchanged, and the binding is now verified through the real verifier. The refusal to invent it here
+is what made that adjudication clean rather than a ratification of a stand-in.)*
+
 ## 7. The C3 stand-in: scope, banner, and re-trigger
 
 The spike-local registry lives in `smoke/g4/campaign.py` and prints
@@ -374,6 +389,12 @@ The spike-local registry lives in `smoke/g4/campaign.py` and prints
   which stays a seal-time artifact (§F.2.1, Part H step 3); nor anything about `holder_proof_ok`.
 - **Re-trigger.** The HTC chain and the registry are built at **G-11** ⇒ re-run the `actor→holder`
   limb end-to-end against a real terminal holder key.
+
+*(Update, 2026-07-29: **done at G-11.** The registry is frozen as `frozen_parameters` row 11
+(ADR 0019, `H(R) = d1bfc5ff…`) and the limb was re-run against it; the actor still resolves to exactly
+one principal and one holder key, an unmapped actor is still rejected, and `resource_owner = holder`
+is still never required. What the stand-in could not establish and G-11 now does: the resolved key is
+checked by a verifier that also validates the HTC chain it terminates.)*
 
 The `may_act` delegation policy is the same kind of stand-in: the frozen `task_authorization_policy`
 is `frozen_parameters` **row 5, UNSET**, and the F2 `wrong_principal` family is **not scored** until

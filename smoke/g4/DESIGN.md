@@ -542,7 +542,19 @@ affected limb, mirroring the standing pin rule that any bump re-triggers its gat
 - **Re-adjudication trigger.** `Γ` frozen and hashed at **G-2** ⇒ re-run G-4's effective-authority
   limb against the frozen `Ω`/`Γ` before any confirmatory result is reported.
 
-### C2 — `INV.access_token_hash = H(AT@aud)` has no fixed construction
+### C2 — `INV.access_token_hash = H(AT@aud)` has no fixed construction — **CLOSED 2026-07-29 by ADR 0018 at G-11**
+
+> **Closed.** ADR 0018 **adopted the proposal below unchanged** and gate G-11 verified the binding
+> through the real HTC/INV verifier, rejecting a swapped token as `inv_access_token_hash`. The
+> judgement recorded below — that the limb could not be honestly adjudicated at Phase 2 because INV
+> did not yet exist — held, and refusing to invent the construction there is what made this
+> adjudication an adjudication rather than a ratification. The three-way distinctness the trap warned
+> about is now pinned by test: `access_token_hash` (lowercase hex, tagged) differs from `ath`
+> (base64url over the **same** input bytes) and from `H_JCS` (over canonical JSON). Still open, and
+> **not** closed by ADR 0018: `label_assertions_digest` and `authz_context_hash` remain ADR 0009
+> category (c), deferred to the F4 label decision (`frozen_parameters` rows 4/6, UNSET) and **G-15**.
+> The record below is kept unchanged.
+
 
 ADR 0009 classifies it **category (c)**, *"fixed when INV/HTC are built and mutation-tested
 (G-11)"*. The adjacent trap is real and now confirmed against the text: RFC 9449's `ath` is
@@ -568,7 +580,20 @@ must never be conflated**, and `H_JCS` must not be assumed to apply.
   and until then the smoke board must not show G-4 as fully adjudicated.
 - **Re-adjudication trigger.** `access_token_hash` fixed at **G-11** ⇒ run the follow-on limb.
 
-### C3 — the identity-plane registry is not built and no HTC chain exists
+### C3 — the identity-plane registry is not built and no HTC chain exists — **CLOSED 2026-07-29 by ADR 0019 at G-11**
+
+> **Closed.** The registry is built and frozen as `src/harness/verifier/identity_registry_v1.json`
+> (ADR 0019, `H(R) = d1bfc5ff…`, `docs/frozen_parameters.md` **row 11**), and G-11 re-ran the
+> `actor→holder` limb against it. The outcome is **unchanged** from the stand-in — the actor resolves
+> to exactly one principal and one holder key, an unmapped actor is rejected, and
+> `resource_owner = holder` is never required — which is the useful result: the stand-in had not
+> flattered the finding. What the stand-in explicitly could not establish and G-11 now does: the
+> resolved key is checked by a verifier that also validates the HTC chain it terminates. Two things
+> the freeze deliberately does **not** cover: `H(R)` hashes structure and derivation labels, **not**
+> key bytes (per-campaign material sealed at Part H step 3, the same line ADR 0016 drew for `Γ`/`κ`);
+> and the `task_authorization_policy` is **not** this registry — row 5 stays UNSET, so F2
+> `wrong_principal` stays unscored. The record below is kept unchanged.
+
 
 - **Stand-in.** A spike-local registry: `oauth_actor → principal → Ed25519 public key`, with the
   key being a **raw spike key, not the terminal key of a real HTC chain**, plus at least one
