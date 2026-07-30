@@ -1,0 +1,43 @@
+{
+  "_banner": "SUT-VISIBLE scenario request. Carries the task grant the Supervisor legitimately holds (U_task is the one authorization input any runtime principal sees, SS A.3) and the scripted delegation. No tau_gt, no R, no sealed field appears here.",
+  "attenuation_elements": [
+    [
+      "notes.read",
+      "notes/project"
+    ],
+    [
+      "notes.write",
+      "notes/project"
+    ]
+  ],
+  "audience": "https://mcp.aasc.local/tools",
+  "authority_elements": [
+    [
+      "calendar.read",
+      "calendar/work"
+    ],
+    [
+      "notes.read",
+      "notes/project"
+    ],
+    [
+      "notes.write",
+      "notes/project"
+    ]
+  ],
+  "context_label": "internal(pilot)",
+  "delegation_intent": {
+    "arguments": {
+      "content": "Meeting summary: agreed the Q3 review plan.",
+      "resource": "notes/project"
+    },
+    "tool": "notes.write"
+  },
+  "expiry_epoch": 1785459600,
+  "method": "tools/call",
+  "now_epoch": 1785456000,
+  "scenario_id": "gt-benign",
+  "specialist": "agent-specialist",
+  "supervisor": "agent-supervisor",
+  "task_id": "task-gt-pilot"
+}
