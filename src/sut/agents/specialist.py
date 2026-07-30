@@ -13,7 +13,9 @@ the arm's. It imports nothing from `src/harness/` (red line 6).
 `invocation_id_provider` is injected by the composition root and yields the
 harness-minted correlation id for the current invocation (SS F.1: the id is
 bound into the sealed intent, the records, and -- in B3 -- the INV `jti`).
-The SUT receives it; it never mints one.
+The SUT receives it; it never mints one. `clock` is likewise injected: the
+run's instant comes from the composition root, so the INV window and the
+live OAuth token are judged on one clock (see `supervisor.py`).
 """
 
 from collections.abc import Callable, Mapping
@@ -35,14 +37,14 @@ class Specialist:
         tool_caller: ToolCaller,
         method: str,
         audience: str,
-        now_epoch: int,
+        clock: Callable[[], int],
         invocation_id_provider: Callable[[], str],
     ) -> None:
         self._arm = arm
         self._tool_caller = tool_caller
         self._method = method
         self._audience = audience
-        self._now_epoch = now_epoch
+        self._clock = clock
         self._invocation_id_provider = invocation_id_provider
 
     def receive(self, envelope: DelegationEnvelope) -> Any:
@@ -58,7 +60,7 @@ class Specialist:
                 task_id=envelope.task_id,
                 audience=self._audience,
                 invocation_id=self._invocation_id_provider(),
-                now_epoch=self._now_epoch,
+                now_epoch=self._clock(),
             ),
         )
         return self._tool_caller(tool, arguments)

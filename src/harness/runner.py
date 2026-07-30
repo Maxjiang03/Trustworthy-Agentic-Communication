@@ -30,6 +30,7 @@ the boundary records a denial and the tool does not run (fail closed).
 
 import asyncio
 import secrets
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,7 +39,7 @@ from typing import Any
 import rfc8785
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from src.harness import frozen_parameters, key_material, sealed_truth
+from src.harness import as_process, frozen_parameters, key_material, sealed_truth
 from src.harness.authorizer import frozen_config
 from src.harness.effect_ledger import LedgerWriter, install_ingress_recorder, read_ledger
 from src.harness.effectors import LedgerEffector
@@ -93,6 +94,35 @@ def verify_frozen_configuration() -> None:
 
 
 @dataclass
+class TimingSeams:
+    """The RQ4 measurement seams, correlated by `correlation_id`. UNMEASURED.
+
+    Four spans, decomposed as Part H's latency protocol requires -- `setup`
+    (SS E.2 Phase 1, excluded from the delegation estimand), `delegation`
+    (SS E.2 Phase 2, the compared quantity), `boundary_verification`, and
+    `end_to_end`. The seams EXIST and are correlated; **no number is emitted,
+    reported, or interpreted in this pass** (EXP1 forbidden action 4): the
+    G-3 threshold (`frozen_parameters` row 2) and the equivalence margin
+    (row 1) are UNSET and must be fixed from external engineering need before
+    any timing measurement (Part H step 2, Part J.2 item 9). `IA-3` stays
+    `[UNVERIFIED-IA]` for G-3.
+
+    Spans are recorded as monotonic-clock intervals so a later measurement
+    pass needs no new instrumentation -- only a threshold, an ADR, and G-3.
+    """
+
+    correlation_id: str
+    spans: dict[str, tuple[int, int]] = field(default_factory=dict)
+
+    def mark(self, name: str, start_ns: int, end_ns: int) -> None:
+        self.spans[name] = (start_ns, end_ns)
+
+    def recorded(self) -> tuple[str, ...]:
+        """Which seams captured a span. Deliberately returns NAMES, not values."""
+        return tuple(sorted(self.spans))
+
+
+@dataclass
 class ScenarioRun:
     """Everything one invocation produced. Harness-side; never handed to the SUT."""
 
@@ -105,6 +135,8 @@ class ScenarioRun:
     ledger_path: str
     tool_result_error: bool
     presentation: Mapping[str, Any] = field(default_factory=dict)
+    timing: TimingSeams | None = None
+    audit_log: list[dict[str, Any]] = field(default_factory=list)
 
     def ledger_entries(self) -> list[dict[str, Any]]:
         return read_ledger(self.ledger_path)
@@ -154,6 +186,35 @@ class GoldenThreadRunner:
         """The SUT-visible document -- the ONLY scenario material the SUT gets."""
         return self._load_json(self._corpus_dir / "sut_visible" / f"{scenario_id}.json")
 
+    def b3_setup(self, *, access_token: str, as_public_jwk: dict[str, str]) -> dict[str, Any]:
+        """The injected provisioning material for a capability arm.
+
+        Everything the arm needs arrives as DATA from the composition root:
+        the frozen documents (never imported by the SUT), the runner-resolved
+        public keys and this campaign's private material (ADR 0007 seeds), the
+        Phase-1 base token from the AS start-up line (ADR 0021), and the
+        PILOT-PROVISIONAL policy object -- which the arm's loader refuses on a
+        confirmatory run, and refuses to default if absent.
+        """
+        policy_path = self._corpus_dir.parents[0] / "policies" / "pilot_policy_v0.json"
+        return {
+            "gamma_document": frozen_config.load_document(),
+            "registry_document": registry_mod.load_document(),
+            "resolved_keys": key_material.resolve_public(self.seed),
+            "kappa_private": key_material.derive_raw(self.seed, "kappa"),
+            "holder_privates": {
+                label: key_material.derive_raw(self.seed, label)
+                for label in ("holder-supervisor", "holder-specialist", "holder-worker")
+            },
+            "access_token": access_token,
+            "as_public_jwk": as_public_jwk,
+            "issuer": self._corpus["issuer"],
+            "resource_server": self._corpus["audience"],
+            "rar_type": as_process.RAR_TYPE,
+            "pilot_policy": self._load_json(policy_path),
+            "run_mode": "pilot",  # never "confirmatory": the seal is Part H's
+        }
+
     def run_scenario(
         self, scenario_id: str, arm: Any, *, setup: Mapping[str, Any] | None = None
     ) -> ScenarioRun:
@@ -161,8 +222,19 @@ class GoldenThreadRunner:
         visible = self.visible(scenario_id)
         sealed = sealed_truth.load_sealed(scenario_id)
         correlation_id = mint_correlation_id()
+        timing = TimingSeams(correlation_id=correlation_id)
+        end_to_end_start = time.perf_counter_ns()
+        # ONE clock for the run: every credential window (capability, HTC,
+        # INV) and the live AS-minted OAuth token are judged against this
+        # instant. The scenario supplies the validity DURATION, never a
+        # frozen "now" -- see src/sut/agents/supervisor.py.
+        run_epoch = int(time.time())
 
+        # SS E.2 Phase 1: setup, identical across arms, EXCLUDED from the
+        # delegation estimand. Bracketed, never measured in this pass.
+        setup_start = time.perf_counter_ns()
         arm.provision(dict(setup or {}))
+        timing.mark("setup", setup_start, time.perf_counter_ns())
 
         # --- the tool stack, wired in the g7 order (recorder first, boundary
         # outermost, so a denied call reaches neither recorder nor tool) ------
@@ -197,10 +269,13 @@ class GoldenThreadRunner:
             # trusted layer emits the MediationEvent); the decision itself is
             # the arm's -- the mechanism under measurement. An arm that raises
             # is a denial: fail closed, the tool never runs.
+            verification_start = time.perf_counter_ns()
             try:
                 return arm.decide(tool, arguments)
             except Exception as exc:  # noqa: BLE001 -- any arm failure is a denial
                 return False, f"arm_error:{type(exc).__name__}"
+            finally:
+                timing.mark("boundary_verification", verification_start, time.perf_counter_ns())
 
         install_boundary(
             server,
@@ -212,19 +287,28 @@ class GoldenThreadRunner:
         # --- agents over the injected port -----------------------------------
         transport = InProcessDelegationTransport()
 
+        def observed_delegate(hop: Any) -> Mapping[str, Any]:
+            # SS E.2 Phase 2: the delegation cost -- the quantity the arms are
+            # compared on (B2's online exchange vs B3's offline attenuation).
+            delegation_start = time.perf_counter_ns()
+            try:
+                return arm.delegate(hop)
+            finally:
+                timing.mark("delegation", delegation_start, time.perf_counter_ns())
+
         def observed_present(credentials: Mapping[str, Any], invocation: Any) -> Mapping[str, Any]:
             presentation = arm.present(credentials, invocation)
             presentations.append(dict(presentation))
             return presentation
 
-        arm_proxy = _PresentObserver(arm, observed_present)
+        arm_proxy = _PresentObserver(arm, observed_present, observed_delegate)
         tool_caller = _LateBoundToolCaller()
         specialist = Specialist(
             arm=arm_proxy,
             tool_caller=tool_caller,  # bound to the live session inside drive()
             method=visible["method"],
             audience=audience,
-            now_epoch=visible["now_epoch"],
+            clock=lambda: run_epoch,
             invocation_id_provider=lambda: correlation_id,
         )
 
@@ -239,7 +323,7 @@ class GoldenThreadRunner:
             return specialist.receive(envelope)
 
         transport.register(visible["specialist"], seal_and_receive)
-        supervisor = Supervisor(arm=arm_proxy, transport=transport)
+        supervisor = Supervisor(arm=arm_proxy, transport=transport, clock=lambda: run_epoch)
 
         # --- drive it: sync agents bridged onto the async MCP session --------
         tool_error: dict[str, bool] = {}
@@ -279,9 +363,10 @@ class GoldenThreadRunner:
             payload_labels=[],
             declassification=None,
             approval_artifact=None,
-            iat=visible["now_epoch"],
+            iat=run_epoch,
         )
 
+        timing.mark("end_to_end", end_to_end_start, time.perf_counter_ns())
         return ScenarioRun(
             scenario_id=scenario_id,
             arm_name=arm.name,
@@ -292,6 +377,8 @@ class GoldenThreadRunner:
             ledger_path=ledger_path,
             tool_result_error=tool_error.get("error", True),
             presentation=presentation,
+            timing=timing,
+            audit_log=list(getattr(arm, "audit_log", [])),
         )
 
     def _complete_intent(
@@ -350,9 +437,10 @@ class _PresentObserver:
     harness observation, not a SUT report. Everything else is delegated.
     """
 
-    def __init__(self, arm: Any, observed_present: Any) -> None:
+    def __init__(self, arm: Any, observed_present: Any, observed_delegate: Any) -> None:
         self._arm = arm
         self._observed_present = observed_present
+        self._observed_delegate = observed_delegate
 
     @property
     def name(self) -> str:
@@ -366,7 +454,7 @@ class _PresentObserver:
         self._arm.provision(setup)
 
     def delegate(self, hop: Any) -> Mapping[str, Any]:
-        return self._arm.delegate(hop)
+        return self._observed_delegate(hop)
 
     def present(self, credentials: Mapping[str, Any], invocation: Any) -> Mapping[str, Any]:
         return self._observed_present(credentials, invocation)

@@ -15,7 +15,7 @@ This agent never reads sealed truth and never computes `R`; it imports
 nothing from `src/harness/` (red line 6).
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from src.sut.baselines.base import Arm, HopContext
@@ -23,14 +23,26 @@ from src.sut.protocol.a2a import DelegationEnvelope, DelegationTransport
 
 
 class Supervisor:
-    """Holds the task grant; delegates the scripted intent to the Specialist."""
+    """Holds the task grant; delegates the scripted intent to the Specialist.
 
-    def __init__(self, *, arm: Arm, transport: DelegationTransport) -> None:
+    `clock` is injected by the composition root and yields the run's instant.
+    The scenario document supplies the validity DURATION, never an instant:
+    a fixture-frozen "now" would judge the capability plane on a different
+    clock from the live AS-minted OAuth token. Determinism is unaffected --
+    the envelope's non-credential fields carry no time, and minted capability
+    bytes are non-reproducible by construction anyway (ADR 0007).
+    """
+
+    def __init__(
+        self, *, arm: Arm, transport: DelegationTransport, clock: Callable[[], int]
+    ) -> None:
         self._arm = arm
         self._transport = transport
+        self._clock = clock
 
     def run(self, visible: Mapping[str, Any]) -> Any:
         """One scripted delegation, from the SUT-visible scenario document."""
+        now_epoch = self._clock()
         hop = HopContext(
             task_id=visible["task_id"],
             audience=visible["audience"],
@@ -42,8 +54,8 @@ class Supervisor:
             attenuation_elements=tuple(
                 (action, resource) for action, resource in visible["attenuation_elements"]
             ),
-            now_epoch=visible["now_epoch"],
-            expiry_epoch=visible["expiry_epoch"],
+            now_epoch=now_epoch,
+            expiry_epoch=now_epoch + int(visible["validity_seconds"]),
         )
         envelope = DelegationEnvelope(
             from_agent=hop.from_agent,

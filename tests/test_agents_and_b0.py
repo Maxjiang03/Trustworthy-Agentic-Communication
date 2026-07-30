@@ -18,6 +18,10 @@ from src.sut.baselines.base import ArmBitmask, InvocationContext
 from src.sut.protocol.a2a import InProcessDelegationTransport
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+# The composition root supplies the instant; a test double pins it so the
+# determinism assertions compare like with like (the fixture carries only a
+# validity DURATION -- see src/sut/agents/supervisor.py).
+FIXED_EPOCH = 1785456000
 VISIBLE = json.loads(
     (
         REPO_ROOT / "fixtures" / "pilot" / "golden_thread" / "sut_visible" / "gt-benign.json"
@@ -39,7 +43,7 @@ class TestSupervisorDeterminism:
         captured = []
         for _ in range(2):
             transport = CapturingTransport()
-            Supervisor(arm=B0Arm(), transport=transport).run(VISIBLE)
+            Supervisor(arm=B0Arm(), transport=transport, clock=lambda: FIXED_EPOCH).run(VISIBLE)
             captured.append(transport.envelopes[0].canonical_bytes())
         assert captured[0] == captured[1]
 
@@ -55,8 +59,8 @@ class TestSupervisorDeterminism:
             ).read_text(encoding="utf-8")
         )
         first, second = CapturingTransport(), CapturingTransport()
-        Supervisor(arm=B0Arm(), transport=first).run(VISIBLE)
-        Supervisor(arm=B0Arm(), transport=second).run(other)
+        Supervisor(arm=B0Arm(), transport=first, clock=lambda: FIXED_EPOCH).run(VISIBLE)
+        Supervisor(arm=B0Arm(), transport=second, clock=lambda: FIXED_EPOCH).run(other)
         assert first.envelopes[0].canonical_bytes() != second.envelopes[0].canonical_bytes()
 
     def test_the_arm_decides_what_is_carried(self):
@@ -67,11 +71,11 @@ class TestSupervisorDeterminism:
                 return {"marker": "arm-decided"}
 
         transport = CapturingTransport()
-        Supervisor(arm=MarkedArm(), transport=transport).run(VISIBLE)
+        Supervisor(arm=MarkedArm(), transport=transport, clock=lambda: FIXED_EPOCH).run(VISIBLE)
         assert transport.envelopes[0].credentials == {"marker": "arm-decided"}
         # Negative arm: B0's own envelope carries nothing.
         empty = CapturingTransport()
-        Supervisor(arm=B0Arm(), transport=empty).run(VISIBLE)
+        Supervisor(arm=B0Arm(), transport=empty, clock=lambda: FIXED_EPOCH).run(VISIBLE)
         assert empty.envelopes[0].credentials == {}
 
 
@@ -86,7 +90,7 @@ class TestSpecialist:
             tool_caller=lambda tool, args: calls.append((tool, args)) or "ok",
             method=VISIBLE["method"],
             audience=VISIBLE["audience"],
-            now_epoch=VISIBLE["now_epoch"],
+            clock=lambda: FIXED_EPOCH,
             invocation_id_provider=lambda: "cid-under-test",
         )
 
@@ -95,7 +99,7 @@ class TestSpecialist:
         specialist = self._specialist(B0Arm(), calls, presented)
         transport = InProcessDelegationTransport()
         transport.register(VISIBLE["specialist"], specialist.receive)
-        Supervisor(arm=B0Arm(), transport=transport).run(VISIBLE)
+        Supervisor(arm=B0Arm(), transport=transport, clock=lambda: FIXED_EPOCH).run(VISIBLE)
         assert calls == [
             (
                 VISIBLE["delegation_intent"]["tool"],

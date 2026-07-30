@@ -32,11 +32,10 @@
     },
     "tool": "calendar.read"
   },
-  "expiry_epoch": 1785459600,
   "method": "tools/call",
-  "now_epoch": 1785456000,
   "scenario_id": "gt-f1-terminal",
   "specialist": "agent-specialist",
   "supervisor": "agent-supervisor",
-  "task_id": "task-gt-pilot"
+  "task_id": "task-gt-pilot",
+  "validity_seconds": 3600
 }

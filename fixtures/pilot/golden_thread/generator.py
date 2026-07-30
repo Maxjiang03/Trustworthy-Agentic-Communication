@@ -57,7 +57,12 @@ from src.harness.verifier import registry as reg  # noqa: E402
 
 # --- Corpus-level constants (the runner-held inputs, ADR 0007) ---------------
 SEED_HEX = "e1" * 32  # pilot corpus seed; testbed material only (seed-disclosure warning)
-NOW_EPOCH = 1785456000  # the frozen logical instant every run evaluates at (determinism)
+# A fixed logical instant used ONLY to compute C_0/C_1 deterministically at
+# generation time (the authorizer needs a `time` fact). It is deliberately not
+# published as the run-time "now": the runner supplies that from a live clock,
+# so the capability plane and the AS-minted OAuth token share one clock. What
+# the SUT-visible document carries is the validity DURATION.
+NOW_EPOCH = 1785456000
 EXPIRY_EPOCH = NOW_EPOCH + 3600
 TASK_ID = "task-gt-pilot"
 ISSUER = "https://as.aasc.local"
@@ -221,8 +226,12 @@ def sut_visible_document(scenario: dict) -> dict:
         "authority_elements": U_TASK_SPEC,
         "attenuation_elements": C1_SPEC,
         "delegation_intent": {"tool": scenario["tool"], "arguments": scenario["arguments"]},
-        "now_epoch": NOW_EPOCH,
-        "expiry_epoch": EXPIRY_EPOCH,
+        # A DURATION, not an instant: the runner supplies the instant from a
+        # live clock at run time, so every credential window (capability, HTC,
+        # INV) and the live OAuth token are judged on ONE clock. A frozen
+        # logical "now" in the fixture would put the capability plane and the
+        # AS-minted token on two different clocks.
+        "validity_seconds": EXPIRY_EPOCH - NOW_EPOCH,
     }
 
 
