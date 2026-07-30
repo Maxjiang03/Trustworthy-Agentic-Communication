@@ -7,7 +7,8 @@ Trustworthy Agentic Communication: a pre-registered, reproducible testbed that m
 `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` is the SINGLE source of truth (baselines, capability/HTC/INV, oracle, smoke-gate DAG, freeze/seal loop, workflow). Do not contradict it. If a change is needed, record an ADR in `adr/` and update the doc — never silently diverge.
 
 ## Current phase
-Repository skeleton, pre-smoke-test. Implementation logic has NOT begun. Next phase: the feasibility smoke gates (design Part G), pilot corpus only.
+Experimental apparatus, pilot corpus only. Eight smoke gates pass (`smoke/README.md`); since 2026-07-30 the golden thread runs end to end — Supervisor → A2A hop (behind a port, ADR 0020) → Specialist → MCP tool call over the frozen `Ω`, under **`B0` and `B3`** (the other seven arms are not built). Gates G-3, G-9, G-10, G-12, G-13, G-14, G-15 remain: the apparatus they need now exists, but **it adjudicated no gate and changed no gate status**. Pre-registration still a stub; `fixtures/confirmatory/` still empty; **no timing number measured or reported** (rows 1–2 UNSET).
+*(Update note, 2026-07-30: this section previously read "Repository skeleton, pre-smoke-test. Implementation logic has NOT begun" — true when written, superseded by the apparatus pass.)*
 
 ## Pre-registration status
 Not yet authored. Per Part H, the pre-registration is written and sealed only AFTER the smoke gates pass, and is derived from the architecture doc. `docs/PRE_REGISTRATION.md` is a stub. Any earlier draft is superseded and must not be reused.

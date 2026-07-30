@@ -6,9 +6,21 @@ confused-deputy problem, TV23). MSc Cybersecurity dissertation, University of Gl
 
 ## Current phase
 
-**Repository skeleton — pre-smoke-test.** Implementation logic has not begun. The next phase is
-the feasibility smoke gates (`docs/EXPERIMENT_ARCHITECTURE_FINAL.md`, Part G), pilot corpus only.
-The pre-registration is deliberately a stub until the gates pass (`docs/PRE_REGISTRATION.md`).
+**Experimental apparatus, pilot corpus only.** Eight feasibility smoke gates have passed
+(`smoke/README.md` is the board), and as of 2026-07-30 the golden thread runs end to end: a
+Supervisor, an A2A delegation hop behind a port, a Specialist, an MCP tool call over the frozen
+ontology, and **two of the nine arms — `B0` and `B3`**. Seven gates remain (G-3, G-9, G-10,
+G-12, G-13, G-14, G-15); the apparatus they need now exists, but **this apparatus adjudicates no
+gate**, and no gate status changed when it was built.
+
+The pre-registration is deliberately a stub until the gates pass (`docs/PRE_REGISTRATION.md`),
+`fixtures/confirmatory/` stays empty until sealing, and **no latency number has been measured or
+reported** — the G-3 threshold and the equivalence margin (`docs/frozen_parameters.md` rows 2 and
+1) are UNSET and must be fixed from external engineering need first.
+
+*(Update note, 2026-07-30: this section previously read "Repository skeleton — pre-smoke-test.
+Implementation logic has not begun," which was true when written and stopped being true in the
+pass that built the apparatus.)*
 
 ## Authoritative design
 
@@ -25,7 +37,7 @@ is committed.
 | `make setup` | `uv sync` — create the pinned environment |
 | `make lint` | `pre-commit run --all-files` (ruff + ruff-format) |
 | `make test` | `pytest -q` |
-| `make gate` | placeholder — smoke gates arrive in the smoke-test phase (Part G) |
+| `make gate GATE=g1` | run one gate's spike (`smoke/g{1,2,4,5,6,7,8,11}/`). POSIX-flavoured — on Windows run `uv run python smoke/g11/spike.py` directly |
 | `make reproduce` | placeholder — available only after sealing |
 
 Without `make` (e.g. plain Windows), run the underlying commands directly:
@@ -45,7 +57,8 @@ cross-platform. Windows is the sealed measurement platform; the POSIX variant is
   module may import it (agents reach it over the wire), and **`src/harness/` may never import it**
   — the oracle and the G-13 verifier reimplement token verification independently (D13/D21)
 - `src/harness/` — the instrument (imports `sut`, never the reverse; except `src/sut/oauth_as/`,
-  which it may never import)
+  which it may never import). All three import rules are enforced by an AST suite
+  (`tests/test_import_redlines.py`), not by convention alone
 - `docs/` — architecture, threat model, frozen parameters, pre-registration stub
 - `adr/` — one file per decision
 - `fixtures/pilot/` vs `fixtures/confirmatory/` — strictly disjoint; confirmatory stays **empty** until post-seal

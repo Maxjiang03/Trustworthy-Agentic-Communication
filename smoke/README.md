@@ -17,6 +17,17 @@ INV-only check) run only for claims retained in the sealed scope.
 
 Run a gate: `make gate GATE=g1`
 
+**Apparatus note, 2026-07-30 (no gate status changed by it).** The experimental apparatus the
+waiting gates need now exists: the golden thread runs end to end — Supervisor → A2A delegation
+hop (behind a port; `a2a-python` still unpinned, ADR 0020) → Specialist → MCP tool call over the
+frozen `Ω` — under **`B0`** (no delegation protection) and **`B3`** (the full control layer, its
+ten §A.5 conjuncts each a named function with its own reason code), with the pilot corpus
+(`fixtures/pilot/golden_thread/`), the harness runner, the SUT-side capability signer (D21's
+independent implementation, agreement-tested against the harness verifier), and Phase-1 OAuth
+provisioning (ADR 0021). **This pass adjudicated no gate, edited no row below, and set no
+evidence grade**; every "not started" is still not started, and `IA-3` remains
+`[UNVERIFIED-IA]` — the RQ4 timing seams exist but **nothing was measured** (rows 1–2 UNSET).
+
 | Gate | Depends on | Status | Report | ADR |
 |------|-----------|--------|--------|-----|
 | G-1 | — | **PASS** — restored after the ADR 0003 corrective suite passed (10/10 regression tests): commitment is now the versioned BlockID scheme (encoding-independent, fail-closed); biscuit-python==0.4.0 pinned; G-1.G′ replaced the seal check (ADR 0002) | [g1/REPORT.md](g1/REPORT.md) | [0002](../adr/0002-python-biscuit-library.md), [0003](../adr/0003-capability-commitment-scheme.md) |
