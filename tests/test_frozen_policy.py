@@ -185,5 +185,84 @@ class TestSemantics:
         assert policy.outcome(is_egress=True, label=None, recipient="a@aasc.local") == "block"
 
     def test_declared_egress_without_a_recipient_blocks(self, policy):
-        # Row 6 cannot be evaluated, so its half of the permit is unestablished.
+        # The whitelist cannot be consulted, so no permit can be established.
         assert policy.outcome(is_egress=True, label="public", recipient=None) == "block"
+
+
+class TestVerdictTable:
+    """ADR 0023: row 6 is the permit whitelist, row 4 supplies the severity.
+
+    One verdict per cell, never two combined. ADR 0022's first reading composed
+    the rows and took the more restrictive, which falsified two of the frozen
+    artifact's own necessity statements; the last test here is the one that
+    would have caught it.
+    """
+
+    CELLS = {
+        ("public", "internal-sink"): "permit",
+        ("public", "external-sink"): "permit",
+        ("internal", "internal-sink"): "permit",
+        ("internal", "external-sink"): "escalate",
+        ("sensitive", "internal-sink"): "block",
+        ("sensitive", "external-sink"): "block",
+    }
+    RECIPIENTS = {"internal-sink": "a@aasc.local", "external-sink": "a@partner.test"}
+
+    @pytest.mark.parametrize("cell,expected", sorted(CELLS.items()))
+    def test_each_cell(self, policy, cell, expected):
+        label, sink = cell
+        assert (
+            policy.outcome(is_egress=True, label=label, recipient=self.RECIPIENTS[sink]) == expected
+        )
+
+    def test_unlabelled_blocks_at_either_sink(self, policy):
+        for recipient in self.RECIPIENTS.values():
+            assert policy.outcome(is_egress=True, label=None, recipient=recipient) == "block"
+
+    def test_the_written_table_and_the_rule_agree(self):
+        """The artifact writes the table out; the loader recomputes it.
+
+        The loader already refuses a document where the two disagree; this
+        asserts the check is real by reading the written cells directly.
+        """
+        doc = frozen_policy.load_document()
+        written = {
+            (entry["label"], entry["sink"]): entry["verdict"]
+            for entry in doc["row6_sink_policy"]["verdict_table"]
+        }
+        assert written == dict(self.CELLS) | {(None, "*"): "block"}
+
+    def test_a_table_that_contradicts_the_rule_is_refused(self, tmp_path):
+        # Negative arm: the loader's cross-check is not vacuous.
+        import json
+
+        doc = frozen_policy.load_document()
+        for entry in doc["row6_sink_policy"]["verdict_table"]:
+            if entry["label"] == "internal" and entry["sink"] == "internal-sink":
+                entry["verdict"] = "escalate"  # ADR 0022's falsified value
+        target = tmp_path / "drifted.json"
+        target.write_text(json.dumps(doc), encoding="utf-8")
+        with pytest.raises(frozen_policy.PolicyStructureError):
+            frozen_policy.load_document(target)
+
+    def test_the_two_necessity_statements_adr_0023_restores(self, policy):
+        """The evidence that made ADR 0022's composition wrong, as a test.
+
+        Row 6's `(internal, internal-sink)` necessity says ordinary internal
+        traffic must be able to run; row 4's `internal` necessity says
+        `escalate` is what makes the declassification path observable. Under
+        the composition the first cell escalated and `escalate` survived ONLY
+        there -- both statements false. Both now hold.
+        """
+        assert (
+            policy.outcome(is_egress=True, label="internal", recipient="a@aasc.local") == "permit"
+        ), "row 6 lists (internal, internal-sink) as allowed; it must permit"
+        assert (
+            policy.outcome(is_egress=True, label="internal", recipient="a@partner.test")
+            == "escalate"
+        ), "escalate must survive where a declassification would be needed"
+        # And escalate is reachable in exactly one cell -- the one that needs it.
+        escalating = [
+            cell for cell, verdict in TestVerdictTable.CELLS.items() if verdict == "escalate"
+        ]
+        assert escalating == [("internal", "external-sink")]

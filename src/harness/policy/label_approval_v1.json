@@ -108,9 +108,20 @@
     ],
     "otherwise": "admissible ONLY under a valid DeclassificationArtifact",
     "composition_with_row4": {
-      "rule": "an egress is permitted only if BOTH planes permit it; the more restrictive outcome wins on the order permit < escalate < block",
-      "necessity": "SS A.6 states the sink rule as a necessary condition ('permitted only if (verified label, sink) is in the frozen allowed-sink policy, or a valid DeclassificationArtifact covers it') while row 4 states an outcome per label. Composing them any other way would let one plane override the other's refusal; taking the more restrictive is the only composition that cannot turn two refusals into a permit."
-    }
+      "rule": "ROW 6 IS THE PERMIT WHITELIST; ROW 4 SUPPLIES THE SEVERITY. Exactly one verdict per cell, never two combined: an unlabelled payload blocks; a whitelisted (label, sink) pair permits; any other pair takes row 4's egress outcome for that label as the severity of the refusal.",
+      "amended_by_adr": "0023",
+      "necessity": "The two rows answer different questions -- row 6 answers WHETHER an egress is allowed, row 4 answers HOW SEVERE a disallowed one is -- so combining them as two verdicts over one cell was a category error. ADR 0022's original 'more restrictive wins' composition falsified two of this document's own necessity statements: it turned (internal, internal-sink) into escalate although row 6 lists that pair as allowed precisely so ordinary internal traffic can run, and it left escalate surviving only in the cell that was meant to permit, although row 4's necessity for `internal` says escalate is what makes the declassification path observable. Under this formulation both necessity statements hold: (internal, internal-sink) permits and (internal, external-sink) escalates."
+    },
+    "verdict_table": [
+      {"label": "public", "sink": "internal-sink", "verdict": "permit"},
+      {"label": "public", "sink": "external-sink", "verdict": "permit"},
+      {"label": "internal", "sink": "internal-sink", "verdict": "permit"},
+      {"label": "internal", "sink": "external-sink", "verdict": "escalate"},
+      {"label": "sensitive", "sink": "internal-sink", "verdict": "block"},
+      {"label": "sensitive", "sink": "external-sink", "verdict": "block"},
+      {"label": null, "sink": "*", "verdict": "block"}
+    ],
+    "verdict_table_status": "DERIVED, not independent: every row is what the whitelist-then-severity rule above yields. It is written out because a policy whose cells cannot be read off at a glance is a policy nobody checks, and the loader asserts the rule reproduces this table exactly -- so the two can never disagree."
   },
   "row10_oracle_classification": {
     "high_risk_actions": [

@@ -52,10 +52,12 @@ CONFIG_VERSION = 1  # any other document version fails closed
 
 DOCUMENT_PATH = Path(__file__).with_name("label_approval_v1.json")
 
-# The three outcomes, ordered least to most restrictive. Composition takes the
-# maximum, so two planes can never combine into a permit neither granted.
+# The three verdicts (ADR 0022, composition amended by ADR 0023). Deliberately
+# a SET, not an order: since ADR 0023 exactly one verdict is produced per cell
+# -- row 6 decides whether, row 4 decides how severe -- so there is nothing to
+# combine and no restrictiveness ranking to apply.
 PERMIT, ESCALATE, BLOCK = "permit", "escalate", "block"
-_RESTRICTIVENESS = {PERMIT: 0, ESCALATE: 1, BLOCK: 2}
+_VERDICTS = frozenset({PERMIT, ESCALATE, BLOCK})
 
 
 class FrozenPolicyError(Exception):
@@ -118,7 +120,7 @@ def _validate(doc: dict[str, Any]) -> None:
         key = (entry["action_class"], entry["label"])
         if key in seen:
             raise PolicyStructureError(f"duplicate outcome rule {key}")
-        if entry["outcome"] not in _RESTRICTIVENESS:
+        if entry["outcome"] not in _VERDICTS:
             raise PolicyStructureError(f"outcome {entry['outcome']!r} is not one of the three")
         if entry["label"] != "*" and entry["label"] not in order:
             raise PolicyStructureError(f"outcome names unknown label {entry['label']!r}")
@@ -131,7 +133,7 @@ def _validate(doc: dict[str, Any]) -> None:
 
     for entry in row4["unlabelled"]:
         _require_necessity(entry, f"unlabelled/{entry.get('action_class')}")
-        if entry["outcome"] not in _RESTRICTIVENESS:
+        if entry["outcome"] not in _VERDICTS:
             raise PolicyStructureError(
                 f"unlabelled outcome {entry['outcome']!r} is not one of three"
             )
@@ -170,6 +172,44 @@ def _validate(doc: dict[str, Any]) -> None:
         _require_necessity(entry, f"sensitive label {entry.get('label')!r}")
         if entry["label"] not in order:
             raise PolicyStructureError(f"sensitive label {entry['label']!r} is outside the order")
+
+    _validate_verdict_table(doc, order, sinks)
+
+
+def _validate_verdict_table(doc: dict[str, Any], order: list[str], sinks: set[str]) -> None:
+    """The written table and the rule must agree, cell for cell (ADR 0023).
+
+    The table is derived, not independent: it is written out so the policy can
+    be read at a glance, and checked here so a future edit to one cannot drift
+    away from the other. Every (label, sink) cell plus the unlabelled case must
+    be present exactly once.
+    """
+    row6 = doc["row6_sink_policy"]
+    table = {(entry["label"], entry["sink"]): entry["verdict"] for entry in row6["verdict_table"]}
+    if len(table) != len(row6["verdict_table"]):
+        raise PolicyStructureError("the verdict table repeats a cell")
+    policy = build(doc, _skip_table_check=True)
+    expected: dict[tuple[str | None, str], str] = {(None, "*"): policy.unlabelled_egress}
+    for label in order:
+        for sink in sorted(sinks):
+            recipient = (
+                f"someone@{policy.internal_sink_domain}"
+                if sink == "internal-sink"
+                else "someone@elsewhere.invalid"
+            )
+            expected[(label, sink)] = policy.outcome(
+                is_egress=True, label=label, recipient=recipient
+            )
+    if table != expected:
+        differing = {
+            cell: (table.get(cell), expected.get(cell))
+            for cell in set(table) | set(expected)
+            if table.get(cell) != expected.get(cell)
+        }
+        raise PolicyStructureError(
+            f"the verdict table disagrees with the rule at {sorted(map(str, differing))}: "
+            f"{differing}"
+        )
 
 
 def h_policy(doc: dict[str, Any], *, version: int = 1) -> str:
@@ -224,23 +264,25 @@ class LabelApprovalPolicy:
         return "internal-sink" if domain == self.internal_sink_domain else "external-sink"
 
     def outcome(self, *, is_egress: bool, label: str | None, recipient: str | None) -> str:
-        """The composed row 4 + row 6 outcome for one concrete action.
+        """The row 4 + row 6 verdict for one concrete action (ADR 0023).
 
-        Composition (declared in the document, and the only one that cannot
-        turn two refusals into a permit): the MORE RESTRICTIVE of the two
-        planes wins, on the order permit < escalate < block.
+        **Row 6 is the permit whitelist; row 4 supplies the severity.** Exactly
+        one verdict per cell, never two combined -- the two rows answer
+        different questions (row 6: *whether* an egress is allowed; row 4:
+        *how severe* a disallowed one is), so treating them as two verdicts
+        over one cell was the category error ADR 0023 corrects.
         """
         if not is_egress:
             return self.non_egress_outcome if label is not None else self.unlabelled_non_egress
         if label is None:
             return self.unlabelled_egress  # fail closed: no permit can be established
-        row4 = self.egress_outcome[label]
         if recipient is None:
-            # Declared egress with no recipient to classify: row 6 cannot be
-            # evaluated, so nothing can establish its half of the permit.
+            # Declared egress with no recipient to classify: the whitelist
+            # cannot be consulted, so no permit can be established.
             return BLOCK
-        row6 = PERMIT if (label, self.sink_class(recipient)) in self.allowed_pairs else BLOCK
-        return max((row4, row6), key=_RESTRICTIVENESS.__getitem__)
+        if (label, self.sink_class(recipient)) in self.allowed_pairs:
+            return PERMIT
+        return self.egress_outcome[label]  # row 4 as the severity of the refusal
 
     # -- row 10 --------------------------------------------------------- #
     def is_high_risk(self, action: str) -> bool:
@@ -250,8 +292,12 @@ class LabelApprovalPolicy:
         return label in self.sensitive_labels
 
 
-def build(doc: dict[str, Any]) -> LabelApprovalPolicy:
-    """The evaluable policy, computed from the document. No defaults anywhere."""
+def build(doc: dict[str, Any], *, _skip_table_check: bool = False) -> LabelApprovalPolicy:
+    """The evaluable policy, computed from the document. No defaults anywhere.
+
+    `_skip_table_check` exists solely so `_validate_verdict_table` can build a
+    policy to check the table against without recursing into itself.
+    """
     row4 = doc["row4_context_policy"]
     order = tuple(row4["label_vocabulary"]["total_order"])
     egress_outcome = {

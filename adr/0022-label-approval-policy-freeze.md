@@ -1,5 +1,14 @@
 # 0022 — The label/sink/classification freeze: `frozen_parameters` rows 4, 6 and 10, hashed as `H(Λ)`
 
+> **Amended by [ADR 0023](0023-label-sink-verdict-correction.md), 2026-07-30 — the composition
+> rule below is superseded.** "The more restrictive wins" falsified two of this document's own
+> necessity statements, and the section *"The composition of rows 4 and 6"* is retained
+> unrewritten as the record of what was decided and why it was wrong. Rows 4 and 6 do **not**
+> compose: row 6 is the permit whitelist and row 4 supplies the severity of a non-whitelisted
+> pair. Every **value** frozen below is unchanged; only the rule turning them into a verdict
+> changed, and `H(Λ)` was recomputed accordingly (the value quoted below is the pre-amendment
+> one — ADR 0023 and `docs/frozen_parameters.md` carry the operative digest).
+
 ## Context
 
 Three seal-time parameters have blocked work since gate G-2 registered the last of them:
@@ -95,7 +104,7 @@ stays unscored.
 
 ## Status
 
-accepted — 2026-07-30
+accepted — 2026-07-30; composition rule **amended by ADR 0023** — 2026-07-30
 
 ## Consequences
 

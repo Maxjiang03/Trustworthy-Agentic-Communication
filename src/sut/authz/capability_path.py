@@ -41,8 +41,35 @@ containment**; the counterfactual suite caught it.
 plane is evaluated against **`P_0`**, the authority prefix, which carries no
 attenuation block -- so nothing there can fail for a narrowing reason, and
 `Allowed(P_0; Gamma, kappa, Omega)` is empty **iff** one of `Gamma`'s own
-checks refused. Four probes established this on `biscuit-python==0.4.0`
-before it was adopted, and the regression suite pins all four:
+checks refused.
+
+**Sound by CONSTRUCTION, not merely by probe.** Read off the frozen templates
+(ADR 0016), and each clause is asserted by test:
+
+1. the **authority block template carries no `check` at all** -- it is four
+   facts (`right/2`, `token_audience/1`, `token_task/1`, `expiry/1`);
+2. the **only token-carried check** is the attenuation template's, and it
+   consumes `scope/2`, a predicate that appears in **neither** block 0 nor
+   `Gamma`;
+3. `Gamma`'s three checks consume `expiry/1`, `token_audience/1`,
+   `token_task/1` (block-0 facts) plus injected facts, and **none mentions
+   `operation/2`** -- so they are candidate-independent and either all pass or
+   some fail regardless of which element is probed.
+
+`P_0` contains only block 0, so by (1) the only checks that can run against it
+are `Gamma`'s, and by (3) their verdict does not depend on the candidate.
+`Allowed(P_0)` is therefore empty exactly when a `Gamma` check refused (or the
+authority block grants nothing in `Omega` -- the residual below).
+
+**The dependency this creates, stated because it is easy to lose:** any
+`Gamma` amendment re-triggers gate **G-2** *and* this soundness argument. A
+future `Gamma` whose check consumed `scope/2`, or an authority block template
+that gained a check, or a `Gamma` check that mentioned `operation/2`, would
+each break a clause above -- so the structural test is part of what an
+amendment must re-establish, not merely the gate.
+
+Four probes established the behaviour on `biscuit-python==0.4.0` before it was
+adopted, and the regression suite pins all four:
 
 | probe | outcome against `P_0` |
 |---|---|
@@ -108,10 +135,10 @@ HTC_TAG = b"AASC-HTC-v1"
 INV_TAG = b"AASC-INV-v1"
 SCHEMA_VERSION = 1
 
-# ADR 0022's three outcomes, least to most restrictive. Composition takes the
-# maximum, so two planes can never combine into a permit neither granted.
+# The three verdicts (ADR 0022, composition amended by ADR 0023). They are not
+# ordered here: since ADR 0023 exactly one of them is produced per cell, so
+# there is nothing to combine and no restrictiveness ranking to apply.
 PERMIT, ESCALATE, BLOCK = "permit", "escalate", "block"
-_RESTRICTIVENESS = {PERMIT: 0, ESCALATE: 1, BLOCK: 2}
 
 CONJUNCT_ORDER = (
     "crypto_chain_ok",
@@ -291,16 +318,22 @@ class BoundaryPolicy:
         return "internal-sink" if domain == self.internal_sink_domain else "external-sink"
 
     def egress_decision(self, label: str | None, recipient: str | None) -> str:
-        """Rows 4 and 6 composed: the MORE RESTRICTIVE plane wins (ADR 0022)."""
+        """The row 4 + row 6 verdict for one egress (ADR 0023).
+
+        **Row 6 is the permit whitelist; row 4 supplies the severity.** One
+        verdict per cell, never two combined -- the rows answer different
+        questions, so composing them as two verdicts over one cell was the
+        category error ADR 0023 corrects.
+        """
         if label is None:
             return self.unlabelled_egress  # fail closed
         if label not in self.order:
             raise PolicyConfigurationError(f"label {label!r} is outside the frozen vocabulary")
         if recipient is None:
             return BLOCK  # declared egress with no classifiable recipient
-        row4 = self.egress_outcome[label]
-        row6 = PERMIT if (label, self.sink_class(recipient)) in self.allowed_pairs else BLOCK
-        return max((row4, row6), key=_RESTRICTIVENESS.__getitem__)
+        if (label, self.sink_class(recipient)) in self.allowed_pairs:
+            return PERMIT
+        return self.egress_outcome[label]  # row 4 as the severity of the refusal
 
 
 @dataclass(frozen=True)
