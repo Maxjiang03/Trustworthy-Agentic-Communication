@@ -1,0 +1,78 @@
+"""Server-side required authority: `R = required_authority(concrete_request, server_policy)`.
+
+SS A.5 fixes the two properties this module exists for, and both are tested:
+
+* `R` is computed **server-side from the concrete request** -- the tool being
+  invoked and the resource its arguments concretely name -- under a server
+  policy that is data, not agent input.
+* `R` **MUST NOT read any agent-supplied authority declaration.** An agent
+  cannot lower (or raise) what a request requires by *saying* something about
+  scope: only the designated resource argument of the concrete call enters
+  the computation, and a `scope`/`declared_scope`/`authority` field in the
+  arguments has no effect (regression-tested).
+
+The action vocabulary is the tool name itself -- the frozen `Omega` declares
+every action to be a tool (`omega.tools`, ADR 0016) -- and the resource is
+either read from the one designated argument (`calendar.read`, `notes.*`) or
+fixed by the server for tools whose resource is not caller-addressable
+(`mail.send` always acts on `mail/outbox`). Everything else fails closed:
+unknown tool, missing or non-string resource argument, or a resource outside
+the frozen `root '/' collection` grammar.
+
+This module deliberately does NOT check `R` against `Omega` or any authority
+set: membership and containment are the authorizer's and the boundary's
+business (`R subset-of C_n` is a SS A.5 conjunct), and conflating "what does
+this request require" with "is it allowed" would blur the two quantities the
+oracle scores separately.
+"""
+
+import re
+from collections.abc import Mapping
+from typing import Any
+
+# The frozen Omega resource grammar (ADR 0016): root '/' collection, exactly
+# one '/', lowercase us-ascii. Enforced here so a malformed resource fails
+# closed at R-computation rather than surfacing as a spurious containment
+# verdict downstream.
+_RESOURCE_RE = re.compile(r"^[a-z0-9]+/[a-z0-9]+$")
+
+# The server policy: data, keyed by tool. `resource_argument` names the ONE
+# argument the resource is read from, with the root it must live under;
+# `fixed_resource` pins the resource regardless of arguments.
+SERVER_POLICY: dict[str, dict[str, str]] = {
+    "calendar.read": {"resource_argument": "resource", "root": "calendar"},
+    "notes.read": {"resource_argument": "resource", "root": "notes"},
+    "notes.write": {"resource_argument": "resource", "root": "notes"},
+    "notes.delete": {"resource_argument": "resource", "root": "notes"},
+    "mail.send": {"fixed_resource": "mail/outbox"},
+}
+
+
+class RequiredAuthorityError(Exception):
+    """The concrete request does not determine a well-formed R. Fail closed."""
+
+
+def required_authority(
+    tool: str,
+    arguments: Mapping[str, Any],
+    policy: Mapping[str, Mapping[str, str]] = SERVER_POLICY,
+) -> frozenset[tuple[str, str]]:
+    """The authority this concrete request requires, as SS F.1 pairs."""
+    rule = policy.get(tool)
+    if rule is None:
+        raise RequiredAuthorityError(f"no server policy for tool {tool!r}")
+    if "fixed_resource" in rule:
+        resource = rule["fixed_resource"]
+    else:
+        name = rule["resource_argument"]
+        value = arguments.get(name)
+        if not isinstance(value, str):
+            raise RequiredAuthorityError(
+                f"{tool!r} requires a string {name!r} argument to name its resource"
+            )
+        if not _RESOURCE_RE.match(value) or not value.startswith(rule["root"] + "/"):
+            raise RequiredAuthorityError(
+                f"{tool!r} resource {value!r} violates the frozen grammar or names a foreign root"
+            )
+        resource = value
+    return frozenset({(tool, resource)})
