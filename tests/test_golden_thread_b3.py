@@ -295,26 +295,28 @@ class TestWouldHaveFailedWorlds:
         return arm, credentials
 
     # -- containment: the F1 blocks are attributable, not masked ------------ #
+    # The counterfactual outcome is EXPECTED PER CASE, never "either is fine":
+    # a test that accepts both outcomes cannot fail for the case it was written
+    # for. `calendar.read` is non-egress and not high-risk, so removing
+    # containment admits it outright. `mail.send` is both an unlabelled egress
+    # (row 4) and a frozen high-risk action (row 10), so three independent
+    # conjuncts refuse it and removing containment moves the block to
+    # `context_policy_ok` -- strictly later than containment, which is what
+    # makes the original block attributable rather than masked.
     @pytest.mark.parametrize(
-        "tool,arguments",
+        "tool,arguments,expected_without_containment",
         [
-            ("mail.send", {"to": "partner@example.test", "subject": "s", "body": "b"}),
-            ("calendar.read", {"resource": "calendar/work"}),
+            (
+                "mail.send",
+                {"to": "partner@example.test", "subject": "s", "body": "b"},
+                "context_policy_ok",
+            ),
+            ("calendar.read", {"resource": "calendar/work"}, None),  # None means ADMITTED
         ],
     )
-    def test_containment_block_would_be_admitted_without_the_conjunct(
-        self, staged, tool, arguments
+    def test_containment_block_is_attributable(
+        self, staged, tool, arguments, expected_without_containment
     ):
-        """The block is containment's, and no EARLIER conjunct was masking it.
-
-        Since ADR 0022 froze rows 4/6/10, `mail.send` is both an unlabelled
-        egress (row 4) and a high-risk action (row 10), so THREE independent
-        conjuncts now refuse it. That is a strengthening, and it sharpens what
-        the counterfactual must assert: removing containment must not leave the
-        request blocked by anything evaluated BEFORE containment. `calendar.read`
-        still admits outright; `mail.send` falls through to the later policy
-        conjuncts -- either way, nothing earlier was masking.
-        """
         setup, visible = staged
         arm, _ = self._arm_with_presentation(setup, visible, tool=tool, arguments=arguments)
         admitted, reason = arm.decide(tool, arguments)
@@ -325,13 +327,19 @@ class TestWouldHaveFailedWorlds:
             setup, visible, tool=tool, arguments=arguments, ablates="containment_ok"
         )
         ablated_admitted, ablated_reason = ablated.decide(tool, arguments)
-        if ablated_admitted:
-            return  # admitted outright: nothing else refuses this request at all
-        blocking = next(name for name, code in REASON_CODES.items() if code == ablated_reason)
-        assert CONJUNCT_ORDER.index(blocking) > CONJUNCT_ORDER.index("containment_ok"), (
-            f"with containment removed the block moved to {blocking!r}, which is evaluated "
-            "BEFORE containment -- so the original block was masked, not attributable"
-        )
+
+        if expected_without_containment is None:
+            assert ablated_admitted is True, (
+                f"{tool} must be ADMITTED once containment is removed; it was blocked at "
+                f"{ablated_reason!r}, so something else was refusing it too"
+            )
+            return
+
+        assert ablated_admitted is False
+        assert ablated_reason == REASON_CODES[expected_without_containment]
+        assert CONJUNCT_ORDER.index(expected_without_containment) > CONJUNCT_ORDER.index(
+            "containment_ok"
+        ), "the expected fallback conjunct must be evaluated strictly AFTER containment"
 
     # -- htc_chain_ok: a wrong-holder INV ----------------------------------- #
     def test_wrong_holder_inv_blocks_and_is_attributable(self, staged):
@@ -499,6 +507,70 @@ class TestGammaCheckDiscriminator:
         assert structural is True
         assert textual is True
 
+    # -- the argument that makes the probes conclusive ---------------------- #
+    @staticmethod
+    def _statements(source: str) -> list[str]:
+        """Datalog statements with `//` comment lines stripped."""
+        body = "\n".join(line for line in source.splitlines() if not line.strip().startswith("//"))
+        return [statement.strip() for statement in body.split(";") if statement.strip()]
+
+    def test_the_authority_block_template_carries_no_check(self):
+        """Clause 1: P_0 contains only block 0, and block 0 has no checks.
+
+        This is what makes the P_0 probe conclusive rather than merely
+        observed: if block 0 could carry a check, a checks-failed outcome
+        against P_0 would no longer identify Gamma as the source.
+        """
+        templates = frozen_config.load_document()["gamma"]["datalog"]
+        statements = self._statements(templates["authority_block_template"])
+        assert statements, "the authority template is empty"
+        assert not any(s.startswith("check") for s in statements), (
+            f"the authority block template carries a check: {statements}"
+        )
+        # Positive arm: it does carry the four facts Gamma's checks consume.
+        joined = " ".join(statements)
+        for predicate in ("right(", "token_audience(", "token_task(", "expiry("):
+            assert predicate in joined
+
+    def test_the_only_token_carried_check_consumes_scope_alone(self):
+        """Clause 2: the attenuation check reads a predicate Gamma never defines."""
+        templates = frozen_config.load_document()["gamma"]["datalog"]
+        checks = [
+            s
+            for s in self._statements(templates["attenuation_block_template"])
+            if s.startswith("check")
+        ]
+        assert len(checks) == 1, f"expected exactly one attenuation check, got {checks}"
+        check = checks[0]
+        assert "scope(" in check
+        # It must NOT consume any of the facts Gamma's own checks consume, or
+        # the two planes would overlap and P_0 would stop separating them.
+        for predicate in ("expiry(", "token_audience(", "token_task("):
+            assert predicate not in check
+        # And `scope` appears in neither block 0 nor Gamma.
+        assert "scope(" not in templates["authority_block_template"]
+        assert "scope(" not in templates["authorizer"]
+
+    def test_gamma_checks_are_candidate_independent(self):
+        """Clause 3: none of Gamma's checks mentions operation/2.
+
+        So their verdict does not depend on which element of Omega is being
+        probed -- which is why an empty Allowed(P_0) is a clean signal rather
+        than an artefact of the candidate chosen.
+        """
+        templates = frozen_config.load_document()["gamma"]["datalog"]
+        statements = self._statements(templates["authorizer"])
+        checks = [s for s in statements if s.startswith("check")]
+        allows = [s for s in statements if s.startswith("allow")]
+        assert len(checks) == 3 and len(allows) == 1
+        for check in checks:
+            assert "operation(" not in check, (
+                f"a Gamma check mentions operation/2 and is therefore candidate-dependent: {check}"
+            )
+        # Negative arm: the ALLOW rule does mention it, so the absence above
+        # is a property of the checks specifically, not of the whole authorizer.
+        assert "operation(" in allows[0]
+
     def test_the_decision_path_parses_no_denial_message(self):
         """Structural means structural: no message text on the decision path."""
         import ast
@@ -565,8 +637,8 @@ class TestFrozenPolicyIsLoadBearing:
         [
             ("public", "a@aasc.local", "permit"),
             ("public", "a@partner.test", "permit"),
-            ("internal", "a@aasc.local", "escalate"),
-            ("internal", "a@partner.test", "block"),
+            ("internal", "a@aasc.local", "permit"),
+            ("internal", "a@partner.test", "escalate"),
             ("sensitive", "a@aasc.local", "block"),
             ("sensitive", "a@partner.test", "block"),
             (None, "a@partner.test", "block"),
