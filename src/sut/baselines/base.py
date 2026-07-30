@@ -67,6 +67,84 @@ class ArmBitmask:
             self.audit,
         )
 
+    def enabled_conjuncts(self) -> frozenset[str]:
+        """The SS A.5 conjuncts this arm's bitmask selects.
+
+        An arm's ladder position is DATA, not a branch: the same decision-path
+        functions serve `B3` and `B-cap`, and the bitmask is what chooses which
+        of them run. `jti_cache` and `audit` select no conjunct -- the first is
+        `B3+`'s replay cache (gate G-9) and the second never sits on the
+        decision path at all (SS E.5).
+        """
+        selected: set[str] = set()
+        for bit, conjuncts in BIT_TO_CONJUNCTS.items():
+            if getattr(self, bit):
+                selected.update(conjuncts)
+        return frozenset(selected)
+
+
+class ArmIdentityError(Exception):
+    """An arm's declared identity does not permit what it was configured to do."""
+
+
+@dataclass(frozen=True)
+class ArmIdentity:
+    """Who an arm declares itself to be, and what that permits (EXP2 STEP 6).
+
+    Before SS E.6's ablation arms exist, this closes the gap that nothing
+    stopped `B3` **proper** from carrying a `disabled` conjunct: a decision
+    path may only skip a conjunct if the arm presenting it has *declared*
+    itself an ablation of exactly that conjunct.
+    """
+
+    name: str
+    is_ablation: bool = False
+    ablates: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.is_ablation and not self.ablates:
+            raise ArmIdentityError(f"ablation arm {self.name!r} names no ablated conjunct")
+        if self.ablates and not self.is_ablation:
+            raise ArmIdentityError(f"arm {self.name!r} names an ablated conjunct but is not one")
+
+    def check_disabled(self, disabled: "frozenset[str]", *, run_mode: str) -> None:
+        """The four rules. Every one refuses rather than warns."""
+        if not disabled:
+            return
+        if not self.is_ablation:
+            raise ArmIdentityError(
+                f"{self.name!r} is not a declared ablation variant and may not disable "
+                f"{sorted(disabled)} (SS E.6 ablations are separate arms)"
+            )
+        if disabled != {self.ablates}:
+            # SS E.6: each ablation is B3 with EXACTLY ONE conjunct disabled,
+            # and an orthogonal fixture blocked only by that conjunct. Two
+            # would make the leave-one-out unmatched.
+            raise ArmIdentityError(
+                f"{self.name!r} declares it ablates {self.ablates!r} but disables "
+                f"{sorted(disabled)}"
+            )
+        if run_mode == "confirmatory":
+            raise ArmIdentityError(
+                f"ablation variant {self.name!r} may not drive a confirmatory run"
+            )
+
+
+# SS E.5 bit -> the SS A.5 conjuncts that bit selects. `htc_holder` carries
+# three: without an HTC chain there is no terminal holder to prove against and
+# none to map an `oauth_actor` onto (SS A.5.1), so the identity-plane check has
+# nothing to check.
+BIT_TO_CONJUNCTS: dict[str, tuple[str, ...]] = {
+    "oauth_authn": ("oauth_resource_authorization_ok",),
+    "crypto_chain": ("crypto_chain_ok",),
+    "authorizer": ("authorizer_policy_ok",),
+    "htc_holder": ("htc_chain_ok", "holder_proof_ok", "identity_plane_consistency_ok"),
+    "invoke": ("invocation_binding_ok",),
+    "contain": ("containment_ok",),
+    "context": ("context_policy_ok",),
+    "approval": ("approval_artifact_ok",),
+}
+
 
 @dataclass(frozen=True)
 class HopContext:

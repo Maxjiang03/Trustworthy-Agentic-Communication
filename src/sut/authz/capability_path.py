@@ -30,16 +30,38 @@ Part I's `reference_allow` (`R subset-of C_sets[-1]`) scores. So
 (expiry, audience, task) plus the SS A.6.1 out-of-profile structural
 rejection -- and the **authority** question falls through to containment.
 
-Discriminating the two needs care, and the naive version was wrong: the
+Discriminating the two needs care, and the first attempt was wrong: the
 pinned library's denial message lists **every** failed check, including the
 attenuation block's own `check if operation(...), scope(...)`, which is the
 narrowing -- i.e. the authority plane. Matching "checks failed" alone
 therefore attributed every F1 block to `authorizer_policy_ok` and **masked
-containment**; the counterfactual suite caught it. The discriminator is the
-check's **origin**: only a check reported `in authorizer` is Gamma's
-[VERIFIED by probe on `biscuit-python==0.4.0`, pinned by a test that asserts
-both message shapes -- `Check n<deg>N in authorizer` for a Gamma check and
-`Check n<deg>N in block n<deg>M` for the attenuation check].
+containment**; the counterfactual suite caught it.
+
+**The discriminator is now STRUCTURAL, not textual** (EXP2 STEP 7). The check
+plane is evaluated against **`P_0`**, the authority prefix, which carries no
+attenuation block -- so nothing there can fail for a narrowing reason, and
+`Allowed(P_0; Gamma, kappa, Omega)` is empty **iff** one of `Gamma`'s own
+checks refused. Four probes established this on `biscuit-python==0.4.0`
+before it was adopted, and the regression suite pins all four:
+
+| probe | outcome against `P_0` |
+|---|---|
+| inside `C_0`, failing `Gamma` check | `Allowed(P_0)` **empty** -> the check plane |
+| inside `C_0`, narrowed away at hop 1 | **permitted** -> falls through to containment |
+| outside `C_0` entirely | denied, but no check failed; `Allowed(P_0)` non-empty -> falls through |
+| outside `C_0` **and** a failing `Gamma` check | `Allowed(P_0)` **empty** -> the check plane |
+
+No denial message is parsed on the decision path any more. `gamma_checks_in`
+below is retained **only** as an independent second witness for the
+regression suite -- a canary that fires if a library bump changes the message
+shapes the earlier reading depended on.
+
+**Residual, stated rather than hidden:** a capability whose authority block
+grants nothing inside `Omega` yields an empty `Allowed(P_0)` for that reason
+alone, and is attributed to `authorizer_policy_ok` rather than to
+containment. `C_0 = U_task` is non-empty in every scenario the design defines,
+so this is degenerate here; it is recorded because the attribution, not the
+outcome, is what would differ.
 
 **Orthogonality for the SS E.6 ablations.** `invocation_binding_ok` checks
 the INV's *bindings* and window but never re-verifies its signature -- who
@@ -73,14 +95,23 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from src.sut.authz.boundary import BoundaryConfig, TokenRejected, admits, verify_access_token
 from src.sut.authz.registry_view import RegistryView, RegistryViewError
+from src.sut.baselines.base import ArmIdentity
 from src.sut.capability import authority
 from src.sut.capability.digests import access_token_hash, commit_prefix, h_jcs
-from src.sut.protocol.required_authority import RequiredAuthorityError, required_authority
+from src.sut.protocol.required_authority import (
+    RequiredAuthorityError,
+    egress_recipient,
+    required_authority,
+)
 
 HTC_TAG = b"AASC-HTC-v1"
 INV_TAG = b"AASC-INV-v1"
 SCHEMA_VERSION = 1
-PILOT_BANNER = "PILOT-PROVISIONAL"
+
+# ADR 0022's three outcomes, least to most restrictive. Composition takes the
+# maximum, so two planes can never combine into a permit neither granted.
+PERMIT, ESCALATE, BLOCK = "permit", "escalate", "block"
+_RESTRICTIVENESS = {PERMIT: 0, ESCALATE: 1, BLOCK: 2}
 
 CONJUNCT_ORDER = (
     "crypto_chain_ok",
@@ -144,13 +175,16 @@ _INV_FIELDS = {
 def gamma_checks_in(denial_message: str) -> str:
     """The failed checks that belong to `Gamma` (the AUTHORIZER), if any.
 
-    The library reports every failed check in one message, tagging each with
-    its origin: `Check n<deg>N in authorizer` for one of `Gamma`'s own checks
-    (expiry, audience, task) and `Check n<deg>N in block n<deg>M` for a check
-    carried in a token block -- which, under the frozen templates, is the
-    attenuation narrowing and therefore the AUTHORITY plane. Returning only
-    the authorizer-origin entries is what keeps containment attributable
-    (module docstring; the naive "any failed check" reading masked it).
+    **Not on the decision path.** Since EXP2 STEP 7 the authorizer/containment
+    split is decided structurally against `P_0` (module docstring), so nothing
+    in production parses a denial message. This function is retained as the
+    regression suite's **independent second witness**: it reads the library's
+    per-check origin tags (`Check n<deg>N in authorizer` for one of `Gamma`'s
+    own checks, `Check n<deg>N in block n<deg>M` for a check carried in a
+    token block, i.e. the attenuation narrowing), and the suite asserts it
+    agrees with the structural discriminator on all four probe cases. It is a
+    canary: if a library bump changes those shapes, a test says so and nothing
+    on the decision path is affected.
     """
     flattened = denial_message.replace("\n", " ")
     marker = "checks failed:"
@@ -176,46 +210,97 @@ class ConjunctFailed(Exception):
         self.detail = detail
 
 
-class PilotPolicyError(Exception):
+class PolicyConfigurationError(Exception):
     """The policy-dependent conjuncts were misconfigured. Construction-time, fail closed."""
 
 
 @dataclass(frozen=True)
-class PilotPolicy:
-    """The injected stand-in for rows 4/6 (context) and 10 (approval).
+class BoundaryPolicy:
+    """Rows 4/6/10 as the boundary consumes them (ADR 0022).
 
-    Never a silent default: `load` refuses a missing policy, a missing
-    PILOT-PROVISIONAL banner, and any run marked confirmatory.
+    Built from the **frozen document itself**, injected as sealed
+    configuration by the runner -- the SUT never imports the harness loader
+    (red line 6), it evaluates the same bytes independently, exactly the line
+    ADR 0016 drew for `Omega`/`Gamma`. There is one policy source: the
+    PILOT-PROVISIONAL stand-in is gone.
+
+    What this enables is the **refusal** half of both conjuncts. The
+    acceptance half needs `authz_context_hash` (ADR 0009 category (c), owned
+    by G-15), so a high-risk action is refused because no approval artifact
+    can verify -- not because approval is impossible in principle.
     """
 
-    banner: str
+    order: tuple[str, ...]
+    egress_outcome: dict[str, str]
+    non_egress_outcome: str
+    unlabelled_egress: str
+    unlabelled_non_egress: str
+    internal_sink_domain: str
+    allowed_pairs: frozenset[tuple[str, str]]
     high_risk_actions: frozenset[str]
-    labels_supported: bool
+    sensitive_labels: frozenset[str]
 
     @classmethod
-    def load(cls, policy: Mapping[str, Any] | None, *, run_mode: str) -> "PilotPolicy":
-        if policy is None:
-            raise PilotPolicyError(
-                "no context/approval policy was injected; rows 4/6/10 are UNSET and "
-                "defaulting is forbidden (EXP1 STEP 12)"
+    def load(cls, document: Mapping[str, Any] | None) -> "BoundaryPolicy":
+        """Build from the frozen document. A missing document fails closed."""
+        if document is None:
+            raise PolicyConfigurationError(
+                "no label/approval policy was injected; defaulting is forbidden (ADR 0022)"
             )
-        banner = str(policy.get("_banner", ""))
-        if PILOT_BANNER not in banner:
-            raise PilotPolicyError(
-                "the injected policy does not carry the PILOT-PROVISIONAL banner"
+        try:
+            row4 = document["row4_context_policy"]
+            order = tuple(row4["label_vocabulary"]["total_order"])
+            egress = {
+                entry["label"]: entry["outcome"]
+                for entry in row4["outcomes"]
+                if entry["action_class"] == "egress"
+            }
+            non_egress = next(
+                entry["outcome"]
+                for entry in row4["outcomes"]
+                if entry["action_class"] == "non_egress"
             )
-        if run_mode == "confirmatory":
-            raise PilotPolicyError(
-                "a PILOT-PROVISIONAL policy may never drive a confirmatory run "
-                "(rows 4/6/10 are UNSET)"
+            unlabelled = {entry["action_class"]: entry["outcome"] for entry in row4["unlabelled"]}
+            row6 = document["row6_sink_policy"]
+            internal = next(
+                entry for entry in row6["sink_classes"] if entry["sink"] == "internal-sink"
             )
-        if run_mode != "pilot":
-            raise PilotPolicyError(f"unknown run mode {run_mode!r}")
-        return cls(
-            banner=banner,
-            high_risk_actions=frozenset(policy.get("approval", {}).get("high_risk_actions", [])),
-            labels_supported=bool(policy.get("context", {}).get("labels_supported", False)),
-        )
+            row10 = document["row10_oracle_classification"]
+            return cls(
+                order=order,
+                egress_outcome=egress,
+                non_egress_outcome=non_egress,
+                unlabelled_egress=unlabelled["egress"],
+                unlabelled_non_egress=unlabelled["non_egress"],
+                internal_sink_domain=internal["internal_domain"],
+                allowed_pairs=frozenset(
+                    (entry["label"], entry["sink"]) for entry in row6["allowed_pairs"]
+                ),
+                high_risk_actions=frozenset(
+                    entry["action"] for entry in row10["high_risk_actions"]
+                ),
+                sensitive_labels=frozenset(entry["label"] for entry in row10["sensitive_labels"]),
+            )
+        except (KeyError, StopIteration, TypeError) as exc:
+            raise PolicyConfigurationError(
+                f"the injected policy document is not the frozen shape: {exc!r}"
+            ) from exc
+
+    def sink_class(self, recipient: str) -> str:
+        domain = recipient.rpartition("@")[2]
+        return "internal-sink" if domain == self.internal_sink_domain else "external-sink"
+
+    def egress_decision(self, label: str | None, recipient: str | None) -> str:
+        """Rows 4 and 6 composed: the MORE RESTRICTIVE plane wins (ADR 0022)."""
+        if label is None:
+            return self.unlabelled_egress  # fail closed
+        if label not in self.order:
+            raise PolicyConfigurationError(f"label {label!r} is outside the frozen vocabulary")
+        if recipient is None:
+            return BLOCK  # declared egress with no classifiable recipient
+        row4 = self.egress_outcome[label]
+        row6 = PERMIT if (label, self.sink_class(recipient)) in self.allowed_pairs else BLOCK
+        return max((row4, row6), key=_RESTRICTIVENESS.__getitem__)
 
 
 @dataclass(frozen=True)
@@ -283,7 +368,23 @@ def _verify_domain_signature(
 
 
 class CapabilityDecisionPath:
-    """The B3 arm's boundary decision: the ten conjuncts over one presentation."""
+    """The capability boundary decision: the SS A.5 conjuncts over one presentation.
+
+    Two distinct notions of "this arm does not run that conjunct", deliberately
+    kept apart:
+
+    * **`enabled`** -- which conjuncts the ARM's mechanism has at all, selected
+      by its SS E.5 bitmask. `B-cap` legitimately runs four of the ten because
+      it carries no HTC, no INV, and no policy plane; that is its ladder
+      position, not an ablation.
+    * **`disabled`** -- the SS E.6 ablation seam: `B3` with exactly ONE conjunct
+      removed and everything else intact. Guarded, because nothing previously
+      stopped `B3` **proper** from silently carrying one (EXP2 STEP 6):
+      `B3` proper refuses a non-empty `disabled`; only a declared ablation
+      variant may carry one, and exactly the one it is named for; the variant's
+      name appears in every audit record it emits; and an ablation variant is
+      refused outright on a confirmatory run.
+    """
 
     def __init__(
         self,
@@ -291,18 +392,24 @@ class CapabilityDecisionPath:
         gamma_document: Mapping[str, Any],
         registry_view: RegistryView,
         oauth_config: BoundaryConfig,
-        pilot_policy: PilotPolicy,
+        policy: BoundaryPolicy,
+        arm_identity: "ArmIdentity",
+        enabled: frozenset[str] | None = None,
         oauth_required_scope: str = "mcp.invoke",
         disabled: frozenset[str] = frozenset(),
+        run_mode: str = "pilot",
         audit_sink: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
-        unknown = disabled - set(CONJUNCT_ORDER)
+        unknown = (disabled | (enabled or frozenset())) - set(CONJUNCT_ORDER)
         if unknown:
-            raise PilotPolicyError(f"cannot disable unknown conjuncts {sorted(unknown)}")
+            raise PolicyConfigurationError(f"unknown conjunct name(s) {sorted(unknown)}")
+        arm_identity.check_disabled(disabled, run_mode=run_mode)
         self._gamma = dict(gamma_document)
         self._registry = registry_view
         self._oauth_config = oauth_config
-        self._policy = pilot_policy
+        self._policy = policy
+        self._identity = arm_identity
+        self._enabled = frozenset(CONJUNCT_ORDER) if enabled is None else enabled
         self._scope = oauth_required_scope
         self._disabled = disabled
         self._audit_sink = audit_sink
@@ -329,7 +436,14 @@ class CapabilityDecisionPath:
         }
         try:
             for name in CONJUNCT_ORDER:
+                if name not in self._enabled:
+                    # The arm's bitmask does not carry this conjunct at all
+                    # (its ladder position), recorded so the trace is honest.
+                    decision.evaluated.append(f"absent:{name}")
+                    continue
                 if name in self._disabled:
+                    # An SS E.6 ablation: present in the mechanism, removed for
+                    # this variant, and never silent.
                     decision.evaluated.append(f"skipped:{name}")
                     continue
                 conjuncts[name](presentation, tool, arguments, state)
@@ -351,7 +465,12 @@ class CapabilityDecisionPath:
         try:
             self._audit_sink(
                 {
-                    "layer": "b3-boundary",
+                    "layer": "capability-boundary",
+                    # The arm's declared identity, in EVERY record: an ablation
+                    # variant's trace can never be mistaken for B3 proper's.
+                    "arm": self._identity.name,
+                    "is_ablation": self._identity.is_ablation,
+                    "ablates": self._identity.ablates,
                     "tool": tool,
                     "admitted": decision.admitted,
                     "reason_code": decision.reason_code,
@@ -393,41 +512,32 @@ class CapabilityDecisionPath:
             authority.reject_out_of_profile(terminal)
         except authority.OutOfProfileError as exc:
             raise ConjunctFailed("authorizer_policy_ok", str(exc)) from exc
-        # The check-plane probe: a failed Gamma check (expiry/audience/task)
-        # fails HERE; a failed BLOCK check is the attenuation narrowing, so it
-        # falls through to containment and an F1 block is never masked.
+        # The STRUCTURAL check-plane probe (EXP2 STEP 7): evaluate the
+        # AUTHORITY prefix P_0, which carries no attenuation block. Nothing
+        # there can fail for a narrowing reason, so an empty Allowed(P_0) means
+        # one of Gamma's own checks refused -- and a narrowed-away or
+        # out-of-C_0 candidate falls through to containment, unmasked.
+        # `required_authority` still runs so a malformed request is refused
+        # here rather than surfacing later as a spurious containment verdict.
         try:
-            elements = sorted(required_authority(tool, arguments))
+            required_authority(tool, arguments)
         except RequiredAuthorityError as exc:
             raise ConjunctFailed("authorizer_policy_ok", f"no well-formed R: {exc}") from exc
-        for element in elements:
-            failed_checks = self._failed_gamma_checks(terminal, element, p)
-            if failed_checks:
-                raise ConjunctFailed("authorizer_policy_ok", f"Gamma check failed: {failed_checks}")
-
-    def _failed_gamma_checks(
-        self, token_bytes: bytes, element: tuple[str, str], p: B3Presentation
-    ) -> str:
-        from datetime import datetime, timezone
-
-        from biscuit_auth import AuthorizationError, AuthorizerBuilder, Biscuit, Fact
-
-        token = Biscuit.from_bytes(token_bytes, self._root_public)
-        builder = AuthorizerBuilder(self._gamma["gamma"]["datalog"]["authorizer"])
-        action, resource = element
-        builder.add_fact(
-            Fact("operation({action}, {resource})", {"action": action, "resource": resource})
+        authority_prefix = bytes(p.capability_hops[0])
+        admitted_at_root = authority.allowed_set(
+            authority_prefix,
+            self._root_public,
+            self._gamma,
+            now_epoch=p.now_epoch,
+            audience=p.audience,
+            task_id=p.task_id,
         )
-        builder.add_fact(
-            Fact("time({t})", {"t": datetime.fromtimestamp(p.now_epoch, tz=timezone.utc)})
-        )
-        builder.add_fact(Fact("request_audience({aud})", {"aud": p.audience}))
-        builder.add_fact(Fact("request_task({task})", {"task": p.task_id}))
-        try:
-            builder.build(token).authorize()
-        except AuthorizationError as exc:
-            return gamma_checks_in(str(exc))
-        return ""
+        if not admitted_at_root:
+            raise ConjunctFailed(
+                "authorizer_policy_ok",
+                "Gamma admits nothing at the authority prefix P_0: one of its own checks "
+                "(expiry, audience, task) refused, or the authority block grants nothing in Omega",
+            )
 
     # -- 3. htc_chain_ok ---------------------------------------------------- #
     def _htc_chain_ok(self, p: B3Presentation, tool, arguments, state) -> None:
@@ -580,31 +690,69 @@ class CapabilityDecisionPath:
 
     # -- 7. context_policy_ok -------------------------------------------------- #
     def _context_policy_ok(self, p: B3Presentation, tool, arguments, state) -> None:
-        # Rows 4/6 are UNSET: the pilot policy supports NO label evaluation, so
-        # any presented LabelAssertion is un-evaluable and fails closed. The
-        # pilot scenarios carry none -- the conjunct is not load-bearing here,
-        # and F4 stays unscored until the rows are frozen by ADR.
-        if p.payload_labels and not self._policy.labels_supported:
+        """Rows 4 and 6, frozen by ADR 0022, over the concrete request.
+
+        Egress is DERIVED, never enumerated: the tool is egress iff the server
+        policy declares a recipient argument for it, which over the frozen
+        `Omega` is exactly `mail.send`. The label is the JOIN of the verified
+        payload labels (SS A.6); no label on an egress action fails closed.
+
+        Only the **refusal** half is decided here. `escalate` means admissible
+        under a valid approval or declassification artifact, and neither can
+        be verified until `authz_context_hash` is fixed (ADR 0009 category
+        (c), owned by G-15) -- so `escalate` refuses, and says why.
+        """
+        recipient = egress_recipient(tool, arguments)
+        if recipient is None:
+            # Non-egress: permit at every label, and unlabelled is permitted
+            # too -- nothing leaves, so no egress policy can apply.
+            return
+        labels = [str(entry.get("label")) for entry in p.payload_labels if "label" in entry]
+        try:
+            label = (
+                max(labels, key=self._policy.order.index)
+                if labels
+                else None  # unlabelled -> the frozen fail-closed rule
+            )
+            outcome = self._policy.egress_decision(label, recipient)
+        except (PolicyConfigurationError, ValueError) as exc:
+            raise ConjunctFailed("context_policy_ok", f"label cannot be evaluated: {exc}") from exc
+        if outcome == PERMIT:
+            return
+        if outcome == ESCALATE:
             raise ConjunctFailed(
                 "context_policy_ok",
-                "payload labels presented but rows 4/6 are UNSET (no frozen label policy)",
+                f"egress of {label!r} to {self._policy.sink_class(recipient)} escalates; "
+                "no declassification or approval artifact can verify until authz_context_hash "
+                "is fixed (ADR 0009 category (c), G-15)",
             )
+        raise ConjunctFailed(
+            "context_policy_ok",
+            f"egress of {label if label else 'an unlabelled payload'!r} to "
+            f"{self._policy.sink_class(recipient)} is blocked by the frozen policy (ADR 0022)",
+        )
 
     # -- 8. approval_artifact_ok ------------------------------------------------ #
     def _approval_artifact_ok(self, p: B3Presentation, tool, arguments, state) -> None:
-        # Row 10 is UNSET: the pilot high-risk set is EMPTY, so no action can
-        # require approval, and any presented artifact is un-verifiable
-        # (authz_context_hash is ADR 0009 category (c), G-15's) -- fail closed
-        # rather than pretend to verify. F5 stays unscored.
+        """Row 10's high-risk set, frozen by ADR 0022.
+
+        The **refusal** half only: a high-risk action requires a valid
+        `ApprovalArtifact`, and none can verify until `authz_context_hash` is
+        fixed (ADR 0009 category (c), owned by G-15). So a high-risk action
+        refuses and says exactly why, rather than pretending to verify.
+        """
         if tool in self._policy.high_risk_actions:
             raise ConjunctFailed(
                 "approval_artifact_ok",
-                "high-risk action but row 10 is UNSET; no approval artifact can verify",
+                f"{tool!r} is a frozen high-risk action (ADR 0022 row 10) and requires an "
+                "approval artifact; none can verify until authz_context_hash is fixed "
+                "(ADR 0009 category (c), G-15)",
             )
         if p.approval_artifact is not None:
             raise ConjunctFailed(
                 "approval_artifact_ok",
-                "an approval artifact was presented but row 10 is UNSET (unverifiable)",
+                "an approval artifact was presented but authz_context_hash is unfixed, so it "
+                "cannot be verified (ADR 0009 category (c), G-15)",
             )
 
     # -- 9. oauth_resource_authorization_ok ------------------------------------- #

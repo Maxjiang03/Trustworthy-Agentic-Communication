@@ -38,14 +38,56 @@ _RESOURCE_RE = re.compile(r"^[a-z0-9]+/[a-z0-9]+$")
 
 # The server policy: data, keyed by tool. `resource_argument` names the ONE
 # argument the resource is read from, with the root it must live under;
-# `fixed_resource` pins the resource regardless of arguments.
+# `fixed_resource` pins the resource regardless of arguments;
+# `recipient_argument` names the argument carrying the effect's recipient, and
+# its PRESENCE is what makes an action egress (ADR 0022 row 4's rule, applied
+# to this plane's view). It is declared per tool here rather than as a list of
+# egress actions anywhere, so the egress set is derived from the tool surface
+# over `Omega` and an ontology amendment cannot desynchronise the two.
 SERVER_POLICY: dict[str, dict[str, str]] = {
     "calendar.read": {"resource_argument": "resource", "root": "calendar"},
     "notes.read": {"resource_argument": "resource", "root": "notes"},
     "notes.write": {"resource_argument": "resource", "root": "notes"},
     "notes.delete": {"resource_argument": "resource", "root": "notes"},
-    "mail.send": {"fixed_resource": "mail/outbox"},
+    "mail.send": {"fixed_resource": "mail/outbox", "recipient_argument": "to"},
 }
+
+
+def recipient_carrying_actions(
+    policy: Mapping[str, Mapping[str, str]] = SERVER_POLICY,
+) -> frozenset[str]:
+    """The actions whose effect carries a recipient -- ADR 0022's egress set.
+
+    Derived from the server policy, never enumerated: over the frozen `Omega`
+    this is exactly `{mail.send}`, and a test asserts that rather than the
+    document declaring it.
+    """
+    return frozenset(tool for tool, rule in policy.items() if "recipient_argument" in rule)
+
+
+def egress_recipient(
+    tool: str,
+    arguments: Mapping[str, Any],
+    policy: Mapping[str, Mapping[str, str]] = SERVER_POLICY,
+) -> str | None:
+    """The recipient this concrete request would send to, or None if non-egress.
+
+    Server-side like `required_authority`: the recipient is read from the ONE
+    argument the policy designates, never from an agent-supplied claim about
+    where the data is going.
+    """
+    rule = policy.get(tool)
+    if rule is None:
+        raise RequiredAuthorityError(f"no server policy for tool {tool!r}")
+    name = rule.get("recipient_argument")
+    if name is None:
+        return None
+    value = arguments.get(name)
+    if not isinstance(value, str) or not value:
+        raise RequiredAuthorityError(
+            f"{tool!r} is an egress action but its {name!r} argument names no recipient"
+        )
+    return value
 
 
 class RequiredAuthorityError(Exception):

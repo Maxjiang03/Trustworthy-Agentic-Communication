@@ -25,11 +25,11 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from src.sut.authz.boundary import BoundaryConfig
 from src.sut.authz.capability_path import (
     B3Presentation,
+    BoundaryPolicy,
     CapabilityDecisionPath,
-    PilotPolicy,
 )
 from src.sut.authz.registry_view import build_view
-from src.sut.baselines.base import ArmBitmask, HopContext, InvocationContext
+from src.sut.baselines.base import ArmBitmask, ArmIdentity, HopContext, InvocationContext
 from src.sut.capability import signer
 from src.sut.capability.signer import CapabilityIssuer
 
@@ -40,7 +40,8 @@ REASON_NOT_PRESENTED = "b3_nothing_presented"
 class B3Arm:
     """Offline attenuation + HTC hop at delegation; the ten conjuncts at the boundary."""
 
-    name = "B3"
+    # `name` is an instance attribute taken from the declared identity, so an
+    # SS E.6 variant cannot present itself as B3 proper.
     bitmask = ArmBitmask(
         oauth_authn=1,
         crypto_chain=1,
@@ -54,7 +55,12 @@ class B3Arm:
         audit=1,
     )
 
-    def __init__(self) -> None:
+    def __init__(self, identity: ArmIdentity | None = None) -> None:
+        # B3 PROPER declares itself non-ablation, so the decision path refuses
+        # any `disabled` conjunct it is handed (EXP2 STEP 6). An SS E.6 variant
+        # passes its own declared identity instead.
+        self.identity = identity or ArmIdentity(name="B3")
+        self.name = self.identity.name
         self._setup: dict[str, Any] | None = None
         self._issuer: CapabilityIssuer | None = None
         self._decision_path: CapabilityDecisionPath | None = None
@@ -74,13 +80,15 @@ class B3Arm:
             "issuer",
             "resource_server",
             "rar_type",
-            "pilot_policy",
+            "policy_document",
             "run_mode",
         }
         missing = required - set(setup)
         if missing:
-            raise ValueError(f"B3 provisioning is missing {sorted(missing)}")
-        policy = PilotPolicy.load(setup["pilot_policy"], run_mode=setup["run_mode"])
+            raise ValueError(f"{self.name} provisioning is missing {sorted(missing)}")
+        # The frozen ADR 0022 document, injected as sealed configuration and
+        # evaluated here independently -- never imported from the harness.
+        policy = BoundaryPolicy.load(setup["policy_document"])
         registry_view = build_view(setup["registry_document"], setup["resolved_keys"])
         self._issuer = CapabilityIssuer(setup["gamma_document"], setup["kappa_private"])
         self._decision_path = CapabilityDecisionPath(
@@ -92,7 +100,11 @@ class B3Arm:
                 as_public_jwk=setup["as_public_jwk"],
                 rar_type=setup["rar_type"],
             ),
-            pilot_policy=policy,
+            policy=policy,
+            arm_identity=self.identity,
+            enabled=self.bitmask.enabled_conjuncts(),
+            disabled=frozenset(setup.get("disabled", ())),
+            run_mode=setup["run_mode"],
             audit_sink=self.audit_log.append,
         )
         self._setup = dict(setup)

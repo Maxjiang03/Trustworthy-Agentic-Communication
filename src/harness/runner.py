@@ -45,6 +45,7 @@ from src.harness.effect_ledger import LedgerWriter, install_ingress_recorder, re
 from src.harness.effectors import LedgerEffector
 from src.harness.mediation.boundary import install_boundary
 from src.harness.oracle import commitment
+from src.harness.policy import frozen_policy
 from src.harness.schema import (
     CapabilityEvidence,
     EvidenceBundle,
@@ -76,7 +77,12 @@ def mint_correlation_id() -> str:
 
 
 def verify_frozen_configuration() -> None:
-    """`H(Gamma)` and `H(R)` against `docs/frozen_parameters.md`. Fail closed."""
+    """`H(Gamma)`, `H(R)` and `H(Lambda)` against `docs/frozen_parameters.md`.
+
+    Fail closed, before any scenario runs. Three frozen artifacts, three
+    digests, three rows-or-row-groups: 8 (ADR 0016), 11 (ADR 0019), and
+    4/6/10 (ADR 0022).
+    """
     gamma_doc = frozen_config.load_document()
     recorded = frozen_parameters.expected_h_gamma()
     computed = frozen_config.h_gamma(gamma_doc)
@@ -90,6 +96,13 @@ def verify_frozen_configuration() -> None:
     if computed != recorded:
         raise FrozenConfigurationMismatch(
             f"H(R) mismatch: artifact {computed} != recorded {recorded} (ADR 0019)"
+        )
+    policy_doc = frozen_policy.load_document()
+    recorded = frozen_parameters.expected_h_policy()
+    computed = frozen_policy.h_policy(policy_doc)
+    if computed != recorded:
+        raise FrozenConfigurationMismatch(
+            f"H(Lambda) mismatch: artifact {computed} != recorded {recorded} (ADR 0022)"
         )
 
 
@@ -132,13 +145,25 @@ class ScenarioRun:
     intent: IntendedInvocation
     observed: ObservedRequest
     mediation_events: list[MediationEvent]
-    ledger_path: str
+    ledger_path: str | None
     tool_result_error: bool
     presentation: Mapping[str, Any] = field(default_factory=dict)
     timing: TimingSeams | None = None
     audit_log: list[dict[str, Any]] = field(default_factory=list)
 
     def ledger_entries(self) -> list[dict[str, Any]]:
+        """The ledger's records. **Raises** on a run that had no ledger.
+
+        Deliberately not an empty list: returning one would let a test assert
+        "no effect occurred" and pass vacuously on a run that never recorded
+        effects in the first place. Absence of evidence must not be readable
+        as evidence of absence (ADR 0014).
+        """
+        if self.ledger_path is None:
+            raise RunnerError(
+                f"scenario {self.scenario_id!r} ran WITHOUT the effect ledger (ADR 0014): "
+                "no effect evidence exists for it, and none may be inferred"
+            )
         return read_ledger(self.ledger_path)
 
     def effects(self) -> list[dict[str, Any]]:
@@ -165,10 +190,12 @@ def _evidence_from(presentation: Mapping[str, Any]) -> EvidenceBundle:
 class GoldenThreadRunner:
     """Runs pilot scenarios under an injected arm. Verifies the freeze first."""
 
-    def __init__(self, *, corpus_dir: Path = CORPUS_DIR, ledger_dir: Path) -> None:
+    def __init__(self, *, corpus_dir: Path = CORPUS_DIR, ledger_dir: Path | None = None) -> None:
         verify_frozen_configuration()  # before any scenario runs (fail closed)
         self._corpus_dir = corpus_dir
-        self._ledger_dir = Path(ledger_dir)
+        # Optional only because a non-ledger-backed run has nowhere to write;
+        # a ledger-backed run without a directory fails closed below.
+        self._ledger_dir = Path(ledger_dir) if ledger_dir is not None else None
         self._corpus = self._load_json(corpus_dir / "corpus.json")
         if self._corpus["derivation_info_prefix"] != key_material.DERIVATION_INFO_PREFIX.decode(
             "ascii"
@@ -196,7 +223,8 @@ class GoldenThreadRunner:
         PILOT-PROVISIONAL policy object -- which the arm's loader refuses on a
         confirmatory run, and refuses to default if absent.
         """
-        policy_path = self._corpus_dir.parents[0] / "policies" / "pilot_policy_v0.json"
+        # The ONE policy source (ADR 0022): the frozen document itself. The
+        # PILOT-PROVISIONAL stand-in is deleted, not merely bypassed.
         return {
             "gamma_document": frozen_config.load_document(),
             "registry_document": registry_mod.load_document(),
@@ -211,14 +239,31 @@ class GoldenThreadRunner:
             "issuer": self._corpus["issuer"],
             "resource_server": self._corpus["audience"],
             "rar_type": as_process.RAR_TYPE,
-            "pilot_policy": self._load_json(policy_path),
+            "policy_document": frozen_policy.load_document(),
             "run_mode": "pilot",  # never "confirmatory": the seal is Part H's
         }
 
     def run_scenario(
-        self, scenario_id: str, arm: Any, *, setup: Mapping[str, Any] | None = None
+        self,
+        scenario_id: str,
+        arm: Any,
+        *,
+        setup: Mapping[str, Any] | None = None,
+        ledger_backed: bool = True,
     ) -> ScenarioRun:
-        """One scenario, one arm, one invocation; returns the SS F.1 records."""
+        """One scenario, one arm, one invocation; returns the SS F.1 records.
+
+        `ledger_backed=False` runs the whole thread **without the effect
+        ledger**: no `LedgerWriter`, no ingress recorder, and an effector that
+        does nothing. It is **not** a POSIX ledger and not a substitute for one
+        -- ADR 0014's enforcement is Win32 share-mode locking and has no
+        stand-in. It exists so the assertions that do not concern effects (the
+        boundary admitted, the tool dispatched and returned, the shape of the
+        presented evidence, the sealed-truth relations) have coverage on every
+        platform instead of being invisible to CI. Any attempt to read effect
+        evidence from such a run **raises** (see `ledger_entries`), so no test
+        can mistake the absence of a ledger for the absence of an effect.
+        """
         visible = self.visible(scenario_id)
         sealed = sealed_truth.load_sealed(scenario_id)
         correlation_id = mint_correlation_id()
@@ -239,26 +284,40 @@ class GoldenThreadRunner:
         # --- the tool stack, wired in the g7 order (recorder first, boundary
         # outermost, so a denied call reaches neither recorder nor tool) ------
         audience = visible["audience"]
-        ledger_path = str(self._ledger_dir / f"{scenario_id}-{arm.name}-{correlation_id[:8]}.jsonl")
-        writer = LedgerWriter(ledger_path)
         mediation_events: list[MediationEvent] = []
         boundary_observations: list[dict[str, Any]] = []
         sealed_intent: dict[str, IntendedInvocation] = {}
         presentations: list[Mapping[str, Any]] = []
 
-        effector = LedgerEffector(
-            writer,
-            audience=audience,
-            principal=visible["specialist"],
-            correlation_provider=lambda: correlation_id,
-        )
+        ledger_path: str | None = None
+        writer: LedgerWriter | None = None
+        if ledger_backed:
+            if self._ledger_dir is None:
+                raise RunnerError("a ledger-backed run needs a ledger directory")
+            ledger_path = str(
+                self._ledger_dir / f"{scenario_id}-{arm.name}-{correlation_id[:8]}.jsonl"
+            )
+            writer = LedgerWriter(ledger_path)
+            effector = LedgerEffector(
+                writer,
+                audience=audience,
+                principal=visible["specialist"],
+                correlation_provider=lambda: correlation_id,
+            )
+        else:
+            # Not a writer of any kind: the tool executes and records NOTHING.
+            # There is no object here that could be mistaken for a ledger.
+            def effector(**_: Any) -> None:
+                return None
+
         server = build_server(effector)
-        install_ingress_recorder(
-            server,
-            audience=audience,
-            correlation_provider=lambda: correlation_id,
-            writer=writer,
-        )
+        if writer is not None:
+            install_ingress_recorder(
+                server,
+                audience=audience,
+                correlation_provider=lambda: correlation_id,
+                writer=writer,
+            )
 
         def decide(tool: str, arguments: dict[str, Any]) -> tuple[bool, str]:
             # Non-bypassable observation point (gate G-6): every dispatch path
@@ -346,7 +405,8 @@ class GoldenThreadRunner:
         try:
             asyncio.run(drive())
         finally:
-            writer.close()
+            if writer is not None:
+                writer.close()
 
         # --- assemble the ObservedRequest from RAW evidence ------------------
         if not boundary_observations:

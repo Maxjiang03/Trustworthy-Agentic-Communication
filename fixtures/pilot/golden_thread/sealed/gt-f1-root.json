@@ -57,7 +57,7 @@
     "https://as.aasc.local",
     "agent-specialist"
   ],
-  "requires_approval": false,
+  "requires_approval": true,
   "resource_owner": [
     "https://as.aasc.local",
     "user-yixian"

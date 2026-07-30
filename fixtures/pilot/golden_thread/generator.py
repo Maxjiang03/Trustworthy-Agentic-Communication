@@ -51,8 +51,13 @@ if str(REPO_ROOT) not in sys.path:
 from src.harness import key_material  # noqa: E402
 from src.harness.authorizer import allowed as authz  # noqa: E402
 from src.harness.authorizer import frozen_config  # noqa: E402
-from src.harness.frozen_parameters import expected_h_gamma, expected_h_registry  # noqa: E402
+from src.harness.frozen_parameters import (  # noqa: E402
+    expected_h_gamma,
+    expected_h_policy,
+    expected_h_registry,
+)
 from src.harness.oracle.jcs_digest import h_jcs  # noqa: E402
+from src.harness.policy import frozen_policy  # noqa: E402
 from src.harness.verifier import registry as reg  # noqa: E402
 
 # --- Corpus-level constants (the runner-held inputs, ADR 0007) ---------------
@@ -126,6 +131,11 @@ SCENARIOS = [
 ]
 
 
+def _high_risk_actions() -> frozenset[str]:
+    """Row 10's frozen high-risk set (ADR 0022), read from the artifact."""
+    return frozen_policy.build(frozen_policy.load_document()).high_risk_actions
+
+
 def _pairs(rows: list[list[str]]) -> frozenset[tuple[str, str]]:
     return frozenset((action, resource) for action, resource in rows)
 
@@ -146,6 +156,9 @@ def compute_authority_sets() -> tuple[frozenset, frozenset]:
     registry_doc = reg.load_document()
     if reg.h_registry(registry_doc) != expected_h_registry():
         raise SystemExit("H(R) mismatch: the frozen identity registry has drifted")
+    policy_doc = frozen_policy.load_document()
+    if frozen_policy.h_policy(policy_doc) != expected_h_policy():
+        raise SystemExit("H(Lambda) mismatch: the frozen label/approval policy has drifted")
 
     seed = bytes.fromhex(SEED_HEX)
     root_private, root_pub = key_material.biscuit_root(seed)
@@ -254,7 +267,9 @@ def sealed_document(scenario: dict, c0: frozenset, c1: frozenset) -> dict:
         "tool": scenario["tool"],
         "intended_request_digest": h_jcs(scenario["arguments"]),
         "intended_labels": [],
-        "requires_approval": False,
+        # COMPUTED from row 10 (ADR 0022), never hand-written: an action is
+        # high-risk iff the frozen classification says so.
+        "requires_approval": scenario["tool"] in _high_risk_actions(),
         "U_task": _rows(c0),
         "C_sets": [_rows(c0), _rows(c1)],
         "R": scenario["R"],
