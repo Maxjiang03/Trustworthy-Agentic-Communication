@@ -22,6 +22,7 @@ DOCUMENT_PATH = Path(__file__).resolve().parents[2] / "docs" / "frozen_parameter
 # recorded `<symbol> = <64 lowercase hex>` form.
 _H_GAMMA_RE = re.compile(r"H\(Γ\)\s*=\s*([0-9a-f]{64})")
 _H_REGISTRY_RE = re.compile(r"H\(R\)\s*=\s*([0-9a-f]{64})")
+_H_POLICY_RE = re.compile(r"H\(Λ\)\s*=\s*([0-9a-f]{64})")
 
 
 class FrozenParametersError(Exception):
@@ -45,3 +46,8 @@ def expected_h_gamma(path: Path = DOCUMENT_PATH) -> str:
 def expected_h_registry(path: Path = DOCUMENT_PATH) -> str:
     """Row 11's recorded `H(R)` (ADR 0019)."""
     return _single_value(_H_REGISTRY_RE, path.read_text(encoding="utf-8"), "H(R)")
+
+
+def expected_h_policy(path: Path = DOCUMENT_PATH) -> str:
+    """Rows 4/6/10's recorded `H(Lambda)` (ADR 0022)."""
+    return _single_value(_H_POLICY_RE, path.read_text(encoding="utf-8"), "H(Lambda)")

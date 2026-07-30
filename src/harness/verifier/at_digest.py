@@ -49,8 +49,13 @@ _TAGS_IN_USE = (
     b"AASC-HTC-v1",  # SS F.2, HTC signature domain
     b"AASC-INV-v1",  # SS F.2, INV signature domain
     b"AASC-REGISTRY-DIGEST",  # ADR 0019, H(R)
+    b"AASC-POLICY-DIGEST",  # ADR 0022, H(Lambda) -- frozen rows 4/6/10
 )
 assert TAG not in _TAGS_IN_USE, "access_token_hash tag must be unique"
+# Pairwise distinctness across the whole family, not merely against this tag:
+# a new construction that collided with any tag in service would silently let
+# one digest be reinterpreted as another.
+assert len(set(_TAGS_IN_USE + (TAG,))) == len(_TAGS_IN_USE) + 1, "domain tags must be distinct"
 
 
 class AccessTokenDigestError(Exception):

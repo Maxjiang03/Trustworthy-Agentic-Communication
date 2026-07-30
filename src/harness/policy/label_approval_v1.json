@@ -1,0 +1,135 @@
+{
+  "schema": "aasc.frozen-label-approval-policy",
+  "config_version": 1,
+  "fixing_adr": "0022",
+  "covers_rows": [4, 6, 10],
+  "encoding": {
+    "charset": "us-ascii",
+    "case": "lower",
+    "comparison": "byte-exact RFC 8259 string equality, no normalization",
+    "note": "The same encoding rule as the frozen Omega (ADR 0016), so a label, a recipient domain and an action name compare the same way everywhere."
+  },
+  "row4_context_policy": {
+    "label_vocabulary": {
+      "total_order": ["public", "internal", "sensitive"],
+      "join": "least-upper-bound over total_order; a derived value takes the join of its inputs (SS A.6)",
+      "labels": [
+        {
+          "label": "public",
+          "rank": 0,
+          "necessity": "The bottom of the order. Without a label that egress may carry unconditionally there is no permit case, and every F4 fixture would block for the same reason, making the conjunct untestable."
+        },
+        {
+          "label": "internal",
+          "rank": 1,
+          "necessity": "The middle rank is what makes the outcome set three-valued rather than binary: it is the only label that can produce `escalate`, which is the outcome that distinguishes an approval/declassification path from an outright block."
+        },
+        {
+          "label": "sensitive",
+          "rank": 2,
+          "necessity": "The top of the order and the only member of row 10's sensitive_labels. Part I's realized_harm_F4 is defined over is_sensitive, so without it the F4 predicate has no positive case."
+        }
+      ]
+    },
+    "egress_predicate": {
+      "rule": "an action is egress iff its effect carries a recipient",
+      "derivation": "DERIVED, never enumerated here: each plane applies this rule to its own view -- the SUT boundary from the server policy's declared recipient argument per tool, the oracle from EffectEvent.recipient. Over the frozen Omega the derived set is exactly {mail.send}, which is asserted by test rather than written into this document.",
+      "necessity": "SS A.6 scopes the label policy to egress ('Egress to a recipient is permitted only if ...'). Hard-coding the action list here would let an Omega amendment silently desynchronise the policy from the ontology; deriving it means an amendment moves both together."
+    },
+    "outcomes": [
+      {
+        "action_class": "non_egress",
+        "label": "*",
+        "outcome": "permit",
+        "necessity": "Nothing leaves, so no egress policy can apply. Blocking a read or an in-store write on the strength of its label would be over-blocking that the false-blocking analysis would correctly count against the mechanism."
+      },
+      {
+        "action_class": "egress",
+        "label": "public",
+        "outcome": "permit",
+        "necessity": "The benign egress case. Without it the policy would block all egress and F4's false-blocking control could not exist."
+      },
+      {
+        "action_class": "egress",
+        "label": "internal",
+        "outcome": "escalate",
+        "necessity": "Admissible only under a valid approval or declassification artifact. This is the only rule that produces escalate, and it is what makes the DeclassificationArtifact path observable rather than decorative."
+      },
+      {
+        "action_class": "egress",
+        "label": "sensitive",
+        "outcome": "block",
+        "necessity": "Absent a valid DeclassificationArtifact this is the F4 attack case: sensitive egress with no declassification is exactly what Part I's realized_harm_F4 scores."
+      }
+    ],
+    "unlabelled": [
+      {
+        "action_class": "egress",
+        "outcome": "block",
+        "necessity": "FAIL CLOSED. With no verified LabelAssertion no permit can be established, and defaulting an unlabelled payload to public would let an attacker obtain a permit by simply omitting the label -- the cheapest possible bypass of the whole F4 family."
+      },
+      {
+        "action_class": "non_egress",
+        "outcome": "permit",
+        "necessity": "Symmetric with the non-egress outcome above: nothing leaves, so the absence of a label cannot be a route to harm, and refusing would over-block every unlabelled read."
+      }
+    ]
+  },
+  "row6_sink_policy": {
+    "sink_classes": [
+      {
+        "sink": "internal-sink",
+        "rule": "the recipient domain is exactly the declared internal_domain",
+        "internal_domain": "aasc.local",
+        "necessity": "The inside of the trust boundary. Without a two-class split every egress would be equally external and the allowed-pair table would collapse to a label-only rule, which row 4 already expresses -- row 6 would then own nothing."
+      },
+      {
+        "sink": "external-sink",
+        "rule": "every recipient whose domain is not exactly the declared internal_domain",
+        "necessity": "The outside. This is the class the F4 attack fixtures target, and the only one for which an internal-labelled payload must not pass unaided."
+      }
+    ],
+    "allowed_pairs": [
+      {
+        "label": "public",
+        "sink": "internal-sink",
+        "necessity": "Public data inside the boundary: the least restricted case, and the control against which any block must be contrasted."
+      },
+      {
+        "label": "public",
+        "sink": "external-sink",
+        "necessity": "Public data is public; refusing it outward would be over-blocking, and it is what distinguishes an egress policy from a blanket outbound ban."
+      },
+      {
+        "label": "internal",
+        "sink": "internal-sink",
+        "necessity": "Internal data staying inside the boundary is the ordinary working case. Without this pair the policy would forbid all internal traffic and the benign workload could not run."
+      }
+    ],
+    "otherwise": "admissible ONLY under a valid DeclassificationArtifact",
+    "composition_with_row4": {
+      "rule": "an egress is permitted only if BOTH planes permit it; the more restrictive outcome wins on the order permit < escalate < block",
+      "necessity": "SS A.6 states the sink rule as a necessary condition ('permitted only if (verified label, sink) is in the frozen allowed-sink policy, or a valid DeclassificationArtifact covers it') while row 4 states an outcome per label. Composing them any other way would let one plane override the other's refusal; taking the more restrictive is the only composition that cannot turn two refusals into a permit."
+    }
+  },
+  "row10_oracle_classification": {
+    "high_risk_actions": [
+      {
+        "action": "mail.send",
+        "necessity": "Externally visible and irreversible: once a message leaves, no later decision can retract it. Part I's realized_harm_F5 is defined over is_high_risk, so an empty set would leave that predicate with no positive case."
+      },
+      {
+        "action": "notes.delete",
+        "necessity": "Irreversible inside the user's own store: the destructive action the frozen Omega supplies (ADR 0016 recorded that Omega supplies it without classifying it, correctly, since classification is policy and not vocabulary)."
+      }
+    ],
+    "not_high_risk_rationale": "calendar.read and notes.read are reads and change nothing; notes.write is reversible inside the user's own store. Naming them here rather than leaving the complement implicit is what makes the boundary of the set reviewable.",
+    "sensitive_labels": [
+      {
+        "label": "sensitive",
+        "necessity": "Part I's is_sensitive selects which verified labels make an undeclassified egress a realized harm. It is the top of row 4's order, so any other choice would make the two rows disagree about which label is the dangerous one."
+      }
+    ]
+  },
+  "scope_boundary": "This document freezes rows 4, 6 and 10 ONLY. It is not the task_authorization_policy (row 5, still UNSET, so F2 wrong_principal stays unscored), and it does not fix authz_context_hash, which stays ADR 0009 category (c) owned by G-15. It therefore enables the REFUSAL half of context_policy_ok and approval_artifact_ok; the ACCEPTANCE half additionally needs authz_context_hash and labelled fixtures."
+}
