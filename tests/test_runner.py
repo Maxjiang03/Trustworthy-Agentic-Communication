@@ -65,6 +65,57 @@ class TestFrozenConfigurationVerification:
             runner.verify_frozen_configuration()
 
 
+class TestScenarioRunEverywhere:
+    """The record kinds that do not touch the ledger (EXP2 STEP 5).
+
+    Previously these shared a fixture with the effect assertions and so were
+    invisible to Linux CI. They are not effect claims, so they run on every
+    platform against a run that is explicitly NOT ledger-backed.
+    """
+
+    def test_records_and_correlation_without_the_ledger(self):
+        from src.sut.baselines.b0 import B0Arm
+
+        gt_runner = runner.GoldenThreadRunner()
+        run = gt_runner.run_scenario("gt-benign", B0Arm(), ledger_backed=False)
+        assert len(run.mediation_events) == 1
+        assert run.mediation_events[0].admitted is True
+        assert run.mediation_events[0].correlation_id == run.correlation_id
+        assert run.observed.correlation_id == run.correlation_id
+        assert run.observed.tool == "notes.write"
+        assert run.intent.correlation_id == run.correlation_id
+        assert run.intent.P_hashes == []  # B0 carries no capability
+        assert run.tool_result_error is False
+        assert set(run.timing.recorded()) == {
+            "setup",
+            "delegation",
+            "boundary_verification",
+            "end_to_end",
+        }
+
+    def test_an_arm_that_raises_is_a_denial_without_the_ledger(self):
+        from src.sut.baselines.b0 import B0Arm
+
+        class RaisingArm(B0Arm):
+            name = "B0-raising"
+
+            def decide(self, tool, arguments):
+                raise RuntimeError("boundary blew up")
+
+        gt_runner = runner.GoldenThreadRunner()
+        run = gt_runner.run_scenario("gt-benign", RaisingArm(), ledger_backed=False)
+        assert run.mediation_events[-1].admitted is False
+        assert run.mediation_events[-1].reason_code.startswith("arm_error:")
+        assert run.tool_result_error is True
+
+    def test_a_ledger_backed_run_needs_a_ledger_directory(self):
+        from src.sut.baselines.b0 import B0Arm
+
+        # Negative arm: the non-ledger mode is opt-in, never a silent default.
+        with pytest.raises(runner.RunnerError):
+            runner.GoldenThreadRunner().run_scenario("gt-benign", B0Arm())
+
+
 @WIN32_ONLY
 class TestScenarioRunB0:
     @pytest.fixture()

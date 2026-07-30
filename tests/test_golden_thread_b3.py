@@ -18,6 +18,7 @@ Windows-only where the effect ledger is involved (ADR 0014); the
 decision-path-only tests run everywhere.
 """
 
+import dataclasses
 import json
 import shutil
 import sys
@@ -32,7 +33,7 @@ from src.harness.as_process import ASProcess, golden_thread_as_document
 from src.harness.authorizer import frozen_config
 from src.harness.runner import GoldenThreadRunner
 from src.harness.verifier import registry as reg
-from src.sut.authz.capability_path import REASON_CODES
+from src.sut.authz.capability_path import CONJUNCT_ORDER, REASON_CODES
 from src.sut.baselines.b3 import B3Arm
 from src.sut.capability import signer
 
@@ -90,6 +91,37 @@ def _setup(runner: GoldenThreadRunner, running_as) -> dict:
     )
 
 
+def _forge_inv(credentials, setup, visible, *, tool, arguments) -> bytes:
+    """An INV signed by a REGISTERED but wrong holder (the worker).
+
+    Registered on purpose: the registry check then passes, so only the holder
+    limb can catch it -- the G-11 construction that isolates the intended
+    condition instead of letting an earlier check mask it.
+    """
+    wrong = Ed25519PrivateKey.from_private_bytes(setup["holder_privates"]["holder-worker"])
+    terminal = signer.MintedHop(
+        bytes(credentials["capability_hops"][-1]),
+        tuple(bytes(b) for b in credentials["block_ids"][-1]),
+    )
+    now = int(time.time())
+    return signer.issue_inv(
+        terminal,
+        holder_private=wrong,
+        holder_kid="kid-holder-worker",
+        raw_at=credentials["access_token"],
+        raw_arguments=arguments,
+        task_id=visible["task_id"],
+        audience=visible["audience"],
+        method=visible["method"],
+        tool=tool,
+        label_assertions_digest="00" * 32,
+        invocation_id="cid-counterfactual",
+        iat=now,
+        nbf=now,
+        exp=now + 300,
+    )
+
+
 @WIN32_ONLY
 class TestB3EndToEnd:
     @pytest.fixture(scope="class")
@@ -126,11 +158,42 @@ class TestB3EndToEnd:
         assert event.reason_code == REASON_CODES["containment_ok"]
         assert run.effects() == []
 
+
+class TestB3Everywhere:
+    """B3's non-effect outcomes, on every platform (EXP2 STEP 5).
+
+    Admission, the reason code, the conjunct trace and the timing seams are
+    not effect claims and never touch the ledger, so gating them behind
+    Windows left CI blind to whether B3 still decided correctly at all.
+    """
+
+    @pytest.fixture(scope="module")
+    @staticmethod
+    def runs(running_as):
+        runner = GoldenThreadRunner()
+        setup = _setup(runner, running_as)
+        return {
+            scenario_id: runner.run_scenario(scenario_id, B3Arm(), setup=setup, ledger_backed=False)
+            for scenario_id in ("gt-benign", "gt-f1-root", "gt-f1-terminal")
+        }
+
+    def test_benign_is_admitted(self, runs):
+        event = runs["gt-benign"].mediation_events[-1]
+        assert event.admitted is True
+        assert event.reason_code == "b3_admitted"
+
+    @pytest.mark.parametrize("scenario_id", ["gt-f1-root", "gt-f1-terminal"])
+    def test_f1_blocks_at_containment(self, runs, scenario_id):
+        event = runs[scenario_id].mediation_events[-1]
+        assert event.admitted is False
+        assert event.reason_code == REASON_CODES["containment_ok"]
+
     def test_every_earlier_conjunct_passed_before_the_block(self, runs):
         """The block is attributable: the audit log shows containment was
         reached, so no earlier conjunct masked it."""
         for scenario_id in ("gt-f1-root", "gt-f1-terminal"):
             entry = runs[scenario_id].audit_log[-1]
+            assert entry["arm"] == "B3"
             assert entry["reason_code"] == REASON_CODES["containment_ok"]
             assert entry["evaluated"] == [
                 "crypto_chain_ok",
@@ -154,59 +217,58 @@ class TestB3EndToEnd:
         }
 
 
+@pytest.fixture(scope="module")
+def staged(running_as):
+    """Provisioning material plus the benign scenario, no ledger needed.
+
+    Module-scoped because the decision-path suites below all need it; these
+    tests exercise the boundary alone, so no ledger directory is involved and
+    they run on every platform.
+    """
+    from src.harness import as_process
+    from src.harness.policy import frozen_policy
+
+    setup = {
+        "gamma_document": frozen_config.load_document(),
+        "registry_document": reg.load_document(),
+        "resolved_keys": key_material.resolve_public(SEED),
+        "kappa_private": key_material.derive_raw(SEED, "kappa"),
+        "holder_privates": {
+            label: key_material.derive_raw(SEED, label)
+            for label in ("holder-supervisor", "holder-specialist", "holder-worker")
+        },
+        "access_token": running_as.phase1_tokens["agent-specialist"],
+        "as_public_jwk": running_as.public_jwk,
+        "issuer": "https://as.aasc.local",
+        "resource_server": "https://mcp.aasc.local/tools",
+        "rar_type": as_process.RAR_TYPE,
+        "policy_document": frozen_policy.load_document(),
+        "run_mode": "pilot",
+    }
+    visible = json.loads(
+        (
+            REPO_ROOT / "fixtures" / "pilot" / "golden_thread" / "sut_visible" / "gt-benign.json"
+        ).read_text(encoding="utf-8")
+    )
+    return setup, visible
+
+
 class TestWouldHaveFailedWorlds:
     """Construct the wrong-outcome world and confirm it is observable."""
 
-    @pytest.fixture(scope="class")
-    @staticmethod
-    def staged(running_as):
-        """A provisioned B3 arm with a real staged presentation, no ledger needed."""
-        # The setup mapping is assembled directly here (no ledger directory):
-        # these tests exercise the decision path alone.
-        from src.harness import as_process
-
-        policy = json.loads(
-            (REPO_ROOT / "fixtures" / "pilot" / "policies" / "pilot_policy_v0.json").read_text(
-                encoding="utf-8"
-            )
-        )
-        setup = {
-            "gamma_document": frozen_config.load_document(),
-            "registry_document": reg.load_document(),
-            "resolved_keys": key_material.resolve_public(SEED),
-            "kappa_private": key_material.derive_raw(SEED, "kappa"),
-            "holder_privates": {
-                label: key_material.derive_raw(SEED, label)
-                for label in ("holder-supervisor", "holder-specialist", "holder-worker")
-            },
-            "access_token": running_as.phase1_tokens["agent-specialist"],
-            "as_public_jwk": running_as.public_jwk,
-            "issuer": "https://as.aasc.local",
-            "resource_server": "https://mcp.aasc.local/tools",
-            "rar_type": as_process.RAR_TYPE,
-            "pilot_policy": policy,
-            "run_mode": "pilot",
-        }
-        visible = json.loads(
-            (
-                REPO_ROOT
-                / "fixtures"
-                / "pilot"
-                / "golden_thread"
-                / "sut_visible"
-                / "gt-benign.json"
-            ).read_text(encoding="utf-8")
-        )
-        return setup, visible
-
-    def _arm_with_presentation(self, setup, visible, *, tool, arguments, disabled=frozenset()):
-        from src.sut.baselines.base import HopContext, InvocationContext
+    def _arm_with_presentation(self, setup, visible, *, tool, arguments, ablates=None):
+        from src.sut.baselines.base import ArmIdentity, HopContext, InvocationContext
 
         run_epoch = int(time.time())  # one clock for the whole construction
-        arm = B3Arm()
+        if ablates is None:
+            arm = B3Arm()  # B3 PROPER: the guard refuses any disabled conjunct
+        else:
+            # The would-have-failed world is a DECLARED SS E.6 ablation variant,
+            # not B3 with a field poked (EXP2 STEP 6): it names what it ablates,
+            # and its name rides in every audit record it emits.
+            arm = B3Arm(ArmIdentity(name=f"B3-minus-{ablates}", is_ablation=True, ablates=ablates))
+            setup = dict(setup, disabled=[ablates])
         arm.provision(setup)
-        if disabled:
-            arm._decision_path._disabled = disabled
         hop = HopContext(
             task_id=visible["task_id"],
             audience=visible["audience"],
@@ -243,19 +305,32 @@ class TestWouldHaveFailedWorlds:
     def test_containment_block_would_be_admitted_without_the_conjunct(
         self, staged, tool, arguments
     ):
+        """The block is containment's, and no EARLIER conjunct was masking it.
+
+        Since ADR 0022 froze rows 4/6/10, `mail.send` is both an unlabelled
+        egress (row 4) and a high-risk action (row 10), so THREE independent
+        conjuncts now refuse it. That is a strengthening, and it sharpens what
+        the counterfactual must assert: removing containment must not leave the
+        request blocked by anything evaluated BEFORE containment. `calendar.read`
+        still admits outright; `mail.send` falls through to the later policy
+        conjuncts -- either way, nothing earlier was masking.
+        """
         setup, visible = staged
         arm, _ = self._arm_with_presentation(setup, visible, tool=tool, arguments=arguments)
         admitted, reason = arm.decide(tool, arguments)
         assert admitted is False
         assert reason == REASON_CODES["containment_ok"]
 
-        # The would-have-failed world: containment disabled, everything else on.
         ablated, _ = self._arm_with_presentation(
-            setup, visible, tool=tool, arguments=arguments, disabled=frozenset({"containment_ok"})
+            setup, visible, tool=tool, arguments=arguments, ablates="containment_ok"
         )
-        assert ablated.decide(tool, arguments) == (True, "b3_admitted"), (
-            "with containment disabled the call must be ADMITTED -- otherwise the block "
-            "was masked by another conjunct, not attributable to containment"
+        ablated_admitted, ablated_reason = ablated.decide(tool, arguments)
+        if ablated_admitted:
+            return  # admitted outright: nothing else refuses this request at all
+        blocking = next(name for name, code in REASON_CODES.items() if code == ablated_reason)
+        assert CONJUNCT_ORDER.index(blocking) > CONJUNCT_ORDER.index("containment_ok"), (
+            f"with containment removed the block moved to {blocking!r}, which is evaluated "
+            "BEFORE containment -- so the original block was masked, not attributable"
         )
 
     # -- htc_chain_ok: a wrong-holder INV ----------------------------------- #
@@ -270,38 +345,24 @@ class TestWouldHaveFailedWorlds:
         # Re-sign the INV with a REGISTERED but wrong holder (the worker), so
         # the registry check passes and only the holder limb can catch it --
         # the G-11 construction that isolates the intended condition.
-        wrong = Ed25519PrivateKey.from_private_bytes(setup["holder_privates"]["holder-worker"])
-        terminal = signer.MintedHop(
-            bytes(credentials["capability_hops"][-1]),
-            tuple(bytes(b) for b in credentials["block_ids"][-1]),
-        )
-        forged = signer.issue_inv(
-            terminal,
-            holder_private=wrong,
-            holder_kid="kid-holder-worker",
-            raw_at=credentials["access_token"],
-            raw_arguments=arguments,
-            task_id=visible["task_id"],
-            audience=visible["audience"],
-            method=visible["method"],
-            tool=tool,
-            label_assertions_digest="00" * 32,
-            invocation_id="cid-counterfactual",
-            iat=int(time.time()),
-            nbf=int(time.time()),
-            exp=int(time.time()) + 300,
-        )
-        import dataclasses
-
+        forged = _forge_inv(credentials, setup, visible, tool=tool, arguments=arguments)
         arm._staged = dataclasses.replace(arm._staged, invocation_assertion=forged)
         admitted, reason = arm.decide(tool, arguments)
         assert admitted is False
         assert reason == REASON_CODES["holder_proof_ok"]
 
-        # Would-have-failed world: with the holder limb disabled, the same
-        # forged INV is admitted -- the block was that limb's, not another's.
-        arm._decision_path._disabled = frozenset({"holder_proof_ok"})
-        assert arm.decide(tool, arguments) == (True, "b3_admitted")
+        # Would-have-failed world: a DECLARED -holder ablation admits the same
+        # forged INV -- the block was that limb's, not another's.
+        ablated, ablated_credentials = self._arm_with_presentation(
+            setup, visible, tool=tool, arguments=arguments, ablates="holder_proof_ok"
+        )
+        ablated._staged = dataclasses.replace(
+            ablated._staged,
+            invocation_assertion=_forge_inv(
+                ablated_credentials, setup, visible, tool=tool, arguments=arguments
+            ),
+        )
+        assert ablated.decide(tool, arguments) == (True, "b3_admitted")
 
     # -- invocation_binding_ok: tool and argument substitution -------------- #
     def test_tool_substitution_blocks_at_invocation_binding(self, staged):
@@ -316,7 +377,9 @@ class TestWouldHaveFailedWorlds:
         assert admitted is False
         assert reason == REASON_CODES["invocation_binding_ok"]
 
-        arm._decision_path._disabled = frozenset({"invocation_binding_ok"})
+        arm, _ = self._arm_with_presentation(
+            setup, visible, tool=signed_tool, arguments=arguments, ablates="invocation_binding_ok"
+        )
         assert arm.decide("notes.read", substituted_args) == (True, "b3_admitted")
 
     def test_argument_substitution_blocks_at_invocation_binding(self, staged):
@@ -330,22 +393,40 @@ class TestWouldHaveFailedWorlds:
         assert admitted is False
         assert reason == REASON_CODES["invocation_binding_ok"]
 
-        arm._decision_path._disabled = frozenset({"invocation_binding_ok"})
-        assert arm.decide(tool, tampered) == (True, "b3_admitted")
+        ablated, _ = self._arm_with_presentation(
+            setup,
+            visible,
+            tool=tool,
+            arguments={"resource": "notes/project", "content": "x"},
+            ablates="invocation_binding_ok",
+        )
+        assert ablated.decide(tool, tampered) == (True, "b3_admitted")
 
 
 class TestGammaCheckDiscriminator:
-    """The library message shapes the authorizer/containment split rests on.
+    """The authorizer/containment split, now decided STRUCTURALLY (EXP2 STEP 7).
 
-    Found by the counterfactual suite, not by reading: the naive reading
-    ("any failed check means the authorizer refused") also matched the
-    ATTENUATION block's check and so attributed every F1 block to
-    `authorizer_policy_ok`, masking containment -- the G-11 lesson exactly.
-    These tests pin both shapes so a library bump cannot silently restore
-    the masking.
+    The split is evaluated against `P_0`, the authority prefix, which carries
+    no attenuation block: `Allowed(P_0)` is empty iff one of `Gamma`'s own
+    checks refused, and a narrowed-away or out-of-`C_0` candidate falls through
+    to containment unmasked. These four probes are what established that on
+    `biscuit-python==0.4.0` before it was adopted; they are pinned here so a
+    library bump cannot silently restore the masking the earlier textual
+    reading caused.
+
+    Each probe also carries the message-level witness (`gamma_checks_in`) as an
+    INDEPENDENT second opinion. The two must agree; they are computed
+    differently, so agreement is evidence rather than tautology.
     """
 
-    def _denial(self, *, element, audience, task, now_offset=0):
+    C0 = [
+        ("calendar.read", "calendar/work"),
+        ("notes.read", "notes/project"),
+        ("notes.write", "notes/project"),
+    ]
+    C1 = [("notes.read", "notes/project"), ("notes.write", "notes/project")]
+
+    def _chain(self):
         from datetime import datetime, timedelta, timezone
 
         from biscuit_auth import KeyPair
@@ -358,105 +439,192 @@ class TestGammaCheckDiscriminator:
             doc,
             keypair.private_key,
             keypair.public_key,
-            [
-                ("calendar.read", "calendar/work"),
-                ("notes.read", "notes/project"),
-                ("notes.write", "notes/project"),
-            ],
-            [[("notes.read", "notes/project"), ("notes.write", "notes/project")]],
+            self.C0,
+            [self.C1],
             audience="https://mcp.aasc.local/tools",
             task="task-gt-pilot",
             expiry=datetime.now(timezone.utc) + timedelta(hours=1),
         )
-        context = authz.RequestContext(
-            now=datetime.now(timezone.utc) + timedelta(seconds=now_offset),
+        return doc, keypair, chain, datetime.now(timezone.utc) + timedelta(seconds=0)
+
+    def _probe(self, element, *, audience="https://mcp.aasc.local/tools", task="task-gt-pilot"):
+        """Returns (allowed_at_P0_is_empty, authorizer_check_failed_in_message)."""
+        from src.harness.authorizer import allowed as authz
+        from src.sut.authz.capability_path import gamma_checks_in
+        from src.sut.capability import authority
+
+        doc, keypair, chain, now = self._chain()
+        context = authz.RequestContext(now=now, audience=audience, task=task)
+
+        # The STRUCTURAL discriminator, exactly as the decision path computes it.
+        allowed_at_root = authority.allowed_set(
+            chain.prefix(0),
+            keypair.public_key,
+            doc,
+            now_epoch=int(now.timestamp()),
             audience=audience,
-            task=task,
+            task_id=task,
         )
-        permitted, evidence = authz.authorize_candidate(
-            chain.prefix(1), keypair.public_key, doc["gamma"], element, context
+        # The message-level witness, on the same prefix and candidate.
+        _, evidence = authz.authorize_candidate(
+            chain.prefix(0), keypair.public_key, doc["gamma"], element, context
         )
-        assert permitted is False
-        return evidence
+        return not allowed_at_root, bool(gamma_checks_in(evidence))
 
-    def test_a_gamma_check_failure_is_reported_in_authorizer(self):
-        from src.sut.authz.capability_path import gamma_checks_in
-
-        evidence = self._denial(
-            element=("notes.write", "notes/project"),
-            audience="https://wrong.audience/",
-            task="task-gt-pilot",
+    def test_probe_a_inside_C0_with_a_failing_gamma_check(self):
+        """The CHECK plane: attributable to authorizer_policy_ok."""
+        structural, textual = self._probe(
+            ("calendar.read", "calendar/work"), audience="https://wrong.audience/"
         )
-        assert "in authorizer" in evidence
-        assert gamma_checks_in(evidence) != ""  # the check plane: attributable here
+        assert structural is True
+        assert textual is True  # the two witnesses agree
 
-    def test_an_attenuation_block_check_is_reported_in_a_block_and_ignored(self):
-        from src.sut.authz.capability_path import gamma_checks_in
+    def test_probe_b_inside_C0_but_narrowed_away_at_hop_1(self):
+        """The AUTHORITY plane: must fall through to containment."""
+        structural, textual = self._probe(("calendar.read", "calendar/work"))
+        assert structural is False
+        assert textual is False
 
-        # F1-terminal shape: narrowed away at hop 1, everything else valid.
-        evidence = self._denial(
-            element=("calendar.read", "calendar/work"),
-            audience="https://mcp.aasc.local/tools",
-            task="task-gt-pilot",
+    def test_probe_c_outside_C0_entirely(self):
+        """The AUTHORITY plane: falls through, so an F1-root block is containment's."""
+        structural, textual = self._probe(("mail.send", "mail/outbox"))
+        assert structural is False
+        assert textual is False
+
+    def test_probe_d_outside_C0_and_a_failing_gamma_check(self):
+        """Both planes refuse; the CHECK plane is evaluated first and owns it."""
+        structural, textual = self._probe(
+            ("mail.send", "mail/outbox"), audience="https://wrong.audience/"
         )
-        assert "in block" in evidence
-        assert "in authorizer" not in evidence
-        assert gamma_checks_in(evidence) == "", (
-            "an attenuation-block check is the AUTHORITY plane; attributing it to "
-            "authorizer_policy_ok masks containment"
+        assert structural is True
+        assert textual is True
+
+    def test_the_decision_path_parses_no_denial_message(self):
+        """Structural means structural: no message text on the decision path."""
+        import ast
+
+        source = (REPO_ROOT / "src" / "sut" / "authz" / "capability_path.py").read_text(
+            encoding="utf-8"
         )
-
-    def test_an_out_of_authority_element_is_also_ignored(self):
-        from src.sut.authz.capability_path import gamma_checks_in
-
-        # F1-root shape: outside C_0 entirely.
-        evidence = self._denial(
-            element=("mail.send", "mail/outbox"),
-            audience="https://mcp.aasc.local/tools",
-            task="task-gt-pilot",
+        tree = ast.parse(source)
+        decide_path = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "_authorizer_policy_ok"
         )
-        assert gamma_checks_in(evidence) == ""
+        called = {
+            child.func.id
+            for child in ast.walk(decide_path)
+            if isinstance(child, ast.Call) and isinstance(child.func, ast.Name)
+        }
+        assert "gamma_checks_in" not in called
+        # Negative arm: the canary still exists for the suite to call.
+        assert "def gamma_checks_in(" in source
 
 
-class TestPolicyDependentConjunctsAreGatedNotDefaulted:
-    def test_construction_without_a_policy_fails(self, running_as):
-        from src.sut.authz.capability_path import PilotPolicy, PilotPolicyError
+class TestFrozenPolicyIsLoadBearing:
+    """Rows 4/6/10 are frozen (ADR 0022): the REFUSAL half now bites."""
 
-        with pytest.raises(PilotPolicyError):
-            PilotPolicy.load(None, run_mode="pilot")
+    def test_no_policy_document_fails_closed(self):
+        from src.sut.authz.capability_path import BoundaryPolicy, PolicyConfigurationError
 
-    def test_a_policy_without_the_banner_is_refused(self):
-        from src.sut.authz.capability_path import PilotPolicy, PilotPolicyError
+        with pytest.raises(PolicyConfigurationError):
+            BoundaryPolicy.load(None)
 
-        with pytest.raises(PilotPolicyError):
-            PilotPolicy.load({"context": {}, "approval": {}}, run_mode="pilot")
+    def test_a_document_of_the_wrong_shape_fails_closed(self):
+        from src.sut.authz.capability_path import BoundaryPolicy, PolicyConfigurationError
 
-    def test_a_confirmatory_run_refuses_the_pilot_stand_in(self):
-        from src.sut.authz.capability_path import PilotPolicy, PilotPolicyError
+        with pytest.raises(PolicyConfigurationError):
+            BoundaryPolicy.load({"context": {}, "approval": {}})
 
-        policy = json.loads(
-            (REPO_ROOT / "fixtures" / "pilot" / "policies" / "pilot_policy_v0.json").read_text(
-                encoding="utf-8"
-            )
+    def test_the_frozen_document_carries_the_frozen_values(self):
+        from src.harness.policy import frozen_policy
+        from src.sut.authz.capability_path import BoundaryPolicy
+
+        policy = BoundaryPolicy.load(frozen_policy.load_document())
+        assert policy.high_risk_actions == {"mail.send", "notes.delete"}
+        assert policy.sensitive_labels == {"sensitive"}
+        assert policy.order == ("public", "internal", "sensitive")
+        assert policy.internal_sink_domain == "aasc.local"
+
+    def test_the_egress_set_is_derived_from_omega_not_enumerated(self):
+        """ADR 0022's rule applied to the SUT plane yields exactly {mail.send}."""
+        from src.harness.authorizer import frozen_config
+        from src.harness.policy import frozen_policy
+        from src.sut.protocol.required_authority import recipient_carrying_actions
+
+        omega_tools = frozenset(frozen_config.load_document()["omega"]["tools"])
+        derived = frozen_policy.egress_actions(omega_tools, recipient_carrying_actions())
+        assert derived == {"mail.send"}
+        # Negative arm: an action outside Omega cannot be smuggled in as egress.
+        with pytest.raises(frozen_policy.PolicyStructureError):
+            frozen_policy.egress_actions(omega_tools, {"shell.exec"})
+
+    @pytest.mark.parametrize(
+        "label,recipient,expected",
+        [
+            ("public", "a@aasc.local", "permit"),
+            ("public", "a@partner.test", "permit"),
+            ("internal", "a@aasc.local", "escalate"),
+            ("internal", "a@partner.test", "block"),
+            ("sensitive", "a@aasc.local", "block"),
+            ("sensitive", "a@partner.test", "block"),
+            (None, "a@partner.test", "block"),
+        ],
+    )
+    def test_the_row4_row6_composition(self, label, recipient, expected):
+        from src.harness.policy import frozen_policy
+        from src.sut.authz.capability_path import BoundaryPolicy
+
+        policy = BoundaryPolicy.load(frozen_policy.load_document())
+        assert policy.egress_decision(label, recipient) == expected
+
+    def test_both_planes_agree_on_the_composition(self):
+        """Rows 4/6 evaluated independently on each plane, over one document."""
+        from src.harness.policy import frozen_policy
+        from src.sut.authz.capability_path import BoundaryPolicy
+
+        doc = frozen_policy.load_document()
+        harness = frozen_policy.build(doc)
+        sut = BoundaryPolicy.load(doc)
+        for label in (None, "public", "internal", "sensitive"):
+            for recipient in ("a@aasc.local", "a@partner.test"):
+                assert harness.outcome(
+                    is_egress=True, label=label, recipient=recipient
+                ) == sut.egress_decision(label, recipient)
+
+    def test_an_unlabelled_egress_is_refused_and_says_why(self, staged):
+        """Row 4 bites: mail.send carries no LabelAssertion, so no permit exists."""
+        setup, visible = staged
+        worlds = TestWouldHaveFailedWorlds()
+        arguments = {"to": "partner@example.test", "subject": "s", "body": "b"}
+        # Ablate containment so the request REACHES the policy conjuncts; with
+        # containment on, an F1-root block fires at conjunct six as before.
+        ablated, _ = worlds._arm_with_presentation(
+            setup, visible, tool="mail.send", arguments=arguments, ablates="containment_ok"
         )
-        with pytest.raises(PilotPolicyError):
-            PilotPolicy.load(policy, run_mode="confirmatory")
-        # Positive arm: the same object loads for a pilot run.
-        assert PilotPolicy.load(policy, run_mode="pilot").high_risk_actions == frozenset()
+        admitted, reason = ablated.decide("mail.send", arguments)
+        assert admitted is False
+        assert reason == REASON_CODES["context_policy_ok"]
+        assert "unlabelled" in ablated.audit_log[-1]["detail"]
 
-    def test_the_pilot_scenarios_make_neither_conjunct_load_bearing(self):
-        policy = json.loads(
-            (REPO_ROOT / "fixtures" / "pilot" / "policies" / "pilot_policy_v0.json").read_text(
-                encoding="utf-8"
-            )
+    def test_a_non_egress_non_high_risk_action_passes_both(self, staged):
+        # Negative arm: the two conjuncts are not refusing everything.
+        setup, visible = staged
+        worlds = TestWouldHaveFailedWorlds()
+        arguments = {"resource": "notes/project", "content": "x"}
+        arm, _ = worlds._arm_with_presentation(
+            setup, visible, tool="notes.write", arguments=arguments
         )
-        # No high-risk action set (row 10 UNSET) and no label support (rows 4/6
-        # UNSET); the corpus carries no LabelAssertion and no approval artifact,
-        # so F4/F5 stay unscored.
-        assert policy["approval"]["high_risk_actions"] == []
-        assert policy["context"]["labels_supported"] is False
+        assert arm.decide("notes.write", arguments) == (True, "b3_admitted")
+        evaluated = arm.audit_log[-1]["evaluated"]
+        assert "context_policy_ok" in evaluated and "approval_artifact_ok" in evaluated
+
+    def test_requires_approval_is_computed_from_row_10(self):
+        """The freeze enables refusal, not scoring: no labelled fixture exists."""
+        sealed = {}
         for scenario_id in ("gt-benign", "gt-f1-root", "gt-f1-terminal"):
-            sealed = json.loads(
+            sealed[scenario_id] = json.loads(
                 (
                     REPO_ROOT
                     / "fixtures"
@@ -466,5 +634,79 @@ class TestPolicyDependentConjunctsAreGatedNotDefaulted:
                     / f"{scenario_id}.json"
                 ).read_text(encoding="utf-8")
             )
-            assert sealed["intended_labels"] == []
-            assert sealed["requires_approval"] is False
+            assert sealed[scenario_id]["intended_labels"] == []  # F4 stays unscored
+        assert {k: v["requires_approval"] for k, v in sealed.items()} == {
+            "gt-benign": False,
+            "gt-f1-root": True,  # mail.send is a frozen high-risk action
+            "gt-f1-terminal": False,
+        }
+
+
+class TestDisabledIsBoundToArmIdentity:
+    """EXP2 STEP 6's four rules, each refusing rather than warning."""
+
+    def test_b3_proper_refuses_a_disabled_conjunct(self, staged):
+        from src.sut.baselines.base import ArmIdentityError
+
+        setup, _ = staged
+        with pytest.raises(ArmIdentityError):
+            B3Arm().provision(dict(setup, disabled=["containment_ok"]))
+        B3Arm().provision(setup)  # positive arm: no disabled set, provisions fine
+
+    def test_only_a_declared_ablation_may_carry_one(self, staged):
+        from src.sut.baselines.base import ArmIdentity, ArmIdentityError
+
+        setup, _ = staged
+        # Merely renaming the arm is not declaring an ablation.
+        with pytest.raises(ArmIdentityError):
+            B3Arm(ArmIdentity(name="B3-sneaky")).provision(
+                dict(setup, disabled=["holder_proof_ok"])
+            )
+        # SS E.6: exactly one conjunct, and exactly the one declared.
+        identity = ArmIdentity(name="B3-minus-holder", is_ablation=True, ablates="holder_proof_ok")
+        with pytest.raises(ArmIdentityError):
+            B3Arm(identity).provision(dict(setup, disabled=["containment_ok"]))
+        with pytest.raises(ArmIdentityError):
+            B3Arm(identity).provision(dict(setup, disabled=["holder_proof_ok", "containment_ok"]))
+        B3Arm(identity).provision(dict(setup, disabled=["holder_proof_ok"]))
+
+    def test_the_variant_name_rides_in_every_audit_record(self, staged):
+        setup, visible = staged
+        worlds = TestWouldHaveFailedWorlds()
+        arguments = {"resource": "notes/project", "content": "x"}
+        arm, _ = worlds._arm_with_presentation(
+            setup, visible, tool="notes.write", arguments=arguments, ablates="containment_ok"
+        )
+        arm.decide("notes.write", arguments)
+        assert arm.audit_log, "an ablation that emits no audit record cannot be attributed"
+        for record in arm.audit_log:
+            assert record["arm"] == "B3-minus-containment_ok"
+            assert record["is_ablation"] is True
+            assert record["ablates"] == "containment_ok"
+        # Negative arm: B3 proper's records name B3 and declare no ablation.
+        proper, _ = worlds._arm_with_presentation(
+            setup, visible, tool="notes.write", arguments=arguments
+        )
+        proper.decide("notes.write", arguments)
+        assert all(r["arm"] == "B3" and r["is_ablation"] is False for r in proper.audit_log)
+
+    def test_an_ablation_is_refused_on_a_confirmatory_run(self, staged):
+        from src.sut.baselines.base import ArmIdentity, ArmIdentityError
+
+        setup, _ = staged
+        identity = ArmIdentity(name="B3-minus-contain", is_ablation=True, ablates="containment_ok")
+        with pytest.raises(ArmIdentityError):
+            B3Arm(identity).provision(
+                dict(setup, disabled=["containment_ok"], run_mode="confirmatory")
+            )
+        # Positive arm: the same variant provisions for a pilot run.
+        B3Arm(identity).provision(dict(setup, disabled=["containment_ok"], run_mode="pilot"))
+
+    def test_an_ablation_identity_must_name_what_it_ablates(self):
+        from src.sut.baselines.base import ArmIdentity, ArmIdentityError
+
+        with pytest.raises(ArmIdentityError):
+            ArmIdentity(name="B3-minus-nothing", is_ablation=True)
+        with pytest.raises(ArmIdentityError):
+            ArmIdentity(name="B3-confused", ablates="containment_ok")
+        assert ArmIdentity(name="B3").ablates is None

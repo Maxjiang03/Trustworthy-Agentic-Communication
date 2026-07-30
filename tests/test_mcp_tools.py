@@ -76,6 +76,39 @@ class TestServerShape:
         assert mail["resource"] == "mail/outbox"
         assert mail["recipient"] == "a@example.test"
 
+    def test_a_denied_call_reaches_neither_recorder_nor_tool(self):
+        """The g7 wiring order, asserted TOOL-SIDE so it runs everywhere.
+
+        The ledger-backed version of this (below, Windows-only) additionally
+        shows nothing reached the ledger; this one shows nothing reached the
+        effector or the tool function, which needs no ledger at all.
+        """
+        from src.harness.mediation.boundary import install_boundary
+
+        effector = RecordingEffector()
+        server = build_server(effector)
+        events = []
+        install_boundary(
+            server,
+            decide=lambda tool, args: (tool != "mail.send", "denied(pilot)"),
+            correlation_provider=lambda: "cid-test",
+            emit=events.append,
+        )
+
+        async def drive():
+            async with create_connected_server_and_client_session(server._mcp_server) as client:
+                denied = await client.call_tool(
+                    "mail.send", {"to": "a@b.test", "subject": "s", "body": "b"}
+                )
+                allowed = await client.call_tool("notes.read", {"resource": "notes/project"})
+                return denied, allowed
+
+        denied, allowed = asyncio.run(drive())
+        assert denied.isError and not allowed.isError
+        assert events[0].admitted is False and events[1].admitted is True
+        # The denied tool never ran: only the admitted one reached the effector.
+        assert [intent["tool"] for intent in effector.intents] == ["notes.read"]
+
     def test_stubs_return_sandbox_markers(self):
         effector = RecordingEffector()
         server = build_server(effector)
