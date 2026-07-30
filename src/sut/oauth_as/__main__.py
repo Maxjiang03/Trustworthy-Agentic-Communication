@@ -7,8 +7,17 @@ file carries no secret at all -- client secrets are derived here, inside this
 process, from the same seed (DESIGN SS 5.1).
 
 On start-up one JSON line is written to stdout so the parent can reach the
-server: the bound port, the AS **public** JWK, and the TLS certificate. All three
-are public by construction; the signing key and the seed never appear.
+server: the bound port, the AS **public** JWK, the TLS certificate, and --
+when the document carries a `phase1` section -- the **Phase-1 base tokens**,
+one per registered client (ADR 0021; SS E.2 Phase 1). Port, JWK and
+certificate are public by construction; the signing key and the seed never
+appear. The Phase-1 tokens are NOT public: the stdout pipe is held by the
+spawning runner alone, and the tokens are runtime-only -- never written to
+disk, never committed, never echoed into `results/` (ADR 0021). Minting
+happens here, inside the AS process, because `exchange.issue_initial` is the
+SS E.2 pre-issued path: deliberately unreachable from the token endpoint, and
+importable by no non-AS module (ADR 0015 rule 3), so the only lawful call
+site is this process.
 """
 
 import json
@@ -17,6 +26,7 @@ import sys
 from pathlib import Path
 
 from src.sut.oauth_as.config import ASConfig, RegistryEntry
+from src.sut.oauth_as.exchange import issue_initial
 from src.sut.oauth_as.keys import derive_client_secret, derive_signing_key, derive_tls_key
 from src.sut.oauth_as.server import build_tls_context, serve_in_thread
 
@@ -49,6 +59,39 @@ def config_from_document(document: dict, seed: bytes) -> ASConfig:
     )
 
 
+def mint_phase1_tokens(document: dict, config: ASConfig, signing_key) -> dict[str, str]:
+    """One Phase-1 base `AT@aud` per registered client (ADR 0021; SS E.2).
+
+    The `phase1` section, when present, MUST cover exactly the registered
+    client set -- a client with no provisioning spec, or a spec for an
+    unregistered client, fails closed rather than silently skipping. When the
+    section is absent (pre-EXP1 documents, e.g. gate G-4's), nothing is
+    minted and the start-up line carries an empty mapping.
+    """
+    phase1 = document.get("phase1")
+    if phase1 is None:
+        return {}
+    if set(phase1) != set(document["clients"]):
+        raise SystemExit(
+            "phase1 provisioning must cover exactly the registered clients: "
+            f"phase1={sorted(phase1)} clients={sorted(document['clients'])}"
+        )
+    tokens: dict[str, str] = {}
+    for client_id, spec in phase1.items():
+        token = issue_initial(
+            config=config,
+            signing_key=signing_key,
+            subject=spec["subject"],
+            client_id=client_id,
+            audience=spec["audience"],
+            scope=spec["scope"],
+            authorization_details=spec["authorization_details"],
+            lifetime_seconds=spec.get("lifetime_seconds"),
+        )
+        tokens[client_id] = token.value
+    return tokens
+
+
 def main(argv: list[str]) -> int:
     if len(argv) != 2:
         print("usage: python -m src.sut.oauth_as <config.json>", file=sys.stderr)
@@ -65,13 +108,17 @@ def main(argv: list[str]) -> int:
     signing_key = derive_signing_key(seed)  # parsed once, reused (SS 8.2)
     tls_context, cert_pem = build_tls_context(derive_tls_key(seed))
 
-    server, _ = serve_in_thread(config_from_document(document, seed), signing_key, tls_context)
+    config = config_from_document(document, seed)
+    server, _ = serve_in_thread(config, signing_key, tls_context)
     print(
         json.dumps(
             {
                 "port": server.port,
                 "public_jwk": signing_key.public_jwk,
                 "tls_cert_pem": cert_pem.decode("ascii"),
+                # Runtime-only bearer material for the runner's pipe alone:
+                # never disk, never the repo, never results/ (ADR 0021).
+                "phase1_tokens": mint_phase1_tokens(document, config, signing_key),
             }
         ),
         flush=True,
