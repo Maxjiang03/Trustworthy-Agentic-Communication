@@ -94,33 +94,88 @@ def l1_per_hop_equalities(matrix) -> None:
 
 
 def l1b_the_refused_hop(matrix) -> None:
-    """`B2` on chain-tamper has NO `AT_1`, so the equality has no object.
+    """The exchange arms on chain-tamper have NO `AT_1`, so the equality has no object.
 
-    Stated rather than skipped. The AS refused to issue, so the delegate
-    realized no hop-1 authority at all -- which is strictly stronger than the
-    equality it cannot be asked: an arm that issued nothing cannot have issued
-    too much. The capability arms DO realize a hop-1 object on the same
-    scenario and it equals `C_1` exactly, which is the whole content of "each
-    mechanism realizes the tamper its own way" (SS E.3).
+    **Two arms now, not one.** `B2-exchange-task-DPoP` takes the same path as
+    `B2-exchange-task`: the AS refuses the widening exchange and issues
+    nothing, so neither delegate holds an `AT_1`.
+
+    Stated rather than skipped, and the reasoning is unchanged rather than
+    softened: the equality cannot be asked, what holds instead is **stronger**
+    -- the arm realized no hop-1 authority at all, and an arm that issued
+    nothing cannot have issued too much. The three capability arms DO realize a
+    hop-1 object on the same scenario and it equals `C_1` exactly, which is the
+    whole content of "each mechanism realizes the tamper its own way" (SS E.3).
     """
-    cell = matrix[("gt-f1-chain-tamper", "B2-exchange-task")]
-    caps = [matrix[("gt-f1-chain-tamper", name)] for name in ("B-cap", "B3")]
+    refused = {
+        name: matrix[("gt-f1-chain-tamper", name)]
+        for name in ("B2-exchange-task", "B2-exchange-task-DPoP")
+    }
+    caps = {name: matrix[("gt-f1-chain-tamper", name)] for name in ("B-cap", "B3", "B3+")}
     expected_c1 = fx.c_sets("gt-f1-chain-tamper")[1]
-    ok = (
-        cell.hop_objects == 1
-        and cell.reason_code == "b2_exchange_refused"
-        and all(c.hop_objects == 2 and c.per_hop[1] == expected_c1 for c in caps)
-    )
+    ok = all(
+        c.hop_objects == 1 and c.reason_code == "b2_exchange_refused" for c in refused.values()
+    ) and all(c.hop_objects == 2 and c.per_hop[1] == expected_c1 for c in caps.values())
     record(
         "G-13.L1b",
         True,
         ok,
-        f"chain-tamper: B2 realized {cell.hop_objects} hop object(s) and was refused at "
-        f"{cell.reason_code!r} -- there is no AT_1 to compare, and no authority was granted "
-        f"at hop 1 at all, which is stronger than the equality. The capability arms realized "
-        f"2 hop objects each with Allowed(P_1) = {_fmt(expected_c1)} = C_1, so block scoping "
-        f"admitted the widening block and granted it nothing. The two mechanisms differ in "
-        f"the REPRESENTATION of the refusal, not in authority granted",
+        f"chain-tamper: BOTH exchange arms ({', '.join(refused)}) realized 1 hop object each "
+        f"and were refused at 'b2_exchange_refused' -- there is no AT_1 to compare, and no "
+        f"authority was granted at hop 1 at all, which is STRONGER than the equality: an arm "
+        f"that issued nothing cannot have issued too much. All THREE capability arms "
+        f"({', '.join(caps)}) realized 2 hop objects each with Allowed(P_1) = "
+        f"{_fmt(expected_c1)} = C_1, so block scoping admitted the widening block and granted "
+        f"it nothing. The two mechanisms differ in the REPRESENTATION of the refusal, not in "
+        f"authority granted",
+    )
+
+
+def l1c_authority_is_not_acceptance(run: fx.Campaign) -> None:
+    """`Allowed(.)` must not move when the boundary would refuse on freshness.
+
+    Since ADR 0027 the SUT boundary applies an INV freshness window
+    (`|now - iat| <= Delta`) that the SS F.2 verifier deliberately does not --
+    SS F.2 defines what makes an artifact **valid**, and freshness is the
+    boundary's **willingness to act on it**. If any part of L1 routed through
+    something freshness-dependent, this instrument would be measuring
+    acceptance and reporting it as authority, and every G-13 equality would be
+    about the wrong quantity.
+
+    Recomputed at an instant **stale by `Delta`** yet well inside each
+    credential's own validity -- the capability expires an hour out, the token
+    five minutes -- so the only thing that moved is the boundary's willingness.
+    """
+    stale = fx.freshness_offset()
+    moved, checked = [], 0
+    for arm_name in fx.STRONG_ARMS:
+        now_sets, later_sets = run.authority_at(arm_name, "gt-benign", offset=stale)
+        checked += len(now_sets)
+        if now_sets != later_sets:
+            moved.append(
+                f"{arm_name}: {[_fmt(s) for s in now_sets]} -> {[_fmt(s) for s in later_sets]}"
+            )
+    # Structural, because behaviour alone would not show WHY: neither plane of
+    # the verifier imports the module that holds `Delta`.
+    verifier = _imports(REPO_ROOT / "src" / "harness" / "verifier" / "matched_authority.py")
+    authorizer = _imports(REPO_ROOT / "src" / "harness" / "authorizer" / "allowed.py")
+    no_freshness = "src.sut.freshness" not in (verifier | authorizer)
+    # And the world really IS one the boundary refuses -- measured, not claimed,
+    # or "unchanged authority" would be unremarkable rather than the point.
+    admitted, refusal = run.boundary_refuses_at("B3", offset=stale)
+    refused = admitted is False and refusal == "b3_invocation_binding"
+    record(
+        "G-13.L1c",
+        True,
+        not moved and no_freshness and checked > 0 and refused,
+        f"{checked} per-hop sets recomputed at an instant {stale}s later. The SUT boundary DOES "
+        f"refuse at that instant -- measured, not claimed: B3 returns {refusal!r} -- yet every "
+        f"recomputed set is UNCHANGED (moved: {moved or 'none'}). Structurally, neither the "
+        f"verifier nor "
+        f"the SS A.0.1 authorizer it reuses imports src/sut/freshness ({no_freshness}), so no "
+        f"part of L1 can route through the acceptance window. Authority is a property of the "
+        f"ARTIFACTS; freshness is a property of the BOUNDARY's willingness to act on them, and "
+        f"G-13 measures the first",
     )
 
 
@@ -243,6 +298,34 @@ def l2_counterfactual(run: fx.Campaign, matrix) -> None:
 # ---------------------------------------------------------------------------
 # L3 — every F1 subcase blocks on every strong arm, cause attributable
 # ---------------------------------------------------------------------------
+def l2_w2_a_cache_denial_is_not_a_granularity_mismatch(run: fx.Campaign) -> None:
+    """`B3+`'s replay cache is a duplicate detector, not an authority plane.
+
+    The world worth constructing now that `B3+` exists: a cache **denial**
+    mistaken for an authority difference. If G-13 reported one as a
+    granularity mismatch it would be exactly the confusion matched fairness
+    exists to prevent -- `B3+` would look like an arm that realizes a
+    different `C_0 -> C_n`, when what happened is that it refused a duplicate
+    of a request whose authority was identical.
+    """
+    denial, per_hop = run.replay_denied_authority()
+    expected = fx.c_sets("gt-benign")
+    admitted, reason = denial
+    unchanged = equalities_hold(per_hop, expected)
+    identical = chains_identical({"B3+": per_hop, "sealed": expected})
+    record(
+        "G-13.L2.W2",
+        True,
+        admitted is False and reason == "b3_replay_duplicate" and unchanged and identical,
+        f"world: `B3+` DENIES a bit-identical replay ({reason!r}), and the authority its "
+        f"presented evidence realizes is recomputed from the SAME bytes: "
+        f"{[_fmt(s) for s in per_hop]}. L1's predicate still returns True ({unchanged}) and "
+        f"L2's still returns True ({identical}), so the denial is NOT reported as a "
+        f"granularity mismatch. The cache changes admission, never Allowed(P_i) -- which is "
+        f"why `B3+` can sit beside `B3` in a matched comparison at all",
+    )
+
+
 def l3_f1_blocks(matrix) -> None:
     f1_cells = [
         matrix[(scenario_id, arm_name)]
@@ -327,9 +410,13 @@ def l4_d21_independence() -> None:
         f"D13/D21 forbids for an instrument that must be able to find a defect in the "
         f"boundary. (3) AGREEMENT is pinned separately by {agreement.name}, and this gate's "
         f"L1 is itself an agreement test: two independent implementations produced the same "
-        f"C_i on every hop of every cell. Residual: agreement is evidence of independence "
-        f"only because the implementations are structurally distinct -- which (1) and (2) "
-        f"establish and which a future refactor could silently undo",
+        f"C_i on every hop of every cell. Residual, stated precisely because a vague one is "
+        f"ignored: agreement is evidence of independence only while the constructions differ, "
+        f"and this scan WOULD catch a refactor that made the verifier import boundary.py -- "
+        f"that is a cross-boundary import and W1 proves the scan non-vacuous. What it CANNOT "
+        f"catch is copy-paste convergence: the token plane rewritten with the boundary's "
+        f"construction and no import at all. The guard against that case is review of a change "
+        f"to matched_authority.py, not a test",
     )
 
 
@@ -392,9 +479,11 @@ def main() -> int:
         matrix = run.matrix()
         l1_per_hop_equalities(matrix)
         l1b_the_refused_hop(matrix)
+        l1c_authority_is_not_acceptance(run)
         l1_counterfactuals(run)
         l2_cross_arm_identity(matrix)
         l2_counterfactual(run, matrix)
+        l2_w2_a_cache_denial_is_not_a_granularity_mismatch(run)
         l3_f1_blocks(matrix)
         l3_counterfactual(run)
         l4_d21_independence()
@@ -407,18 +496,22 @@ def main() -> int:
         print(f"GATE G-13: FAIL -- mandatory check(s) failed: {', '.join(failures)}")
         print("Per STEP 15: do NOT mark PASS. Report which limb, why, and the smallest correction.")
         return 1
-    print("GATE G-13: all adjudicable mandatory checks passed")
+    print("GATE G-13: all mandatory checks passed over ALL FIVE strong baselines")
     print(
-        "OPEN LIMBS, and they are open rather than passed: five arms receive per-hop C_i and "
-        "three exist. B2-exchange-task-DPoP and B3+ are UNBUILT, so their limbs are open in "
-        "the same words G-4's row used when it first passed over its adjudicable limbs only. "
-        "DPoP adds holder binding and the jti cache adds duplicate detection, neither of which "
-        "adds AUTHORITY, so those limbs are EXPECTED to be formal -- expected, not verified."
+        "THE TWO PREVIOUSLY OPEN LIMBS ARE NOW CLOSED. B2-exchange-task-DPoP and B3+ exist and "
+        "were run: their per-hop authority was recomputed from raw presented evidence and "
+        "compared against the sealed C_i like every other arm's, and the five arms realize an "
+        "IDENTICAL C_0 -> C_n. The earlier row said DPoP and the jti cache add binding and "
+        "duplicate detection but not AUTHORITY, and marked that EXPECTED, NOT VERIFIED. It is "
+        "now VERIFIED, by measurement rather than by assertion -- and the matrix agreeing on "
+        "outcomes was never the check: outcomes are not authority sets."
     )
     print(
         "Scope: this gate establishes matched per-hop AUTHORITY. It does not establish cost "
         "(IA-3 stays [UNVERIFIED-IA] for G-3), the DPoP taxonomy (G-14), the F4/F5 monitor "
-        "(G-15), duplicate replay (G-9), or process-separated mediation (G-12)."
+        "(G-15), or process-separated mediation (G-12). The jti cache B3+ carries is atomic "
+        "within ONE process and has no backend, so G-9's multi-process criterion is untouched "
+        "and IA-9 stays [UNVERIFIED-IA] -- building the cache is not running the gate."
     )
     return 0
 
