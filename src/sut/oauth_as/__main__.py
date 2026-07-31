@@ -89,6 +89,25 @@ def mint_phase1_tokens(document: dict, config: ASConfig, signing_key) -> dict[st
             lifetime_seconds=spec.get("lifetime_seconds"),
         )
         tokens[client_id] = token.value
+        # ADDITIONAL NAMED GRANTS for the same client (ADR 0029). The SS E.1
+        # ladder row -- not the client identity -- decides how broad an arm's
+        # base token is, so one client may hold more than one base `AT@aud`
+        # and each arm takes the one its row specifies. Same pre-issued path,
+        # same `issue_initial` call, same shape; only the granted set differs.
+        # Keyed `<client_id>:<grant name>` so a caller cannot confuse one with
+        # the plain per-client token.
+        for name, extra in (spec.get("additional_grants") or {}).items():
+            issued = issue_initial(
+                config=config,
+                signing_key=signing_key,
+                subject=spec["subject"],
+                client_id=client_id,
+                audience=spec["audience"],
+                scope=extra.get("scope", spec["scope"]),
+                authorization_details=extra["authorization_details"],
+                lifetime_seconds=extra.get("lifetime_seconds", spec.get("lifetime_seconds")),
+            )
+            tokens[f"{client_id}:{name}"] = issued.value
     return tokens
 
 

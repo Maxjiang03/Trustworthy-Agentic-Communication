@@ -261,7 +261,7 @@ class TestTheArmCannotBeMisprovisioned:
         """
         narrower = [["notes.read", "notes/project"]]
         with pytest.raises(b2mod.B2ConfigurationError):
-            B2ExchangeTaskArm().provision(dict(setup, task_grant=narrower))
+            B2ExchangeTaskArm().provision(dict(setup, grant_elements=narrower))
 
     def test_the_correctly_provisioned_arm_provisions(self, setup):
         """Positive arm: the refusals above are not refusing everything."""
@@ -323,7 +323,7 @@ class TestAdr0024Counterfactual:
                 as_public_jwk=process.public_jwk,
                 as_port=process.port,
                 as_tls_cert_pem=process.tls_cert_pem,
-                task_grant=task_grant,
+                grant_elements=task_grant,
             )
         )
         return arm
@@ -699,7 +699,7 @@ class TestTheArmGetsNoCapabilityConjunct:
             "client_secret",
             "actor_identity_private_jwk",
             "as_tls_cert_pem",
-            "task_grant",
+            "grant_elements",
         ):
             incomplete = {k: v for k, v in setup.items() if k != field}
             with pytest.raises(b2mod.B2ConfigurationError):

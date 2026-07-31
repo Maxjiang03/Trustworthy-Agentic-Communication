@@ -47,6 +47,7 @@ from src.harness.mediation.boundary import install_boundary
 from src.harness.oracle import commitment
 from src.harness.policy import frozen_policy
 from src.harness.schema import (
+    ApiKeyEvidence,
     CapabilityEvidence,
     EvidenceBundle,
     IntendedInvocation,
@@ -203,7 +204,13 @@ def _evidence_from(presentation: Mapping[str, Any]) -> EvidenceBundle:
         )
     if "access_token" in presentation:
         oauth = OAuthEvidence(kind="oauth", raw_at=presentation["access_token"].encode("ascii"))
-    return EvidenceBundle(oauth=oauth, capability=capability, api_key=None, inv_only=None)
+    api_key = None
+    if "api_key_id" in presentation:
+        # `raw_key_ref` is a REFERENCE (SS F.1). `B1` presents the key id here
+        # and compares the secret in-process, so no shared secret enters any
+        # record the oracle reads (CLAUDE.md red line 8).
+        api_key = ApiKeyEvidence(kind="api_key", raw_key_ref=presentation["api_key_id"])
+    return EvidenceBundle(oauth=oauth, capability=capability, api_key=api_key, inv_only=None)
 
 
 class GoldenThreadRunner:
@@ -285,6 +292,34 @@ class GoldenThreadRunner:
             raise RunnerError(f"the pilot corpus declares more than one U_task: {grants}")
         return [[action, resource] for action, resource in sorted(distinct.pop())]
 
+    def ladder_grant_elements(self, ladder_grant: str) -> list[list[str]]:
+        """The element set an SS E.1 row's base token must carry (ADR 0029).
+
+        `"task"` is the corpus's own `U_task`; `"broad"` is the whole frozen
+        `Omega`. Read from the frozen artifacts rather than passed in, so the
+        AS's provisioning and the arm's self-check cannot be handed two
+        different answers by one caller mistake.
+        """
+        if ladder_grant == "task":
+            return self.task_grant()
+        if ladder_grant == "broad":
+            omega = frozen_config.load_document()["omega"]["elements"]
+            return [[action, resource] for action, resource in sorted(map(tuple, omega))]
+        raise RunnerError(f"unknown SS E.1 ladder grant {ladder_grant!r} (ADR 0029)")
+
+    def b1_setup(self, *, key_id: str = "pilot-api-key") -> dict[str, Any]:
+        """`B1`'s injected provisioning material (SS E.1's appendix arm).
+
+        One shared secret, derived from the sealed seed and handed over in
+        memory. There is nothing else to provision: `B1` expresses no
+        authority, no audience and no scope, so no frozen document, no key
+        material and no token reaches it.
+        """
+        return {
+            "api_key_id": key_id,
+            "api_key_secret": key_material.b1_api_key(self.seed, key_id),
+        }
+
     def b2_setup(
         self,
         *,
@@ -295,7 +330,8 @@ class GoldenThreadRunner:
         client_id: str = "agent-supervisor",
         actor_id: str = "agent-specialist",
         scope: str = "mcp.invoke",
-        task_grant: list[list[str]] | None = None,
+        ladder_grant: str = "task",
+        grant_elements: list[list[str]] | None = None,
     ) -> dict[str, Any]:
         """The injected provisioning material for `B2-exchange-task` (SS E.2).
 
@@ -312,12 +348,20 @@ class GoldenThreadRunner:
         runtime-only: derived here, in memory, handed to the arm, never written
         to disk, the repository, or `results/` (CLAUDE.md red line 8).
 
-        `task_grant` defaults to the corpus's own `U_task` and is what the arm
-        checks its subject token against before it will provision at all
-        (ADR 0024). Passing one explicitly is a deliberate act -- it says "this
-        run's task grant is not the corpus's" -- and the arm still refuses if
-        the token it holds does not match whatever is passed.
+        `ladder_grant` names which SS E.1 row the arm occupies, and decides
+        BOTH which of the delegating client's base tokens it receives and what
+        its own provisioning check compares against (ADR 0029). `"task"` gives
+        the ADR 0024 task-scoped `AT@aud` and `C_0 = U_task`; `"broad"` gives
+        the coarse `Omega` grant the same client also holds, because SS E.4
+        predicts the broad arms ADMIT `F1-root` and a task-scoped token would
+        make them block it. The arm refuses to provision if the row it declares
+        and the row it is handed disagree, so breadth cannot be smuggled in.
+        `grant_elements` overrides the element set for a deliberate
+        counterfactual; the arm still verifies the token against whatever is
+        passed.
         """
+        if ladder_grant not in ("task", "broad"):
+            raise RunnerError(f"unknown SS E.1 ladder grant {ladder_grant!r} (ADR 0029)")
         principal = registry_mod.load_document()["actors"][actor_id]
         return {
             "as_port": as_port,
@@ -332,7 +376,12 @@ class GoldenThreadRunner:
             "actor_id": actor_id,
             "actor_identity_private_jwk": key_material.identity_private_jwk(self.seed, principal),
             "scope": scope,
-            "task_grant": self.task_grant() if task_grant is None else task_grant,
+            "ladder_grant": ladder_grant,
+            "grant_elements": (
+                self.ladder_grant_elements(ladder_grant)
+                if grant_elements is None
+                else grant_elements
+            ),
             "run_mode": "pilot",  # never "confirmatory": the seal is Part H's
         }
 

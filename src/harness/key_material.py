@@ -140,6 +140,10 @@ def identity_private_jwk(seed: bytes, principal: str) -> "dict[str, str]":
 # ---------------------------------------------------------------------------
 AS_CLIENT_SECRET_INFO = b"AASC-G4-CLIENT-SECRET"
 
+# `B1`'s shared secret. Its own `info` label, so it cannot be confused
+# with an AS client secret or with any holder key derived from the same seed.
+B1_API_KEY_INFO = b"AASC-B1-API-KEY"
+
 
 def as_client_secret(seed: bytes, client_id: str) -> str:
     """Mirror of `src/sut/oauth_as/keys.derive_client_secret` (not an import)."""
@@ -148,5 +152,22 @@ def as_client_secret(seed: bytes, client_id: str) -> str:
         length=32,
         salt=None,
         info=AS_CLIENT_SECRET_INFO + b":" + client_id.encode("ascii"),
+    ).derive(seed)
+    return urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def b1_api_key(seed: bytes, key_id: str) -> str:
+    """`B1`'s static shared secret for one key id (EXP3 STEP 8).
+
+    Runtime-only, runner-held, in memory: derived here and injected as
+    start-up configuration, never written to disk, the repository, or
+    `results/` (CLAUDE.md red line 8). `B1` compares it for equality and
+    reads nothing else, which is the arm.
+    """
+    raw = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=B1_API_KEY_INFO + b":" + key_id.encode("ascii"),
     ).derive(seed)
     return urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")

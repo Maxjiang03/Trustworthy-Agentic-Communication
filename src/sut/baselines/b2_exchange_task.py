@@ -142,6 +142,15 @@ class B2ExchangeTaskArm:
     """Online per-hop RFC 8693 narrowing; bearer `AT_n` verified at the boundary."""
 
     name = "B2-exchange-task"
+    # SS E.1 ladder properties, declared as DATA on the arm (ADR 0029). The
+    # ROW decides how broad this arm's base grant is -- not which client
+    # happens to be used -- and provisioning refuses a grant that disagrees
+    # with the row. `B2-exchange-broad` and `B2-broad-noexchange` override
+    # `ladder_grant`; the no-exchange arm additionally overrides
+    # `performs_exchange`, and the broad exchange arm `narrows_at_the_hop`.
+    ladder_grant = "task"  # receives per-hop `C_i`
+    performs_exchange = True  # an ONLINE round trip per hop
+    narrows_at_the_hop = True  # ... which narrows, rather than restating
     bitmask = ArmBitmask(
         oauth_authn=1,
         crypto_chain=0,
@@ -184,26 +193,39 @@ class B2ExchangeTaskArm:
             "actor_id",
             "actor_identity_private_jwk",
             "scope",
-            "task_grant",
+            "ladder_grant",
+            "grant_elements",
             "run_mode",
         }
         missing = required - set(setup)
         if missing:
             raise B2ConfigurationError(f"{self.name} provisioning is missing {sorted(missing)}")
 
-        # Requirement 2: ONE TLS context, built here and never rebuilt. The
-        # trust anchor is PEM text from the injected configuration, so no
-        # certificate is read from -- or written to -- disk (requirement 4).
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        context.minimum_version = ssl.TLSVersion.TLSv1_3
-        context.load_verify_locations(cadata=setup["as_tls_cert_pem"])
-        self._tls_context = context
-        # Requirement 1: the literal loopback address. The AS certificate
-        # carries a `127.0.0.1` IP SAN, so hostname verification still holds.
-        # Requirement 2 again: ONE keep-alive connection, reused across hops.
-        self._connection = http.client.HTTPSConnection(
-            LOOPBACK, int(setup["as_port"]), context=context, timeout=15
-        )
+        # ADR 0029: the SS E.1 row this arm occupies decides its base grant,
+        # so the injected `ladder_grant` must NAME that row and cannot silently
+        # differ from it.
+        declared = type(self).ladder_grant
+        if setup["ladder_grant"] != declared:
+            raise B2ConfigurationError(
+                f"{self.name} occupies the {declared!r} row of the SS E.1 ladder but was "
+                f"provisioned as {setup['ladder_grant']!r}. Breadth is a property of the ARM, "
+                "not of whichever client's token it happens to be handed (ADR 0029)"
+            )
+        if self.performs_exchange:
+            # Requirement 2: ONE TLS context, built here and never rebuilt. The
+            # trust anchor is PEM text from the injected configuration, so no
+            # certificate is read from -- or written to -- disk (requirement 4).
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            context.minimum_version = ssl.TLSVersion.TLSv1_3
+            context.load_verify_locations(cadata=setup["as_tls_cert_pem"])
+            self._tls_context = context
+            # Requirement 1: the literal loopback address. The AS certificate
+            # carries a `127.0.0.1` IP SAN, so hostname verification still
+            # holds. Requirement 2 again: ONE keep-alive connection, reused
+            # across hops.
+            self._connection = http.client.HTTPSConnection(
+                LOOPBACK, int(setup["as_port"]), context=context, timeout=15
+            )
         # Requirement 3: keys parsed once, here. The actor-assertion signing
         # key and (inside BoundaryConfig) the AS public key are never re-parsed
         # per request.
@@ -218,12 +240,12 @@ class B2ExchangeTaskArm:
         # is runtime-only, injected, and never written anywhere.
         credentials = f"{setup['client_id']}:{setup['client_secret']}".encode()
         self._authorization = "Basic " + base64.b64encode(credentials).decode("ascii")
-        self._check_subject_token_is_the_task_grant(setup)
+        self._check_subject_token_matches_the_ladder_grant(setup)
         self._setup = dict(setup)
 
-    # -- the ADR 0024 guarantee, held by the ARM ------------------------------ #
-    def _check_subject_token_is_the_task_grant(self, setup: Mapping[str, Any]) -> None:
-        """Refuse a subject token whose authority is not exactly `U_task`.
+    # -- the ADR 0024/0029 guarantee, held by the ARM -------------------------- #
+    def _check_subject_token_matches_the_ladder_grant(self, setup: Mapping[str, Any]) -> None:
+        """Refuse a subject token whose authority is not exactly this row's grant.
 
         **This arm can otherwise be misprovisioned silently, and it fails
         TOWARD the hypothesis.** The AS enforces `C_i subset-of C_{i-1}`
@@ -246,16 +268,26 @@ class B2ExchangeTaskArm:
         property as being impossible to misprovision.
 
         The equality is `==`, not `subset-of`: a subject token carrying LESS
-        than `U_task` would make the arm unable to pass on `C_1` and would
-        show up as a spurious block, which is the opposite bias and equally
-        unacceptable.
+        than its row's grant would make the arm unable to pass on what the row
+        specifies and would show up as a spurious block, which is the opposite
+        bias and equally unacceptable.
+
+        **ADR 0029 generalises the check without weakening it.** `U_task` is
+        the STRONG rows' grant; the BROAD rows' is the coarse `Omega`, because
+        SS E.4 predicts they ADMIT `F1-root` and `(mail.send, mail/outbox)`
+        lies outside `U_task` -- on a task-scoped token a broad arm would
+        block it, contradicting SS E.4 and destroying the arm whose whole job
+        is to isolate the exchange round trip FROM narrowing. Which grant
+        applies is read from `type(self).ladder_grant`, checked above, so the
+        arm still cannot be handed a grant its row does not specify.
         """
         assert self._oauth_config is not None
-        expected = frozenset((action, resource) for action, resource in setup["task_grant"])
+        declared = type(self).ladder_grant
+        expected = frozenset((action, resource) for action, resource in setup["grant_elements"])
         if not expected:
             raise B2ConfigurationError(
-                f"{self.name}: `task_grant` is empty; the arm cannot verify its own "
-                "provisioning against nothing (ADR 0024)"
+                f"{self.name}: `grant_elements` is empty; the arm cannot verify its own "
+                "provisioning against nothing (ADR 0024/0029)"
             )
         try:
             claims = verify_access_token(
@@ -265,18 +297,17 @@ class B2ExchangeTaskArm:
             raise B2ConfigurationError(
                 f"{self.name}: the injected subject token does not verify at this boundary "
                 f"({exc.reason}: {exc.description}), so its authority cannot be checked "
-                "against U_task (ADR 0024)"
+                "against its ladder row's grant (ADR 0024/0029)"
             ) from exc
         granted = allowed_authority(claims, self._oauth_config)
         if granted != expected:
             raise B2ConfigurationError(
-                f"{self.name}: the injected subject token grants {sorted(granted)}, but "
-                f"U_task for this run is {sorted(expected)}. ADR 0024 requires the "
-                "delegating client's base AT@aud to carry authority EXACTLY U_task: the AS "
-                "enforces per-hop containment against this token's own authorization_details, "
-                "so a wider one would let a chain-tamper hop be ISSUED and would cost this arm "
-                "a block it should win. Provision the AS with "
-                "`golden_thread_as_document(..., task_grant=U_task)`."
+                f"{self.name}: the injected subject token grants {sorted(granted)}, but the "
+                f"{declared!r} row of the SS E.1 ladder specifies {sorted(expected)}. "
+                "ADR 0024/0029: the AS enforces per-hop containment against this token's own "
+                "authorization_details, so a token wider than the row would let a chain-tamper "
+                "hop be ISSUED and cost a strong arm a block it should win, while one narrower "
+                "than the row would make a broad arm block what SS E.4 predicts it admits."
             )
 
     # -- delegate: the ONLINE Phase-2 hop (SS E.2) ---------------------------- #
@@ -292,7 +323,7 @@ class B2ExchangeTaskArm:
         """
         if self._setup is None or self._connection is None:
             raise RuntimeError(REASON_NOT_PROVISIONED)
-        requested = tuple(hop.attenuation_elements) + tuple(hop.widening_elements)
+        requested = self._requested_elements(hop)
         details = [
             {
                 "type": self._setup["rar_type"],
@@ -337,6 +368,23 @@ class B2ExchangeTaskArm:
             "audience": hop.audience,
             "authorization_details": body.get("authorization_details", []),
         }
+
+    def _requested_elements(self, hop: HopContext) -> tuple[tuple[str, str], ...]:
+        """What this row asks the AS for at the hop.
+
+        A NARROWING row asks for `C_i` (plus, on `F1-chain-tamper`, the
+        widening the scenario declares -- which the AS refuses). A BROAD row
+        asks for **exactly what it already holds**, which is the whole point:
+        `B2-exchange-broad` isolates the exchange round trip **from**
+        narrowing, so an implementation that quietly narrowed would destroy
+        the arm and silently contradict SS E.4. `widening_elements` is not
+        added on a broad row -- it is already inside that row's grant, which
+        is why SS E.3 marks the subcase **NA** for the broad arms rather than
+        expecting a block.
+        """
+        if self.narrows_at_the_hop:
+            return tuple(hop.attenuation_elements) + tuple(hop.widening_elements)
+        return tuple((action, resource) for action, resource in self._setup["grant_elements"])
 
     def _actor_assertion(self, now_epoch: int) -> str:
         """The delegate's actor assertion, signed with the key parsed at provision.

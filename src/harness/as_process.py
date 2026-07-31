@@ -105,6 +105,7 @@ def golden_thread_as_document(
     omega_elements: list[list[str]],
     task_grant: "list[list[str]] | None" = None,
     task_grant_client: str = "agent-supervisor",
+    broad_grant_name: str = "broad",
 ) -> dict[str, Any]:
     """The AS config document for the golden-thread pilot (runner-assembled).
 
@@ -145,10 +146,18 @@ def golden_thread_as_document(
     resource_owner = registry_document["resource_owners"][0]
     rar = rar_objects(omega_elements, audience)
     grants = {actor: rar for actor in actors}
+    additional: dict[str, dict[str, Any]] = {}
     if task_grant is not None:
         if task_grant_client not in grants:
             raise ASProcessError(f"task_grant names unregistered client {task_grant_client!r}")
         grants[task_grant_client] = rar_objects(task_grant, audience)
+        # ADR 0029: the SS E.1 ladder row decides breadth, so the SAME client
+        # also holds the coarse `Omega` grant, under an explicit name. The
+        # broad arms take that one; the strong arms take `C_0 = U_task`.
+        # Delegating the broad arms from a DIFFERENT principal was rejected --
+        # it would change the `may_act` relation as a side effect and confound
+        # the arms in a second respect.
+        additional[task_grant_client] = {broad_grant_name: {"authorization_details": rar}}
     registry = {}
     for actor, principal in actors.items():
         label = registry_document["principals"][principal]["key_reference"]
@@ -172,6 +181,7 @@ def golden_thread_as_document(
                 "audience": audience,
                 "scope": "mcp.invoke",
                 "authorization_details": grants[actor],
+                **({"additional_grants": additional[actor]} if actor in additional else {}),
             }
             for actor in actors
         },
