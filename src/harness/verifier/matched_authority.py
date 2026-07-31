@@ -41,6 +41,22 @@ capability-plane SET and then applies `scope` per request, while this module
 asks a yes/no question per candidate with all three planes inside it. Same
 frozen inputs, different construction -- which is what makes agreement
 evidence rather than tautology.
+
+**The residual that leaves, stated precisely enough to be auditable.** Gate
+G-13's L1 is an agreement test between this module and the SUT, and agreement
+is evidence of independence only while the two constructions really differ. It
+is tempting to record that as "a future refactor could undo it", but that is
+broader than the truth and a vague residual is one nobody acts on. Precisely:
+G-13's L4 import scan **would** catch a refactor that made this module import
+`src/sut/authz/boundary.py`, because that is a cross-boundary import and L4.W1
+proved the scan non-vacuous by flagging one. What no import scan can catch is
+**copy-paste convergence** -- this token plane rewritten with the boundary's
+construction (a capability-plane set built first, `scope` applied per request
+afterwards) and no import at all. The two would then agree because they are the
+same algorithm rather than because two constructions independently reached one
+answer, and every L1 equality would still pass. **The guard against that is
+review of a change to this module, not a test**, and saying so is the point of
+recording it here.
 """
 
 from dataclasses import dataclass

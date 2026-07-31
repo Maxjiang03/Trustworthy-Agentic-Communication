@@ -483,3 +483,15 @@ AASC_G4_AS_SEED=<hex> python -m src.sut.oauth_as <config.json>
 ```
 
 which prints one JSON line carrying the bound port, the AS **public** JWK, and the TLS certificate.
+
+---
+
+## Update, 2026-07-31 — the `may_act` residual is RELEASED (ADR 0028)
+
+*Appended, not a rewrite: nothing above is retracted and the gate's adjudication is untouched.*
+
+This report records the AS's `may_act` as populated from a **spike-local** delegation policy *pending `frozen_parameters` row 5*. **Row 5 will now never be set** (ADR 0028): the `F2 wrong_principal` subfamily is deferred and unscored, because row 5 has no anchor outside the author's judgement and any value would make that family measure conformance to an invented artifact.
+
+The residual is therefore **released by decision** rather than left hanging: the delegation policy is the **final** configuration for this study, no longer provisional, and it is sealed with the AS configuration at Part H step 3 like any other AS parameter (ADR 0017). A residual that is permanently unresolvable must be closed by decision — leaving it marked *pending* would state something untrue for the rest of the project's life.
+
+What does **not** change: G-4's adjudication, its pass criterion, and every other residual it records. The three retained `F2` subfamilies are scored in full.

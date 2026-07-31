@@ -106,10 +106,19 @@ Block 1 built the SUT-side signer and pinned agreement; this gate is where that 
 3. **Agreement**, pinned separately by `tests/test_sut_signer_agreement.py`, and by this gate's
    own L1: two independent implementations produced the same `C_i` on every hop of every cell.
 
-**Residual, stated because it is easy to lose:** agreement is evidence of independence *only
-because* the implementations are structurally distinct. (1) and (2) establish that today; a
-future refactor could silently undo it, which is why both are asserted structurally here and in
-`tests/test_matched_authority.py` rather than left as prose.
+**Residual, stated precisely because a vague one is ignored.** Agreement is evidence of
+independence *only because* the implementations are structurally distinct, and (1) and (2)
+establish that today. *(This paragraph first read "a future refactor could silently undo it".
+That was true but broader than the truth, and is superseded here — update, 2026-07-31.)* The
+accurate statement is narrower and therefore actionable: L4's import scan **would** catch a
+refactor that made the verifier import `src/sut/authz/boundary.py` — that is a cross-boundary
+import, and **L4.W1 proved the scan non-vacuous** by flagging one. What the scan **cannot** catch
+is **copy-paste convergence**: the token plane rewritten with the boundary's construction — a
+capability-plane set built first, `scope` applied per request afterwards — and **no import at
+all**. The two would then agree because they are the same algorithm rather than because two
+constructions independently reached one answer, and every L1 equality would still pass. **The
+guard against that case is review of a change to `matched_authority.py`, not a test**, and it is
+recorded as such rather than implied to be covered.
 
 ## 7. Every equality was shown able to fail
 
