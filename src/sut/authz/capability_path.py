@@ -98,12 +98,18 @@ The `disabled` set is that seam: a disabled conjunct is skipped and recorded,
 never silently absent. This pass uses it only for the STEP 13
 would-have-failed counterfactuals; no ablation arm is built (forbidden 11).
 
-**Two conjuncts cannot honestly be frozen yet** (rows 4/6/10 UNSET): the
-policy object is injected configuration and construction fails without one;
-the pilot stand-in carries a PILOT-PROVISIONAL banner and a guard refuses it
-on a confirmatory run; and the pilot scenarios carry no LabelAssertion and
-no high-risk action, so neither conjunct is load-bearing here -- F4/F5 stay
-unscored until those rows are frozen by ADR.
+**The two policy conjuncts are load-bearing, in their REFUSAL half only**
+(rows 4/6/10 frozen by ADR 0022, composition amended by ADR 0023). The policy
+object is injected configuration and construction fails without one; both
+planes evaluate the same frozen bytes and neither imports the other's
+evaluation. What the freeze does *not* give is the acceptance half: a
+`LabelAssertion`, a `DeclassificationArtifact` and an `ApprovalArtifact` all
+hinge on constructions deferred to the F4 label-plumbing decision and
+`authz_context_hash` (ADR 0009 category (c), owned by G-15), so each is
+**refused with its reason stated** rather than read at face value. F4/F5 stay
+unscored until then.
+*(Update note: this paragraph read "Two conjuncts cannot honestly be frozen
+yet (rows 4/6/10 UNSET)" and was true when written; ADR 0022/0023 froze them.)*
 
 `audit = 1` for B3: the structured JSONL decision log is emitted OFF the
 decision path -- a sink failure can cost log completeness, never a
@@ -723,46 +729,62 @@ class CapabilityDecisionPath:
 
     # -- 7. context_policy_ok -------------------------------------------------- #
     def _context_policy_ok(self, p: B3Presentation, tool, arguments, state) -> None:
-        """Rows 4 and 6, frozen by ADR 0022, over the concrete request.
+        """Rows 4 and 6, frozen by ADR 0022/0023, over the concrete request.
 
         Egress is DERIVED, never enumerated: the tool is egress iff the server
         policy declares a recipient argument for it, which over the frozen
-        `Omega` is exactly `mail.send`. The label is the JOIN of the verified
-        payload labels (SS A.6); no label on an egress action fails closed.
+        `Omega` is exactly `mail.send`.
+
+        **A presented label is REFUSED, never read**, exactly as the sibling
+        `approval_artifact_ok` refuses a presented `ApprovalArtifact`. SS F.1's
+        `LabelAssertion` declares five things that would have to be checked --
+        `signature`, `issuer_kid`, `iat`/`exp`, and a `payload_digest` bound to
+        the payload bytes -- and its digest construction is deferred to the F4
+        label-plumbing decision (ADR 0009 category (c), owned by G-15), so not
+        one of them can be verified today. Reading the bare `label` field would
+        let an agent-supplied string decide a security verdict and turn a
+        `sensitive` egress into a `permit` -- precisely what `required_authority`
+        exists to prevent. So the label plane is either verifiable or refused.
 
         Only the **refusal** half is decided here. `escalate` means admissible
         under a valid approval or declassification artifact, and neither can
-        be verified until `authz_context_hash` is fixed (ADR 0009 category
-        (c), owned by G-15) -- so `escalate` refuses, and says why.
+        be verified until `authz_context_hash` is fixed -- so `escalate`
+        refuses, and says why.
         """
+        if p.payload_labels:
+            raise ConjunctFailed(
+                "context_policy_ok",
+                f"{len(p.payload_labels)} label assertion(s) were presented, but no "
+                "LabelAssertion can be verified: its payload_digest construction is deferred "
+                "to the F4 label-plumbing decision (ADR 0009 category (c), owned by G-15), so "
+                "the signature, issuer_kid and iat/exp it declares cannot be checked either. "
+                "A self-declared label is not evidence and must not decide a verdict",
+            )
         recipient = egress_recipient(tool, arguments)
         if recipient is None:
             # Non-egress: permit at every label, and unlabelled is permitted
             # too -- nothing leaves, so no egress policy can apply.
             return
-        labels = [str(entry.get("label")) for entry in p.payload_labels if "label" in entry]
-        try:
-            label = (
-                max(labels, key=self._policy.order.index)
-                if labels
-                else None  # unlabelled -> the frozen fail-closed rule
-            )
-            outcome = self._policy.egress_decision(label, recipient)
-        except (PolicyConfigurationError, ValueError) as exc:
-            raise ConjunctFailed("context_policy_ok", f"label cannot be evaluated: {exc}") from exc
+        # The SS A.6 join over the VERIFIED labels, which is empty by
+        # construction while the refusal above stands: so the frozen unlabelled
+        # rule decides. The outcome is still READ from the injected document
+        # rather than assumed, which is why the three-way dispatch stays -- it
+        # is the policy that fails this closed, not this function.
+        outcome = self._policy.egress_decision(None, recipient)
         if outcome == PERMIT:
             return
         if outcome == ESCALATE:
             raise ConjunctFailed(
                 "context_policy_ok",
-                f"egress of {label!r} to {self._policy.sink_class(recipient)} escalates; "
-                "no declassification or approval artifact can verify until authz_context_hash "
+                f"egress to {self._policy.sink_class(recipient)} escalates; no "
+                "declassification or approval artifact can verify until authz_context_hash "
                 "is fixed (ADR 0009 category (c), G-15)",
             )
         raise ConjunctFailed(
             "context_policy_ok",
-            f"egress of {label if label else 'an unlabelled payload'!r} to "
-            f"{self._policy.sink_class(recipient)} is blocked by the frozen policy (ADR 0022)",
+            f"egress of an unlabelled payload to {self._policy.sink_class(recipient)} is "
+            "blocked by the frozen policy (ADR 0022/0023): with no verifiable LabelAssertion "
+            "no permit can be established",
         )
 
     # -- 8. approval_artifact_ok ------------------------------------------------ #

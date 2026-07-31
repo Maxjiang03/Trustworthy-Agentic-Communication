@@ -8,11 +8,16 @@ error every round:
    code and **no EffectEvent in the ledger** -- the LEDGER, not the agent, is
    what shows nothing executed.
 2. **The wrong-outcome world is observable.** For each block, disabling the
-   containment conjunct shows the call *would* be admitted -- so the block is
-   attributable to containment and not masked by an earlier conjunct (the
-   G-11 masking lesson). The same construction runs for `htc_chain_ok` and
-   `invocation_binding_ok` with a wrong-holder INV and a tool/argument
-   substitution.
+   containment conjunct moves the outcome to a **per-case expected** one:
+   `calendar.read` is then admitted outright, while `mail.send` -- an
+   unlabelled egress (row 4) *and* a frozen high-risk action (row 10) -- is
+   then blocked at a conjunct strictly LATER than containment. Either way the
+   original block is attributable to containment and was not masked by an
+   earlier conjunct (the G-11 masking lesson). The expectation is declared per
+   case, never "whichever happens": a test that accepts both outcomes cannot
+   fail for the case it was written for. The same construction runs for
+   `htc_chain_ok` and `invocation_binding_ok` with a wrong-holder INV and a
+   tool/argument substitution.
 
 Windows-only where the effect ledger is involved (ADR 0014); the
 decision-path-only tests run everywhere.
@@ -679,6 +684,76 @@ class TestFrozenPolicyIsLoadBearing:
         assert admitted is False
         assert reason == REASON_CODES["context_policy_ok"]
         assert "unlabelled" in ablated.audit_log[-1]["detail"]
+
+    def test_a_presented_label_is_refused_not_read(self, staged):
+        """A self-declared label must never decide a security verdict.
+
+        The cell is chosen to be the dangerous one: `(public, external-sink)`
+        is an ALLOWED pair, so had the conjunct read `entry["label"]` at face
+        value this exact presentation would have been **permitted** -- an
+        agent-supplied field turning a `mail.send` to an external domain into a
+        permit. SS F.1's `LabelAssertion` declares a signature, an issuer_kid,
+        an iat/exp and a payload_digest, and not one of them is checkable until
+        the F4 label-plumbing decision / G-15, so the assertion is refused the
+        way the sibling `approval_artifact_ok` refuses a presented artifact.
+        """
+        from src.harness.policy import frozen_policy
+        from src.sut.authz.capability_path import BoundaryPolicy
+
+        setup, visible = staged
+        worlds = TestWouldHaveFailedWorlds()
+        arguments = {"to": "partner@example.test", "subject": "s", "body": "b"}
+        arm, _ = worlds._arm_with_presentation(
+            setup, visible, tool="mail.send", arguments=arguments, ablates="containment_ok"
+        )
+        # What makes the refusal load-bearing rather than decorative: the
+        # claimed cell really is a permit under the frozen policy.
+        policy = BoundaryPolicy.load(frozen_policy.load_document())
+        assert policy.egress_decision("public", "partner@example.test") == "permit"
+
+        arm._staged = dataclasses.replace(
+            arm._staged,
+            payload_labels=(
+                {
+                    "payload_digest": "00" * 32,
+                    "label": "public",
+                    "issuer_kid": "kid-holder-specialist",
+                    "iat": 0,
+                    "exp": 1 << 31,
+                    "signature": "",
+                },
+            ),
+        )
+        admitted, reason = arm.decide("mail.send", arguments)
+        assert admitted is False
+        assert reason == REASON_CODES["context_policy_ok"]
+        detail = arm.audit_log[-1]["detail"]
+        assert "no LabelAssertion can be verified" in detail and "G-15" in detail
+
+    def test_the_unlabelled_path_is_unchanged_by_that_refusal(self, staged):
+        """Refusing a presented label moves no pilot outcome.
+
+        No pilot presentation carries one -- the arm stages none and the runner
+        assembles `payload_labels=[]` -- so the only path any pilot scenario
+        takes is the unlabelled one, which still permits non-egress and still
+        fails closed on egress.
+        """
+        setup, visible = staged
+        worlds = TestWouldHaveFailedWorlds()
+        notes = {"resource": "notes/project", "content": "x"}
+        arm, _ = worlds._arm_with_presentation(setup, visible, tool="notes.write", arguments=notes)
+        assert arm._staged.payload_labels == (), "the arm stages no label"
+        assert arm.decide("notes.write", notes) == (True, "b3_admitted")
+
+        mail = {"to": "partner@example.test", "subject": "s", "body": "b"}
+        egress, _ = worlds._arm_with_presentation(
+            setup, visible, tool="mail.send", arguments=mail, ablates="containment_ok"
+        )
+        assert egress._staged.payload_labels == ()
+        admitted, reason = egress.decide("mail.send", mail)
+        assert admitted is False
+        assert reason == REASON_CODES["context_policy_ok"]
+        assert "unlabelled" in egress.audit_log[-1]["detail"]
 
     def test_a_non_egress_non_high_risk_action_passes_both(self, staged):
         # Negative arm: the two conjuncts are not refusing everything.

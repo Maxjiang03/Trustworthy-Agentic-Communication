@@ -219,9 +219,9 @@ class GoldenThreadRunner:
         Everything the arm needs arrives as DATA from the composition root:
         the frozen documents (never imported by the SUT), the runner-resolved
         public keys and this campaign's private material (ADR 0007 seeds), the
-        Phase-1 base token from the AS start-up line (ADR 0021), and the
-        PILOT-PROVISIONAL policy object -- which the arm's loader refuses on a
-        confirmatory run, and refuses to default if absent.
+        Phase-1 base token from the AS start-up line (ADR 0021), and the frozen
+        rows 4/6/10 document (ADR 0022/0023), which the arm's loader evaluates
+        itself and refuses to default if absent.
         """
         # The ONE policy source (ADR 0022): the frozen document itself. The
         # PILOT-PROVISIONAL stand-in is deleted, not merely bypassed.
