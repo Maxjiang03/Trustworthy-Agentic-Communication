@@ -120,7 +120,9 @@ def _armed(arm, setup, visible, *, tool=BENIGN_TOOL, arguments=None, now=None):
     now = int(time.time()) if now is None else now
     arm.provision(setup)
     credentials = arm.delegate(_hop(visible, now))
-    arm.present(credentials, _invocation(visible, now, tool=tool, arguments=arguments or BENIGN_ARGS))
+    arm.present(
+        credentials, _invocation(visible, now, tool=tool, arguments=arguments or BENIGN_ARGS)
+    )
     return arm, credentials, now
 
 
@@ -213,7 +215,8 @@ class TestOAuthAuthnIsOnAndVerifies:
         """The RS believes it is a different resource server, so `aud` no longer
         names it -- SS E.4's OAuth audience-mismatch negative control."""
         arm, _, _ = _armed(
-            BCapArm(), dict(setup, resource_server="https://other.aasc.local/tools"),
+            BCapArm(),
+            dict(setup, resource_server="https://other.aasc.local/tools"),
             _visible("gt-benign"),
         )
         admitted, reason = arm.decide(BENIGN_TOOL, BENIGN_ARGS)
@@ -303,7 +306,9 @@ class TestCapturedCapabilityContrast:
         # captured off the wire.
         thief = BCapArm()
         thief.provision(setup)
-        thief.present(capture(credentials), _invocation(visible, now, tool=BENIGN_TOOL, arguments=BENIGN_ARGS))
+        thief.present(
+            capture(credentials), _invocation(visible, now, tool=BENIGN_TOOL, arguments=BENIGN_ARGS)
+        )
         assert thief.decide(BENIGN_TOOL, BENIGN_ARGS) == (True, "b3_admitted"), (
             "B-cap is a BEARER capability: it must admit, and that is the "
             "measurement B3's holder binding is compared against"
@@ -317,7 +322,9 @@ class TestCapturedCapabilityContrast:
         # base token -- and can only sign an INV with its OWN key.
         thief = B3Arm()
         thief.provision(setup)
-        thief.present(credentials, _invocation(visible, now, tool=BENIGN_TOOL, arguments=BENIGN_ARGS))
+        thief.present(
+            credentials, _invocation(visible, now, tool=BENIGN_TOOL, arguments=BENIGN_ARGS)
+        )
         thief._staged = dataclasses.replace(
             thief._staged,
             invocation_assertion=self._capturing_party_inv(credentials, setup, visible, now),
@@ -336,9 +343,7 @@ class TestCapturedCapabilityContrast:
         visible = _visible("gt-benign")
         _, credentials, now = _armed(B3Arm(), setup, visible)
         captured = capture(credentials)
-        assert captured["capability_hops"] == [
-            bytes(hop) for hop in credentials["capability_hops"]
-        ]
+        assert captured["capability_hops"] == [bytes(hop) for hop in credentials["capability_hops"]]
         assert captured["access_token"] == credentials["access_token"]
         assert captured["htc_chain"] == []  # the holder plane is what is missing
 
