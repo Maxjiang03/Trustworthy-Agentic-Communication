@@ -41,3 +41,10 @@ jobs:
       # for the same reason: run it here rather than assume it.
       - name: Gate G-11 spike (cross-platform)
         run: uv run python smoke/g11/spike.py
+
+      # The G-13 spike touches the AS and Biscuit but never the effect ledger,
+      # so it is platform-independent by the same argument -- confirmed here
+      # rather than assumed. It runs every strong arm over the pilot corpus, so
+      # a change that quietly breaks matched per-hop authority fails CI.
+      - name: Gate G-13 spike (cross-platform)
+        run: uv run python smoke/g13/spike.py
