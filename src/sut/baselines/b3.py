@@ -9,8 +9,8 @@ OAuth resource plane and the capability plane.
 Provisioning material arrives INJECTED (EXP1 STEP 12): the frozen
 `Omega`/`Gamma` and registry documents as data, the runner-resolved public
 keys, this arm's key material, the Phase-1 base token from the AS start-up
-line (ADR 0021), and the PILOT-PROVISIONAL policy object -- construction
-fails if none is supplied, and the loader refuses a confirmatory run.
+line (ADR 0021), and the frozen rows 4/6/10 policy document (ADR 0022/0023),
+which the arm evaluates itself and refuses to default if absent.
 
 `jti_cache = 0`: B3 does not close bit-identical replay (that is B3+ and
 gate G-9); `audit = 1`: the decision path emits its structured log off the
@@ -137,7 +137,14 @@ class B3Arm:
             exp=hop.expiry_epoch,
         )
         # The measured Phase-2 operation: offline append + HTC hop, no AS trip.
-        attenuated = self._issuer.attenuate(root_hop, list(hop.attenuation_elements))
+        # `widening_elements` is the SS E.3 chain-tamper intent as a capability
+        # arm realizes it -- appended to the SAME block, so what goes on the
+        # wire verifies under `kappa_pub` yet carries no authority: block
+        # scoping lets a later block narrow what block 0 granted, never widen
+        # it. Empty for every benign scenario.
+        attenuated = self._issuer.attenuate(
+            root_hop, list(hop.attenuation_elements) + list(hop.widening_elements)
+        )
         htc1 = signer.issue_htc_hop(
             attenuated,
             index=1,

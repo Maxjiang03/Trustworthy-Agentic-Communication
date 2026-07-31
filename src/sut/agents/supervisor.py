@@ -54,6 +54,13 @@ class Supervisor:
             attenuation_elements=tuple(
                 (action, resource) for action, resource in visible["attenuation_elements"]
             ),
+            # The SS E.3 chain-tamper INTENT, declared by the scenario and
+            # passed through untouched: this agent never decides how it is
+            # realized -- that is the arm's, which is what keeps the arms
+            # comparable over one substrate.
+            widening_elements=tuple(
+                (action, resource) for action, resource in visible.get("widening_elements", ())
+            ),
             now_epoch=now_epoch,
             expiry_epoch=now_epoch + int(visible["validity_seconds"]),
         )

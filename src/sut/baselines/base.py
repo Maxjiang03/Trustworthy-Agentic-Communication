@@ -159,6 +159,14 @@ class HopContext:
     attenuation_elements: tuple[tuple[str, str], ...]
     now_epoch: int
     expiry_epoch: int
+    # SS E.3 `F1-chain-tamper`, carried as the declared INTENT and nothing more:
+    # the elements the delegating party attempts to add to what it passes on,
+    # which lie outside `C_{i-1}`. **Each mechanism realizes it its own way** --
+    # the exchange arm sends them in the request and the AS refuses to issue;
+    # the capability arms append them as a widening block that verifies under
+    # `kappa_pub` yet carries no authority under block scoping. Empty for every
+    # benign scenario, so no existing hop changes.
+    widening_elements: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
