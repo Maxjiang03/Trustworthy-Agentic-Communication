@@ -20,6 +20,7 @@ principal's own material as start-up configuration (the pattern
 """
 
 from base64 import urlsafe_b64encode
+from collections.abc import Iterable
 
 from biscuit_auth import Algorithm, KeyPair, PrivateKey, PublicKey
 from cryptography.hazmat.primitives import hashes, serialization
@@ -78,3 +79,74 @@ def resolve_public(seed: bytes) -> "dict[str, str]":
     """
     labels = ("kappa", "holder-supervisor", "holder-specialist", "holder-worker")
     return {label: public_wire(holder_private(seed, label)) for label in labels}
+
+
+# ---------------------------------------------------------------------------
+# Identity-plane keys: the principal's own key, which signs its RFC 8693
+# actor assertion. Distinct from `holder-*` by derivation label, because
+# `smoke/g4/DESIGN.md` SS 7.3 warns the two must never be conflated.
+# ---------------------------------------------------------------------------
+_IDENTITY_PREFIX = "identity-"
+
+
+def identity_private(seed: bytes, principal: str) -> Ed25519PrivateKey:
+    """A principal's identity key, under this corpus's derivation rule."""
+    return holder_private(seed, f"{_IDENTITY_PREFIX}{principal}")
+
+
+def identity_public_jwk(seed: bytes, principal: str) -> "dict[str, str]":
+    """The public half, as the AS's registry carries it."""
+    return {"kty": "OKP", "crv": "Ed25519", "x": public_wire(identity_private(seed, principal))}
+
+
+def identity_jwks(seed: bytes, principals: Iterable[str]) -> "dict[str, dict[str, str]]":
+    """principal -> public identity JWK, as the AS registry carries them.
+
+    One construction site for the derivation label, so the AS's registry and
+    the arm that signs an actor assertion cannot drift apart by a typo.
+    """
+    return {principal: identity_public_jwk(seed, principal) for principal in principals}
+
+
+def identity_private_jwk(seed: bytes, principal: str) -> "dict[str, str]":
+    """The private half, injected into the arm that must sign an actor assertion.
+
+    Runtime-only, runner-held, in memory: like every other value this module
+    derives, it MUST never be written to disk, committed, or echoed into
+    `results/` (CLAUDE.md red line 8, ADR 0021 rule 2).
+    """
+    private = identity_private(seed, principal)
+    raw = private.private_bytes(
+        serialization.Encoding.Raw,
+        serialization.PrivateFormat.Raw,
+        serialization.NoEncryption(),
+    )
+    return dict(
+        identity_public_jwk(seed, principal),
+        d=urlsafe_b64encode(raw).rstrip(b"=").decode("ascii"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# The AS's own derivations, MIRRORED rather than imported.
+#
+# `src/harness/` may never import `src/sut/oauth_as/` (ADR 0015 rule 4), and
+# `B2-exchange-task` needs the client secret the AS derives in-process. So the
+# rule is reimplemented here from the AS's DOCUMENTED derivation, exactly as
+# this module already mirrors the corpus-label rule -- agreement is required,
+# shared code is not, and a test drives a real exchange to prove the two ends
+# accept each other. If the AS's `info` label ever changes, that test fails
+# rather than the arm silently losing its ability to authenticate.
+# ---------------------------------------------------------------------------
+AS_CLIENT_SECRET_INFO = b"AASC-G4-CLIENT-SECRET"
+
+
+def as_client_secret(seed: bytes, client_id: str) -> str:
+    """Mirror of `src/sut/oauth_as/keys.derive_client_secret` (not an import)."""
+    raw = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=AS_CLIENT_SECRET_INFO + b":" + client_id.encode("ascii"),
+    ).derive(seed)
+    return urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")

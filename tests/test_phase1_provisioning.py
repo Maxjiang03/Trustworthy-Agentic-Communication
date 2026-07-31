@@ -21,14 +21,6 @@ from src.sut.authz import boundary
 SEED = bytes.fromhex("e1" * 32)
 
 
-def _identity_jwks(seed: bytes, registry_document: dict) -> dict[str, dict[str, str]]:
-    jwks = {}
-    for principal in registry_document["principals"]:
-        key = key_material.holder_private(seed, f"identity-{principal}")
-        jwks[principal] = {"kty": "OKP", "crv": "Ed25519", "x": key_material.public_wire(key)}
-    return jwks
-
-
 @pytest.fixture(scope="module")
 def as_document():
     registry_document = reg.load_document()
@@ -37,7 +29,7 @@ def as_document():
         corpus=corpus,
         registry_document=registry_document,
         resolved_keys=key_material.resolve_public(SEED),
-        identity_jwks=_identity_jwks(SEED, registry_document),
+        identity_jwks=key_material.identity_jwks(SEED, registry_document["principals"]),
         omega_elements=frozen_config.load_document()["omega"]["elements"],
     )
 

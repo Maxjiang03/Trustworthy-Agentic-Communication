@@ -54,19 +54,6 @@ WIN32_ONLY = pytest.mark.skipif(
 )
 
 
-def _identity_jwks(registry_document: dict) -> dict[str, dict[str, str]]:
-    return {
-        principal: {
-            "kty": "OKP",
-            "crv": "Ed25519",
-            "x": key_material.public_wire(
-                key_material.holder_private(SEED, f"identity-{principal}")
-            ),
-        }
-        for principal in registry_document["principals"]
-    }
-
-
 @pytest.fixture(scope="module")
 def running_as():
     registry_document = reg.load_document()
@@ -74,7 +61,7 @@ def running_as():
         corpus={"issuer": "https://as.aasc.local", "audience": "https://mcp.aasc.local/tools"},
         registry_document=registry_document,
         resolved_keys=key_material.resolve_public(SEED),
-        identity_jwks=_identity_jwks(registry_document),
+        identity_jwks=key_material.identity_jwks(SEED, registry_document["principals"]),
         omega_elements=frozen_config.load_document()["omega"]["elements"],
     )
     with ASProcess(document, SEED) as process:

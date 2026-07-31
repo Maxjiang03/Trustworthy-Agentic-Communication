@@ -81,6 +81,21 @@ class ASProcess:
         self.stop()
 
 
+def rar_objects(elements: "list[list[str]] | list[tuple[str, str]]", audience: str) -> list[dict]:
+    """One RAR object per element.
+
+    Never one object listing every action and every datatype: a single object's
+    RFC 9396 SS 2.2 product over all actions x all datatypes would manufacture
+    pairs outside `Omega`, which the AS validator rightly refuses
+    (`rar-outside-omega`). RFC 9396 SS 2 explicitly allows several entries of
+    one type, which is the sanctioned way to express a non-rectangular set.
+    """
+    return [
+        {"type": RAR_TYPE, "locations": [audience], "actions": [action], "datatypes": [resource]}
+        for action, resource in elements
+    ]
+
+
 def golden_thread_as_document(
     *,
     corpus: dict[str, Any],
@@ -88,6 +103,8 @@ def golden_thread_as_document(
     resolved_keys: dict[str, str],
     identity_jwks: dict[str, dict[str, str]],
     omega_elements: list[list[str]],
+    task_grant: "list[list[str]] | None" = None,
+    task_grant_client: str = "agent-supervisor",
 ) -> dict[str, Any]:
     """The AS config document for the golden-thread pilot (runner-assembled).
 
@@ -98,23 +115,33 @@ def golden_thread_as_document(
     `mcp.invoke`); in B3 the capability is the narrowing plane and effective
     authority is the SS A.4 intersection, which the coarse base grant leaves
     to the capability.
+
+    **`task_grant`, and why the coarse default cannot serve every arm.** In
+    `B2-exchange-task` there is no capability plane: the TOKEN is the authority
+    plane, and the AS enforces `C_i subset-of C_{i-1}` against the subject
+    token's own `authorization_details`. Left coarse, the delegating party's
+    base token would carry the whole of `Omega`, so the AS would enforce only
+    `C_1 subset-of Omega` -- and an `F1-chain-tamper` hop widening to
+    `(mail.send, mail/outbox)`, an element that IS in `Omega`, would be
+    **issued** rather than refused (SS E.3 expects a block, and forbidden
+    action 3 forbids weakening `B2`). `task_grant` therefore provisions the
+    delegating client's base `AT@aud` with authority exactly `C_0 = U_task`,
+    which is the OAuth analogue of SS A.3's "the AS mints `U_task` as `P_0`;
+    the Supervisor only narrows". The path, the shape and the minting call are
+    ADR 0021's, unchanged and identical to `B3`'s; only this one client's
+    granted set differs, and every other client -- including the specialist,
+    whose base token is the one `B3` presents -- keeps the coarse grant.
     """
     issuer = corpus["issuer"]
     audience = corpus["audience"]
     actors = registry_document["actors"]
     resource_owner = registry_document["resource_owners"][0]
-    # One RAR object per Omega element: a single object's RFC 9396 SS 2.2
-    # product over all actions x all datatypes would manufacture pairs outside
-    # Omega, which the AS validator rightly refuses (rar-outside-omega).
-    rar = [
-        {
-            "type": RAR_TYPE,
-            "locations": [audience],
-            "actions": [action],
-            "datatypes": [resource],
-        }
-        for action, resource in omega_elements
-    ]
+    rar = rar_objects(omega_elements, audience)
+    grants = {actor: rar for actor in actors}
+    if task_grant is not None:
+        if task_grant_client not in grants:
+            raise ASProcessError(f"task_grant names unregistered client {task_grant_client!r}")
+        grants[task_grant_client] = rar_objects(task_grant, audience)
     registry = {}
     for actor, principal in actors.items():
         label = registry_document["principals"][principal]["key_reference"]
@@ -137,7 +164,7 @@ def golden_thread_as_document(
                 "subject": resource_owner,
                 "audience": audience,
                 "scope": "mcp.invoke",
-                "authorization_details": rar,
+                "authorization_details": grants[actor],
             }
             for actor in actors
         },

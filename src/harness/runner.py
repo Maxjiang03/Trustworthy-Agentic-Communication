@@ -243,6 +243,49 @@ class GoldenThreadRunner:
             "run_mode": "pilot",  # never "confirmatory": the seal is Part H's
         }
 
+    def b2_setup(
+        self,
+        *,
+        access_token: str,
+        as_public_jwk: dict[str, str],
+        as_port: int,
+        as_tls_cert_pem: str,
+        client_id: str = "agent-supervisor",
+        actor_id: str = "agent-specialist",
+        scope: str = "mcp.invoke",
+    ) -> dict[str, Any]:
+        """The injected provisioning material for `B2-exchange-task` (SS E.2).
+
+        `access_token` is the **delegating** client's Phase-1 base `AT@aud` --
+        the exchange's `subject_token`, and SS 5.3's "the delegating agent
+        (holder of `AT_{i-1}`) is the client of the exchange". `B3`'s setup
+        passes the specialist's instead, because there the base token is authn
+        only; the difference is which principal's token each mechanism starts
+        from, not which provisioning path minted it.
+
+        The client secret and the actor-assertion key are **mirrored** from the
+        AS's documented derivations rather than imported (ADR 0015 rule 4 bars
+        the harness from importing `src/sut/oauth_as/`), and both are
+        runtime-only: derived here, in memory, handed to the arm, never written
+        to disk, the repository, or `results/` (CLAUDE.md red line 8).
+        """
+        principal = registry_mod.load_document()["actors"][actor_id]
+        return {
+            "as_port": as_port,
+            "as_tls_cert_pem": as_tls_cert_pem,
+            "as_public_jwk": as_public_jwk,
+            "issuer": self._corpus["issuer"],
+            "resource_server": self._corpus["audience"],
+            "rar_type": as_process.RAR_TYPE,
+            "access_token": access_token,
+            "client_id": client_id,
+            "client_secret": key_material.as_client_secret(self.seed, client_id),
+            "actor_id": actor_id,
+            "actor_identity_private_jwk": key_material.identity_private_jwk(self.seed, principal),
+            "scope": scope,
+            "run_mode": "pilot",  # never "confirmatory": the seal is Part H's
+        }
+
     def run_scenario(
         self,
         scenario_id: str,
