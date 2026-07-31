@@ -30,9 +30,17 @@ from joserfc import jws
 from joserfc.errors import JoseError
 from joserfc.jwk import OKPKey
 
+from src.sut import freshness
+
 ALGS = ["Ed25519"]  # RFC 9864 identifier; ADR 0006 allowlist, never `none`
 DPOP_TYP = "dpop+jwt"  # RFC 9449 SS 4.2
-IAT_WINDOW_SECONDS = 300  # SS 4.3 item 11: "within an acceptable timeframe"
+
+# SS 4.3 item 11 requires the `iat` to be "within an acceptable timeframe" and
+# RFC 9449 deliberately leaves the window to the server. ADR 0027 fixes it as
+# `Delta`, shared with the `jti` replay cache and INV freshness, so G-14's two
+# arms cannot differ in window. Sourced from ONE place (`src/sut/freshness.py`)
+# rather than restated here.
+IAT_WINDOW_SECONDS = freshness.DELTA_SECONDS
 
 _REQUIRED_CLAIMS = ("jti", "htm", "htu", "iat")  # SS 4.2
 
@@ -164,6 +172,7 @@ def verify_proof(
     nonce_required: bool = False,
     access_token: str | None = None,
     bound_jkt: str | None = None,
+    freshness_window: int = IAT_WINDOW_SECONDS,
 ) -> ProofResult:
     """RFC 9449 SS 4.3 items 1-11, plus item 12 when `access_token` is given.
 
@@ -212,7 +221,9 @@ def verify_proof(
         if nonce_store is None or not nonce_store.is_valid(claims.get("nonce")):
             raise DPoPError(10, "nonce is missing, stale, or from another server's namespace")
 
-    if not isinstance(claims["iat"], int) or abs(now - claims["iat"]) > IAT_WINDOW_SECONDS:
+    if not isinstance(claims["iat"], int) or not freshness.is_fresh(
+        now, claims["iat"], freshness_window
+    ):
         raise DPoPError(11, "iat is outside the acceptable window")  # item 11
 
     if access_token is not None:  # item 12 -- protected resource only

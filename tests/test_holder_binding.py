@@ -580,6 +580,17 @@ def test_registry_is_not_the_task_authorization_policy():
     assert "task_authorization_policy" in doc["scope_boundary"]
     assert "may_act" not in text
     assert "tasks" not in doc and "task_policy" not in doc
-    # The frozen-parameters row for that policy stays UNSET.
+    # The frozen-parameters row for that policy carries no value, and since
+    # ADR 0028 it never will: it is DEFERRED BY DECISION rather than open.
+    # *(This assertion read `"UNSET" in row 5` and was true when written;
+    # ADR 0028 replaced the open marker with the deferral.)*
+    from src.harness import frozen_parameters as fp
+
     rows = (REPO_ROOT / "docs" / "frozen_parameters.md").read_text(encoding="utf-8")
-    assert "| 5 |" in rows and "UNSET" in rows.split("| 5 |")[1].split("\n")[0]
+    row_five = rows.split("| 5 |")[1].split("\n")[0]
+    assert "DEFERRED BY DECISION (ADR 0028)" in row_five
+    assert "UNSET" not in row_five
+    # Stronger than the string: the reader fails closed on it, and with a type
+    # that is distinct from a row nobody has decided yet.
+    with pytest.raises(fp.RowDeferred):
+        fp.task_authorization_policy()
