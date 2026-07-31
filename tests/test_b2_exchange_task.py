@@ -294,9 +294,7 @@ class TestAntiBiasStructural:
         assert any(text == "127.0.0.1" for text in code_literals)
 
     # -- requirement 2: one TLS context, one keep-alive connection ------------
-    def test_one_context_and_one_connection_are_reused_across_hops(
-        self, provisioned, monkeypatch
-    ):
+    def test_one_context_and_one_connection_are_reused_across_hops(self, provisioned, monkeypatch):
         visible = _visible("gt-benign")
         context, connection = provisioned._tls_context, provisioned._connection
 

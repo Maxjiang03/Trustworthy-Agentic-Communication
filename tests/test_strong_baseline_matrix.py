@@ -223,9 +223,7 @@ class TestChainTamperAttribution:
         Outside `Omega` and every mechanism refuses it as malformed; inside
         `C_0` and it grants nothing new.
         """
-        omega = frozenset(
-            (a, r) for a, r in frozen_config.load_document()["omega"]["elements"]
-        )
+        omega = frozenset((a, r) for a, r in frozen_config.load_document()["omega"]["elements"])
         target = frozenset({("mail.send", "mail/outbox")})
         c0 = frozenset(map(tuple, _sealed("gt-f1-chain-tamper")["C_sets"][0]))
         assert target <= omega
@@ -246,9 +244,7 @@ class TestChainTamperAttribution:
         assert benign["run"].observed.evidence.oauth is not None
 
     @pytest.mark.parametrize("arm_name", ["B-cap", "B3"])
-    def test_capability_arms_the_widening_block_verifies_but_grants_nothing(
-        self, matrix, arm_name
-    ):
+    def test_capability_arms_the_widening_block_verifies_but_grants_nothing(self, matrix, arm_name):
         """The tamper is cryptographically valid and authoritatively empty.
 
         `crypto_chain_ok` passed -- the appended block really does verify under
@@ -271,9 +267,7 @@ class TestChainTamperAttribution:
         assert "R exceeds C_n" in arm.audit_log[-1]["detail"]
 
     @pytest.mark.parametrize("arm_name", ["B-cap", "B3"])
-    def test_the_tampered_chain_is_a_prefix_extension_of_the_untampered_one(
-        self, matrix, arm_name
-    ):
+    def test_the_tampered_chain_is_a_prefix_extension_of_the_untampered_one(self, matrix, arm_name):
         """The tamper is in the appended block, not a forged root.
 
         Two signed blocks, exactly as the benign hop produces -- so the arm is
