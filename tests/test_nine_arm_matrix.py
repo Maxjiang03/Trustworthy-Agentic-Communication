@@ -18,6 +18,22 @@ result and must never be scored as one.
 
 Nothing here is timed (EXP3 forbidden action 1). Platform-independent: every
 cell runs without the effect ledger, which changes no admission outcome.
+
+**FORWARD NOTE for the block that adds F4/F5 -- read this before extending
+`EXPECTED`.** The table below derives its arm grouping from a hardcoded
+`STRONG` tuple. That is the right shape for **F1**, where whether an arm
+blocks is a **ladder property**: an arm either receives per-hop `C_i` or it
+does not. It is **NOT** the right shape for **F4/F5**. Those rows carry
+SS E.4's **A-dagger** annotation, where the OAuth arms admit **ABSENT** the
+shared boundary-owned context/approval reference monitor and **block WITH**
+it -- a grouping determined by a **configuration condition**, not by where an
+arm sits on the ladder. Flattening those cells into a plain `A` would report a
+**reference-monitor-configuration difference as a capability-versus-OAuth
+advantage**, which is the precise error SS E.4's footnote and gate **G-15**
+exist to prevent. Extending `EXPECTED` will therefore need the monitor
+configuration as an explicit axis rather than a second hardcoded tuple.
+Recorded here, where the next block will read it; **not built now** (EXP3
+forbidden action 7).
 """
 
 import json
