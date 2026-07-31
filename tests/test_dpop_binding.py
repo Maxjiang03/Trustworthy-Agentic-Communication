@@ -1,9 +1,21 @@
 """Regression suite for DPoP binding (gate G-5, ADR 0006).
 
 Exactly six tests, each with positive and negative arms. All helpers are
-TEST-LOCAL by design: the production DPoP verifier is built with the
-B2-DPoP arm and re-tested at G-11/G-14, so no src/ module exists this
-pass. The four-way DPoP attacker taxonomy (Part D) is gate G-14, not
+TEST-LOCAL by design: this suite is gate G-5's regression record and
+reimplements the JOSE surface frame-locally, so it stays readable against
+the RFC without depending on how the project later factored the same
+checks.
+
+*(Correction, 2026-07-31: this paragraph read "the production DPoP verifier
+is built with the B2-DPoP arm ... so no src/ module exists this pass". That
+was true when written and is now false -- `src/sut/dpop.py` verifies proofs
+and `src/sut/freshness.py` holds the window. The local constants below are
+therefore a deliberate frame-local restatement, not an absence: in
+particular the 300 s window here is RFC 9449 SS 4.3 item 11's "acceptable
+timeframe" as this suite illustrates it, and is NOT the project's `Delta`,
+which ADR 0027 fixes at 60 s in `src/sut/freshness.py`. Two different
+things, kept apart on purpose -- `tests/test_frozen_scalars.py` pins the
+project value.)* The four-way DPoP attacker taxonomy (Part D) is gate G-14, not
 this suite. The DPoP proof covers method+URI only [VERIFIED, RFC 9449
 SS 4.2]; nothing here claims tool/body binding (that is INV, gate G-11).
 
@@ -25,7 +37,10 @@ ALG = "Ed25519"  # RFC 9864 fully-specified identifier; explicit allowlist below
 ALGS = [ALG]
 HTM = "POST"
 HTU = "https://mcp.example/rpc"
-IAT_WINDOW_SECONDS = 300  # RFC 9449 SS 4.3 item 11: explicit acceptance window
+# RFC 9449 SS 4.3 item 11's "acceptable timeframe", as THIS G-5 suite illustrates
+# it. Deliberately NOT the project's `Delta`: ADR 0027 fixes that at 60 s in
+# `src/sut/freshness.py`, and `tests/test_frozen_scalars.py` pins it there.
+IAT_WINDOW_SECONDS = 300
 
 RFC8037_A2_PUB = {
     "kty": "OKP",

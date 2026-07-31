@@ -10,6 +10,20 @@ reconcile by making one side call the other.
 
 Every test has a positive arm and a negative arm so no assertion can pass
 vacuously.
+
+**What this suite does NOT cover, declared rather than left implicit.** Since
+2026-07-31 the SUT boundary applies one condition the harness verifier does
+not: INV freshness, `|now - iat| <= Delta` (ADR 0027, `frozen_parameters`
+row 3). The verifier implements SS F.2's **validity** MUST list -- what gate
+G-11 adjudicated -- and freshness is a boundary **acceptance policy**, a
+different question (SS F.2's validity-versus-acceptance note). Adding it here
+would change what G-11 verified, so it is deliberately absent.
+
+The consequence: **this agreement covers a strictly smaller set of conditions
+than the SUT implements**, and agreement here is therefore not evidence about
+the freshness check. Anything that reads this suite as "the two layers agree"
+-- gate G-13's D21 limb does -- must read it as "the two layers agree on
+SS F.2's validity conditions".
 """
 
 import time

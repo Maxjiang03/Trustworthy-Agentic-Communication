@@ -768,13 +768,27 @@ class CapabilityDecisionPath:
             raise ConjunctFailed("invocation_binding_ok", "INV carries no invocation id")
         if not inv["nbf"] <= p.now_epoch <= inv["exp"]:
             raise ConjunctFailed("invocation_binding_ok", "INV outside its validity window")
-        # SS F.2 INV FRESHNESS, and it is a separate condition from the window
-        # above: `nbf`/`exp` is the issuer's chosen validity, `Delta` is the
-        # boundary's acceptance of how recently the assertion was made. ADR 0027
-        # fixes one `Delta` for this, the DPoP proof `iat` window and the `jti`
-        # cache TTL, so G-14's two arms cannot differ in window and any
-        # difference it reports is attributable to the mechanisms rather than
-        # to the clock. `now` is injected, never read from a wall clock.
+        # BOUNDARY ACCEPTANCE POLICY, from **ADR 0027** -- not SS F.2, whose
+        # Verification MUST list contains `every nbf <= now <= exp` and no
+        # `|now - iat| <= Delta` rule at all. The two answer different
+        # questions and SS F.2 states the distinction: SS F.2 defines what makes
+        # an INV **valid**, and this defines what this boundary is willing to
+        # **accept**. The check above is the issuer's chosen validity window;
+        # this is how recently the assertion was made.
+        #
+        # ADR 0027 fixes one `Delta` for this, the DPoP proof `iat` window and
+        # the `jti` cache TTL, so G-14's two arms cannot differ in window and
+        # any difference it reports is attributable to the mechanisms rather
+        # than to the clock. `now` is injected, never read from a wall clock.
+        #
+        # **Consequence for B3+ fixtures, recorded because it runs toward this
+        # project's own hypothesis:** SS E.4 predicts `F3
+        # dpop-captured-proof-replay` as `B3 = A` and `B3+ = B`, and that one
+        # cell is B3+'s entire reason to exist. A bit-identical replay
+        # constructed OUTSIDE `Delta` would now be blocked HERE, by B3, which
+        # would collapse the distinction. The fixture MUST be constructed
+        # WITHIN `Delta` so that only duplicate detection can catch it
+        # (ADR 0027 Consequences; SS E.4; SS J.2 item 9).
         if not freshness.is_fresh(p.now_epoch, inv["iat"]):
             raise ConjunctFailed(
                 "invocation_binding_ok",

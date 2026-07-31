@@ -142,6 +142,34 @@ class TestOneWindowThreeConsumers:
         assert not freshness.is_fresh(1_000, 1_000 - 61)
         assert not freshness.is_fresh(1_000, 1_000 + 61)
 
+    def test_the_third_consumer_is_the_sut_boundary_not_the_harness_verifier(self):
+        """The asymmetry is DECLARED, so it is pinned rather than left implicit.
+
+        `invocation_binding_ok` applies `|now - iat| <= Delta`; the harness
+        verifier deliberately does **not**. That verifier implements SS F.2's
+        **validity** MUST list -- `every nbf <= now <= exp` and no freshness
+        rule -- which is what gate G-11 adjudicated, and boundary acceptance
+        policy is a different question. Adding freshness there would change
+        what G-11 verified, so this test protects the adjudicated scope in
+        both directions: it fails if the SUT loses the check, and it fails if
+        the verifier gains one.
+        """
+        sut = (REPO_ROOT / "src" / "sut" / "authz" / "capability_path.py").read_text(
+            encoding="utf-8"
+        )
+        verifier = (REPO_ROOT / "src" / "harness" / "verifier" / "holder_binding.py").read_text(
+            encoding="utf-8"
+        )
+        assert "freshness.is_fresh" in sut
+        assert "is_fresh" not in verifier and "DELTA_SECONDS" not in verifier
+        # And the consequence, which the agreement suite records: D21 agreement
+        # therefore covers a strictly smaller set of conditions than the SUT
+        # implements.
+        agreement = (REPO_ROOT / "tests" / "test_sut_signer_agreement.py").read_text(
+            encoding="utf-8"
+        )
+        assert "strictly smaller set of conditions" in agreement
+
     def test_no_consumer_reads_a_wall_clock(self):
         """ADR 0027's injectable-clock condition, asserted on the source.
 

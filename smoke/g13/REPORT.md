@@ -105,6 +105,12 @@ Block 1 built the SUT-side signer and pinned agreement; this gate is where that 
    to find a defect in the boundary.
 3. **Agreement**, pinned separately by `tests/test_sut_signer_agreement.py`, and by this gate's
    own L1: two independent implementations produced the same `C_i` on every hop of every cell.
+   *Scope, added 2026-07-31: that suite covers §F.2's **validity** conditions. Since ADR 0027
+   the SUT boundary additionally applies INV freshness (`|now − iat| ≤ Δ`), which the §F.2
+   verifier deliberately does not — acceptance policy is not its subject. The agreement is
+   therefore over a **strictly smaller** set of conditions than the SUT implements, and says
+   nothing about the freshness check. Nothing in G-13 rests on it doing so: L1 compares
+   authority SETS, which freshness does not enter.*
 
 **Residual, stated precisely because a vague one is ignored.** Agreement is evidence of
 independence *only because* the implementations are structurally distinct, and (1) and (2)

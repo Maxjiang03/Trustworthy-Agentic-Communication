@@ -101,3 +101,26 @@ step 3)
   confounded by the apparatus.
 - **Re-triggered by:** any change to `Δ` (which re-triggers G-9 and G-14), and any change to the
   sealed measurement platform's clock resolution.
+
+### Addition, 2026-07-31 — a fixture constraint `Δ` creates, fixed in advance
+
+*Nothing above is retracted; this records a consequence found while binding `Δ` to INV
+freshness at the boundary.*
+
+**The bit-identical replay fixture MUST be constructed WITHIN `Δ`.** §E.4 predicts
+`F3 dpop-captured-proof-replay (bit-identical)` as **`B3` = A (admits)** and **`B3⁺` = B
+(blocks)**, and that single cell is `B3⁺`'s entire reason to exist — §E.1's *price of closing
+duplicate replay*. Once `Δ` governs INV freshness, a replay constructed **outside** `Δ` would be
+blocked by `B3` as well, for a reason that has nothing to do with duplicate detection, and the
+distinction the cell exists to measure would **collapse**.
+
+The direction matters and is why this is fixed now rather than noticed later: the collapse would
+make `B3` look **stronger** than §E.4 predicts, i.e. it runs toward this project's own
+hypothesis. Recording the constraint in advance is what stops it becoming a **post-hoc fixture
+adjustment** made after the cell disagrees — at which point no reader could tell whether the
+fixture was corrected or the result was.
+
+So: the captured proof and its INV are replayed at an instant `t` with `|t − iat| ≤ Δ`, so every
+conjunct **other than** duplicate detection still passes and `B3` admits. If a future amendment
+to `Δ` makes that construction impossible, the finding is reported — the fixture is not moved
+outside the window to make a run succeed. Carried into §E.4 beside the row and into §J.2 item 9.
