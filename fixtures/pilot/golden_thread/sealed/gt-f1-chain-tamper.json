@@ -27,8 +27,8 @@
   ],
   "R": [
     [
-      "notes.write",
-      "notes/project"
+      "mail.send",
+      "mail/outbox"
     ]
   ],
   "U_task": [
@@ -46,32 +46,37 @@
     ]
   ],
   "_banner": "HARNESS-ONLY SEALED TRUTH -- no SUT principal may read this document (CLAUDE.md red line 5; SS A.3). correlation_id and P_hashes are completed by the runner at mint time, because tokens are minted at run time (ADR 0007) and the correlation id is minted per invocation (SS F.1).",
-  "attack_subcase": "benign:golden-thread",
+  "attack_subcase": "F1:chain-tamper",
   "audience": "https://mcp.aasc.local/tools",
   "htc_holder_kid": "kid-holder-specialist",
   "intended_labels": [],
-  "intended_request_digest": "2ffd1d427ccfa3946e9af58e562be7661035eb158623402ef74b84ca961393bb",
-  "is_benign": true,
+  "intended_request_digest": "438c7acc3287dc52bfc417c7a9af9bdf50e1f70ff61c7cc9591d5a2de7c83ad9",
+  "is_benign": false,
   "method": "tools/call",
   "not_applicable": {
-    "arms": [],
-    "reason": ""
+    "arms": [
+      "B0",
+      "B1",
+      "B2-broad-noexchange",
+      "B2-exchange-broad"
+    ],
+    "reason": "no per-hop authority chain to tamper with (SS E.3)"
   },
   "oauth_actor": [
     "https://as.aasc.local",
     "agent-specialist"
   ],
-  "requires_approval": false,
+  "requires_approval": true,
   "resource_owner": [
     "https://as.aasc.local",
     "user-yixian"
   ],
-  "scenario_id": "gt-benign",
+  "scenario_id": "gt-f1-chain-tamper",
   "tau_gt": [
     [
       "notes.write",
       "notes/project"
     ]
   ],
-  "tool": "notes.write"
+  "tool": "mail.send"
 }

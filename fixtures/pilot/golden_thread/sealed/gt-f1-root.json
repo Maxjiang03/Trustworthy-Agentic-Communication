@@ -53,6 +53,10 @@
   "intended_request_digest": "438c7acc3287dc52bfc417c7a9af9bdf50e1f70ff61c7cc9591d5a2de7c83ad9",
   "is_benign": false,
   "method": "tools/call",
+  "not_applicable": {
+    "arms": [],
+    "reason": ""
+  },
   "oauth_actor": [
     "https://as.aasc.local",
     "agent-specialist"

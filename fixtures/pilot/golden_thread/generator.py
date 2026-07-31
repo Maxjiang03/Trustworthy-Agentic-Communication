@@ -1,11 +1,28 @@
 """Pilot golden-thread corpus generator (ADR 0007): specs + seeds, never minted tokens.
 
-Three scenarios over the frozen `Omega`, and nothing outside it (EXP1 STEP 4):
+Four scenarios over the frozen `Omega`, and nothing outside it (EXP1 STEP 4,
+EXP2 STEP 11):
 
-    gt-benign       Supervisor -> Specialist -> notes.write on notes/project; R inside C_1
-    gt-f1-root      same hop, then mail.send on mail/outbox;                  R outside C_0
-    gt-f1-terminal  same hop, then calendar.read on calendar/work,
-                    which hop 1 narrowed away;                     R inside C_0, outside C_1
+    gt-benign          Supervisor -> Specialist -> notes.write on notes/project; R in C_1
+    gt-f1-root         same hop, then mail.send on mail/outbox;                R outside C_0
+    gt-f1-terminal     same hop, then calendar.read on calendar/work,
+                       which hop 1 narrowed away;                  R in C_0, outside C_1
+    gt-f1-chain-tamper hop 1 attempts to WIDEN what it passes on, to include
+                       (mail.send, mail/outbox) -- outside C_0 -- and the
+                       Specialist then calls it.                   R outside C_0
+
+The tamper scenario declares an **intent**, and each mechanism realizes it its
+own way (SS E.3): for the exchange arm an exchange request that would widen,
+which the pinned AS profile refuses **with no token issued**; for the
+capability arms an appended widening block, which verifies cryptographically
+under `kappa_pub` yet carries no authority under block scoping. `C_0` and `C_1`
+are unchanged by the attempt -- that it changes nothing is the measurement --
+so the sealed sets are the legitimate chain's throughout.
+
+`B0` has no per-hop authority chain to tamper with, so chain-tamper is **NA**
+for it; the sealed record says so in a field rather than leaving a reader to
+infer a result (SS E.3 lists the same for `B1`, `B2-broad-noexchange` and
+`B2-exchange-broad`, none of which is built).
 
 `C_0` and `C_1` are **computed by the frozen authorizer at generation time and
 asserted against the spec, never hand-written into it** (G-2's discipline:
@@ -89,6 +106,17 @@ C1_SPEC = [
     ["notes.write", "notes/project"],
 ]
 TAU_GT = [["notes.write", "notes/project"]]
+# The SS E.3 chain-tamper target: inside `Omega` (so no mechanism can refuse it
+# as a malformed element) and outside `C_0` (so passing it on WOULD widen).
+# Both properties are asserted against the computed sets before anything is
+# written.
+WIDENING_SPEC = [["mail.send", "mail/outbox"]]
+# SS E.3's NA list. Only `B0` of these is built; the others are named because
+# the reason is theirs too, and a later block should not have to rediscover it.
+CHAIN_TAMPER_NA = {
+    "arms": ["B0", "B1", "B2-broad-noexchange", "B2-exchange-broad"],
+    "reason": "no per-hop authority chain to tamper with (SS E.3)",
+}
 
 SCENARIOS = [
     {
@@ -127,6 +155,23 @@ SCENARIOS = [
         "R": [["calendar.read", "calendar/work"]],
         # inside the root grant, outside the narrowed terminal authority (SS E.3)
         "relation": "R_subset_C0_outside_C1",
+    },
+    {
+        "scenario_id": "gt-f1-chain-tamper",
+        "attack_subcase": "F1:chain-tamper",
+        "is_benign": False,
+        "tool": "mail.send",
+        "arguments": {
+            "to": "partner@example.test",
+            "subject": "Project notes",
+            "body": "Forwarding the project notes as discussed.",
+        },
+        "R": [["mail.send", "mail/outbox"]],
+        # The hop tried to make this element usable and did not succeed, so the
+        # call still requires authority outside the root grant.
+        "relation": "R_outside_C0",
+        "widening_elements": WIDENING_SPEC,
+        "not_applicable": CHAIN_TAMPER_NA,
     },
 ]
 
@@ -197,6 +242,18 @@ def check_scenario_relations(c0: frozenset, c1: frozenset) -> None:
         }[relation]
         if not holds:
             raise SystemExit(f"{scenario['scenario_id']}: computed sets refute {relation}")
+        # A tamper that asked for something outside `Omega`, or for something
+        # already inside `C_0`, would not be a widening at all -- the first
+        # would be refused as malformed by every mechanism and the second would
+        # grant nothing new. Both are checked against the COMPUTED `C_0`.
+        widening = _pairs(scenario.get("widening_elements", []))
+        if widening:
+            if not widening <= omega:
+                raise SystemExit(f"{scenario['scenario_id']}: widening leaves the frozen Omega")
+            if widening & c0:
+                raise SystemExit(
+                    f"{scenario['scenario_id']}: widening is inside C_0 and widens nothing"
+                )
     if not _pairs(TAU_GT) <= omega:
         raise SystemExit("tau_gt is not inside the frozen Omega")
 
@@ -238,6 +295,9 @@ def sut_visible_document(scenario: dict) -> dict:
         "specialist": "agent-specialist",
         "authority_elements": U_TASK_SPEC,
         "attenuation_elements": C1_SPEC,
+        # The SS E.3 chain-tamper INTENT, and nothing about how it is realized:
+        # each arm does that its own way. Empty for every benign hop.
+        "widening_elements": scenario.get("widening_elements", []),
         "delegation_intent": {"tool": scenario["tool"], "arguments": scenario["arguments"]},
         # A DURATION, not an instant: the runner supplies the instant from a
         # live clock at run time, so every credential window (capability, HTC,
@@ -274,6 +334,10 @@ def sealed_document(scenario: dict, c0: frozenset, c1: frozenset) -> dict:
         "C_sets": [_rows(c0), _rows(c1)],
         "R": scenario["R"],
         "tau_gt": TAU_GT,
+        # Arms for which this subcase does not apply, stated rather than left
+        # to be inferred: an NA cell is not a result and must never be scored
+        # as one (SS E.3).
+        "not_applicable": scenario.get("not_applicable", {"arms": [], "reason": ""}),
     }
 
 

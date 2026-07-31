@@ -39,5 +39,6 @@
   "specialist": "agent-specialist",
   "supervisor": "agent-supervisor",
   "task_id": "task-gt-pilot",
-  "validity_seconds": 3600
+  "validity_seconds": 3600,
+  "widening_elements": []
 }

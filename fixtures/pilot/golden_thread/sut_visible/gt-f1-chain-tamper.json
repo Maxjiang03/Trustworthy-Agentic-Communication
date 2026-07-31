@@ -28,15 +28,22 @@
   "context_label": "internal(pilot)",
   "delegation_intent": {
     "arguments": {
-      "resource": "calendar/work"
+      "body": "Forwarding the project notes as discussed.",
+      "subject": "Project notes",
+      "to": "partner@example.test"
     },
-    "tool": "calendar.read"
+    "tool": "mail.send"
   },
   "method": "tools/call",
-  "scenario_id": "gt-f1-terminal",
+  "scenario_id": "gt-f1-chain-tamper",
   "specialist": "agent-specialist",
   "supervisor": "agent-supervisor",
   "task_id": "task-gt-pilot",
   "validity_seconds": 3600,
-  "widening_elements": []
+  "widening_elements": [
+    [
+      "mail.send",
+      "mail/outbox"
+    ]
+  ]
 }
