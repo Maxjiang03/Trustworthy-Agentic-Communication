@@ -33,7 +33,7 @@ import pytest
 from joserfc.jwk import OKPKey
 
 from src.harness import key_material
-from src.harness.as_process import ASProcess, golden_thread_as_document
+from src.harness.as_process import RAR_TYPE, ASProcess, golden_thread_as_document
 from src.harness.authorizer import frozen_config
 from src.harness.runner import GoldenThreadRunner
 from src.harness.verifier import registry as reg
@@ -58,7 +58,11 @@ def _sealed(scenario_id: str) -> dict:
 
 
 @pytest.fixture(scope="module")
-def as_document():
+def runner():
+    return GoldenThreadRunner()
+
+
+def _as_document(task_grant) -> dict:
     registry_document = reg.load_document()
     return golden_thread_as_document(
         corpus={"issuer": ISSUER, "audience": AUDIENCE},
@@ -66,11 +70,17 @@ def as_document():
         resolved_keys=key_material.resolve_public(SEED),
         identity_jwks=key_material.identity_jwks(SEED, registry_document["principals"]),
         omega_elements=frozen_config.load_document()["omega"]["elements"],
-        # The delegating client's base AT@aud carries authority exactly
-        # `C_0 = U_task`, so the AS enforces `C_1 subset-of C_0` rather than
-        # `C_1 subset-of Omega` (see `golden_thread_as_document`).
-        task_grant=_visible("gt-benign")["authority_elements"],
+        task_grant=task_grant,
     )
+
+
+@pytest.fixture(scope="module")
+def as_document(runner):
+    # The delegating client's base AT@aud carries authority exactly
+    # `C_0 = U_task`, so the AS enforces `C_1 subset-of C_0` rather than
+    # `C_1 subset-of Omega`. `U_task` comes from the corpus itself, which is
+    # the same source the arm's own ADR 0024 check reads.
+    return _as_document(runner.task_grant())
 
 
 @pytest.fixture(scope="module")
@@ -80,8 +90,15 @@ def running_as(as_document):
 
 
 @pytest.fixture(scope="module")
-def runner():
-    return GoldenThreadRunner()
+def coarse_as():
+    """The MISPROVISIONED world ADR 0024 describes: no `task_grant` at all.
+
+    Every client's base `AT@aud` then carries the whole frozen `Omega`, which
+    is the parameter's own default. Used only by the counterfactual below.
+    """
+    document = _as_document(None)
+    with ASProcess(document, SEED) as process:
+        yield process
 
 
 @pytest.fixture
@@ -205,6 +222,185 @@ class TestTheExchangeNarrows:
             credentials["access_token"], config, now=int(time.time())
         )
         assert boundary.allowed_authority(claims, config) == {("notes.read", "notes/project")}
+
+
+# --------------------------------------------------------------------------
+# The ADR 0024 guarantee, held by the ARM
+# --------------------------------------------------------------------------
+class TestTheArmCannotBeMisprovisioned:
+    """`task_grant` is opt-in on the AS document and its default is the
+    dangerous value, so the guarantee cannot live with the caller.
+
+    The arm reads the authority of the token it actually holds and refuses
+    unless it equals the run's `U_task`. Being correctly provisioned today is
+    not the same property as being impossible to misprovision.
+    """
+
+    def test_a_coarse_base_token_is_refused(self, setup, running_as):
+        """The exact mistake: hand the arm a base token that was not narrowed.
+
+        The specialist's token from this very AS is coarse -- `task_grant`
+        narrows the delegating client's alone -- so this is the misprovisioning
+        a caller reaches by passing the wrong client's token or by forgetting
+        `task_grant` entirely.
+        """
+        with pytest.raises(b2mod.B2ConfigurationError) as raised:
+            B2ExchangeTaskArm().provision(
+                dict(setup, access_token=running_as.phase1_tokens["agent-specialist"])
+            )
+        message = str(raised.value)
+        assert "ADR 0024" in message
+        assert "mail.send" in message  # it names what the token wrongly grants
+
+    def test_a_narrower_than_u_task_base_token_is_also_refused(self, setup):
+        """The equality is `==`, not `subset-of`.
+
+        A token carrying LESS than `U_task` would make the arm unable to pass
+        on `C_1` and would show up as a spurious block -- the opposite bias,
+        and equally unacceptable.
+        """
+        narrower = [["notes.read", "notes/project"]]
+        with pytest.raises(b2mod.B2ConfigurationError):
+            B2ExchangeTaskArm().provision(dict(setup, task_grant=narrower))
+
+    def test_the_correctly_provisioned_arm_provisions(self, setup):
+        """Positive arm: the refusals above are not refusing everything."""
+        arm = B2ExchangeTaskArm()
+        arm.provision(setup)
+        arm.close()
+
+    def test_the_runner_reads_u_task_from_the_corpus(self, runner):
+        """One source for the AS's provisioning and the arm's self-check.
+
+        Passed as an argument on both sides, one caller mistake could give
+        them two different answers and the check would agree with itself while
+        being wrong.
+        """
+        assert runner.task_grant() == sorted(_visible("gt-benign")["authority_elements"])
+        # Every scenario must declare the same task grant -- they are one task
+        # with different invocations -- or the single value would be a guess.
+        grants = {
+            path.stem: sorted(json.loads(path.read_text(encoding="utf-8"))["authority_elements"])
+            for path in sorted((CORPUS / "sut_visible").glob("*.json"))
+        }
+        assert len(set(map(str, grants.values()))) == 1, grants
+        assert len(grants) == 4
+
+    def test_a_token_that_does_not_verify_is_refused_before_the_comparison(self, setup):
+        """Fail closed: an unverifiable token has no authority to compare."""
+        with pytest.raises(b2mod.B2ConfigurationError) as raised:
+            B2ExchangeTaskArm().provision(dict(setup, access_token="not.a.jwt"))
+        assert "does not verify" in str(raised.value)
+
+
+class TestAdr0024Counterfactual:
+    """What token exchange actually does under agent delegation.
+
+    This is a **result**, not only a regression guard. RFC 8693 does not by
+    itself guarantee a narrower exchanged token -- scope, audience and
+    `authorization_details` are AS-policy-determined **[VERIFIED]** -- and the
+    pinned profile enforces `C_i subset-of C_{i-1}` against the **subject
+    token's own** grant. So how much authority a delegating agent can pass on
+    is decided by how its base token was provisioned, not by the exchange
+    grant type. Two deployments differing in nothing but that provisioning
+    give opposite answers to the same chain-tamper hop.
+
+    Recorded permanently because it is the mechanism behind ADR 0024: an
+    OAuth deployment that provisions agents with a coarse resource-level grant
+    -- the natural thing to do, and what this pilot did by default -- gets no
+    protection from token exchange against a hop that widens within that
+    grant.
+    """
+
+    WIDENING = [["mail.send", "mail/outbox"]]
+
+    @staticmethod
+    def _arm_against(process, runner, task_grant):
+        arm = B2ExchangeTaskArm()
+        arm.provision(
+            runner.b2_setup(
+                access_token=process.phase1_tokens["agent-supervisor"],
+                as_public_jwk=process.public_jwk,
+                as_port=process.port,
+                as_tls_cert_pem=process.tls_cert_pem,
+                task_grant=task_grant,
+            )
+        )
+        return arm
+
+    def test_with_a_coarse_base_grant_the_as_issues_the_widened_token(self, coarse_as, runner):
+        """The deployment believes `U_task` is the whole ontology, so it is
+        honestly provisioned for that -- and the AS then has nothing to refuse.
+        """
+        omega = [list(pair) for pair in frozen_config.load_document()["omega"]["elements"]]
+        arm = self._arm_against(coarse_as, runner, omega)
+        try:
+            credentials = arm.delegate(_hop(_visible("gt-benign"), widening=self.WIDENING))
+            assert "access_token" in credentials, "expected the AS to ISSUE the widened token"
+            config = boundary.BoundaryConfig(
+                issuer=ISSUER,
+                resource_server=AUDIENCE,
+                as_public_jwk=coarse_as.public_jwk,
+                rar_type=RAR_TYPE,
+            )
+            claims = boundary.verify_access_token(
+                credentials["access_token"], config, now=int(time.time())
+            )
+            granted = boundary.allowed_authority(claims, config)
+            assert ("mail.send", "mail/outbox") in granted, (
+                "the widened element was issued to the delegate"
+            )
+            # And the consequence, made concrete: the boundary then ADMITS the
+            # very call SS E.3 predicts a block for.
+            from src.sut.baselines.base import InvocationContext
+
+            visible = _visible("gt-f1-chain-tamper")
+            arm.present(
+                credentials,
+                InvocationContext(
+                    tool="mail.send",
+                    arguments=visible["delegation_intent"]["arguments"],
+                    method=visible["method"],
+                    task_id=visible["task_id"],
+                    audience=visible["audience"],
+                    invocation_id="cid-counterfactual",
+                    now_epoch=int(time.time()),
+                ),
+            )
+            assert arm.decide("mail.send", visible["delegation_intent"]["arguments"]) == (
+                True,
+                b2mod.REASON_ADMITTED,
+            ), "B2 loses SS E.3's predicted block for a PROVISIONING reason"
+        finally:
+            arm.close()
+
+    def test_with_the_task_scoped_grant_the_as_refuses(self, running_as, runner):
+        """The same hop, the same code, the same AS profile -- one difference."""
+        arm = self._arm_against(running_as, runner, runner.task_grant())
+        try:
+            credentials = arm.delegate(_hop(_visible("gt-benign"), widening=self.WIDENING))
+            assert "access_token" not in credentials
+            refusal = credentials["exchange_refusal"]
+            assert refusal.error == "invalid_authorization_details"
+            assert refusal.status == 400
+        finally:
+            arm.close()
+
+    def test_the_two_deployments_differ_in_nothing_else(self, as_document, runner):
+        """The contrast is the provisioned grant and nothing besides.
+
+        Otherwise the counterfactual would be about two different AS profiles
+        rather than about one profile under two provisionings.
+        """
+        coarse = _as_document(None)
+        scoped = as_document
+        assert coarse["phase1"]["agent-supervisor"] != scoped["phase1"]["agent-supervisor"]
+        for key in ("issuer", "token_endpoint", "rar_type", "omega", "clients", "registry"):
+            assert coarse[key] == scoped[key]
+        assert coarse["delegation_policy"] == scoped["delegation_policy"]
+        # And only the DELEGATING client's grant moved.
+        for actor in ("agent-specialist", "agent-worker"):
+            assert coarse["phase1"][actor] == scoped["phase1"][actor]
 
 
 # --------------------------------------------------------------------------
@@ -499,7 +695,12 @@ class TestTheArmGetsNoCapabilityConjunct:
         assert "src.sut.authz.boundary" in imported
 
     def test_provisioning_fails_closed_on_missing_material(self, setup):
-        for field in ("client_secret", "actor_identity_private_jwk", "as_tls_cert_pem"):
+        for field in (
+            "client_secret",
+            "actor_identity_private_jwk",
+            "as_tls_cert_pem",
+            "task_grant",
+        ):
             incomplete = {k: v for k, v in setup.items() if k != field}
             with pytest.raises(b2mod.B2ConfigurationError):
                 B2ExchangeTaskArm().provision(incomplete)

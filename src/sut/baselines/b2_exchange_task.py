@@ -24,9 +24,11 @@ are other families and another axis.
   same pre-issued path, the same `issue_initial` call and the same shape as
   `B3`'s. The delegating client's base token carries authority exactly
   `C_0 = U_task`, because here the token IS the authority plane and the AS
-  enforces `C_i subset-of C_{i-1}` against the subject token's own grant; see
-  `src/harness/as_process.golden_thread_as_document` for why a coarse base
-  token would silently make `F1-chain-tamper` issuable.
+  enforces `C_i subset-of C_{i-1}` against the subject token's own grant.
+  **The arm checks this itself and refuses otherwise** -- see
+  `_check_subject_token_is_the_task_grant`, which exists because a coarse base
+  token would silently make `F1-chain-tamper` issuable and would cost this arm
+  a block it should win.
 * *Phase 2* is, at each hop, a real **online** round trip to the running AS.
   That round trip **is** the measured difference from the capability arms and
   is never shortcut: no cached token, no offline mint, no local narrowing.
@@ -64,6 +66,7 @@ import base64
 import http.client
 import json
 import ssl
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -72,7 +75,13 @@ from urllib.parse import urlencode
 from joserfc import jwt
 from joserfc.jwk import OKPKey
 
-from src.sut.authz.boundary import BoundaryConfig, TokenRejected, admits, verify_access_token
+from src.sut.authz.boundary import (
+    BoundaryConfig,
+    TokenRejected,
+    admits,
+    allowed_authority,
+    verify_access_token,
+)
 from src.sut.baselines.base import ArmBitmask, HopContext, InvocationContext
 from src.sut.protocol.required_authority import RequiredAuthorityError, required_authority
 
@@ -175,6 +184,7 @@ class B2ExchangeTaskArm:
             "actor_id",
             "actor_identity_private_jwk",
             "scope",
+            "task_grant",
             "run_mode",
         }
         missing = required - set(setup)
@@ -208,7 +218,66 @@ class B2ExchangeTaskArm:
         # is runtime-only, injected, and never written anywhere.
         credentials = f"{setup['client_id']}:{setup['client_secret']}".encode()
         self._authorization = "Basic " + base64.b64encode(credentials).decode("ascii")
+        self._check_subject_token_is_the_task_grant(setup)
         self._setup = dict(setup)
+
+    # -- the ADR 0024 guarantee, held by the ARM ------------------------------ #
+    def _check_subject_token_is_the_task_grant(self, setup: Mapping[str, Any]) -> None:
+        """Refuse a subject token whose authority is not exactly `U_task`.
+
+        **This arm can otherwise be misprovisioned silently, and it fails
+        TOWARD the hypothesis.** The AS enforces `C_i subset-of C_{i-1}`
+        against the subject token's OWN `authorization_details`, so a base
+        token left at the pilot's coarse `Omega` grant means the AS enforces
+        only `C_1 subset-of Omega`. `F1-chain-tamper` widens to
+        `(mail.send, mail/outbox)`, an element that IS in `Omega`, so the AS
+        would **issue** the widened `AT_1`, this arm would lose SS E.3's
+        predicted block for a provisioning reason, and `B3` would appear to
+        win a comparison it did not win. Forbidden action 3 forbids weakening
+        `B2` in any respect; being provisioned so its own containment check is
+        toothless is exactly that.
+
+        ADR 0024 put the fix in the AS document, which left the guarantee with
+        the CALLER -- and `task_grant` is opt-in with the dangerous value as
+        its default. The guarantee lives here instead: the arm reads the
+        authority of the token it actually holds, out of that token's own
+        claims, and refuses to provision unless it equals the `U_task` it was
+        given for the run. Being correctly provisioned today is not the same
+        property as being impossible to misprovision.
+
+        The equality is `==`, not `subset-of`: a subject token carrying LESS
+        than `U_task` would make the arm unable to pass on `C_1` and would
+        show up as a spurious block, which is the opposite bias and equally
+        unacceptable.
+        """
+        assert self._oauth_config is not None
+        expected = frozenset((action, resource) for action, resource in setup["task_grant"])
+        if not expected:
+            raise B2ConfigurationError(
+                f"{self.name}: `task_grant` is empty; the arm cannot verify its own "
+                "provisioning against nothing (ADR 0024)"
+            )
+        try:
+            claims = verify_access_token(
+                setup["access_token"], self._oauth_config, now=int(time.time())
+            )
+        except TokenRejected as exc:
+            raise B2ConfigurationError(
+                f"{self.name}: the injected subject token does not verify at this boundary "
+                f"({exc.reason}: {exc.description}), so its authority cannot be checked "
+                "against U_task (ADR 0024)"
+            ) from exc
+        granted = allowed_authority(claims, self._oauth_config)
+        if granted != expected:
+            raise B2ConfigurationError(
+                f"{self.name}: the injected subject token grants {sorted(granted)}, but "
+                f"U_task for this run is {sorted(expected)}. ADR 0024 requires the "
+                "delegating client's base AT@aud to carry authority EXACTLY U_task: the AS "
+                "enforces per-hop containment against this token's own authorization_details, "
+                "so a wider one would let a chain-tamper hop be ISSUED and would cost this arm "
+                "a block it should win. Provision the AS with "
+                "`golden_thread_as_document(..., task_grant=U_task)`."
+            )
 
     # -- delegate: the ONLINE Phase-2 hop (SS E.2) ---------------------------- #
     def delegate(self, hop: HopContext) -> Mapping[str, Any]:

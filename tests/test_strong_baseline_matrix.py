@@ -82,7 +82,12 @@ def _visible(scenario_id: str) -> dict:
 
 
 @pytest.fixture(scope="module")
-def running_as():
+def runner():
+    return GoldenThreadRunner()
+
+
+@pytest.fixture(scope="module")
+def running_as(runner):
     registry_document = reg.load_document()
     document = golden_thread_as_document(
         corpus={"issuer": ISSUER, "audience": AUDIENCE},
@@ -92,17 +97,18 @@ def running_as():
         omega_elements=frozen_config.load_document()["omega"]["elements"],
         # One AS serves every arm: `task_grant` narrows only the DELEGATING
         # client's base token, and `B3`/`B-cap` present the specialist's, which
-        # stays the coarse ADR 0021 base `AT@aud`.
-        task_grant=_visible("gt-benign")["authority_elements"],
+        # stays the coarse ADR 0021 base `AT@aud`. `U_task` is read from the
+        # corpus -- the same source `B2ExchangeTaskArm.provision` checks its
+        # own token against, so the two cannot be given different answers.
+        task_grant=runner.task_grant(),
     )
     with ASProcess(document, SEED) as process:
         yield process
 
 
 @pytest.fixture(scope="module")
-def matrix(running_as):
+def matrix(runner, running_as):
     """Every applicable cell, run exactly once. Returns (scenario, arm) -> record."""
-    runner = GoldenThreadRunner()
     b3_setup = runner.b3_setup(
         access_token=running_as.phase1_tokens["agent-specialist"],
         as_public_jwk=running_as.public_jwk,

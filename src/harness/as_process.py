@@ -131,6 +131,13 @@ def golden_thread_as_document(
     ADR 0021's, unchanged and identical to `B3`'s; only this one client's
     granted set differs, and every other client -- including the specialist,
     whose base token is the one `B3` presents -- keeps the coarse grant.
+
+    **This parameter is opt-in and its default is the dangerous value**, so it
+    is deliberately not the only thing standing between the study and a
+    silently misprovisioned arm: `B2ExchangeTaskArm.provision` reads the
+    authority of the token it actually holds and REFUSES unless it equals the
+    run's `U_task`. Forgetting `task_grant` here therefore fails loudly at
+    provisioning rather than quietly costing `B2` a block.
     """
     issuer = corpus["issuer"]
     audience = corpus["audience"]

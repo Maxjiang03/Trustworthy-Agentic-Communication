@@ -243,6 +243,29 @@ class GoldenThreadRunner:
             "run_mode": "pilot",  # never "confirmatory": the seal is Part H's
         }
 
+    def task_grant(self) -> list[list[str]]:
+        """`U_task` as the pilot corpus itself declares it (ADR 0024).
+
+        Read from the SUT-visible documents rather than accepted as an
+        argument, so the AS's Phase-1 provisioning and the arm's own
+        self-check cannot be handed two different answers by one caller
+        mistake. The corpus must declare exactly one task grant across its
+        scenarios -- they are one task with different invocations -- and more
+        than one fails closed rather than silently picking the first.
+        """
+        grants: dict[str, tuple[tuple[str, str], ...]] = {}
+        for path in sorted((self._corpus_dir / "sut_visible").glob("*.json")):
+            visible = self._load_json(path)
+            grants[path.stem] = tuple(
+                (action, resource) for action, resource in visible["authority_elements"]
+            )
+        if not grants:
+            raise RunnerError("the corpus declares no scenarios, so U_task is undefined")
+        distinct = set(grants.values())
+        if len(distinct) != 1:
+            raise RunnerError(f"the pilot corpus declares more than one U_task: {grants}")
+        return [[action, resource] for action, resource in sorted(distinct.pop())]
+
     def b2_setup(
         self,
         *,
@@ -253,6 +276,7 @@ class GoldenThreadRunner:
         client_id: str = "agent-supervisor",
         actor_id: str = "agent-specialist",
         scope: str = "mcp.invoke",
+        task_grant: list[list[str]] | None = None,
     ) -> dict[str, Any]:
         """The injected provisioning material for `B2-exchange-task` (SS E.2).
 
@@ -268,6 +292,12 @@ class GoldenThreadRunner:
         the harness from importing `src/sut/oauth_as/`), and both are
         runtime-only: derived here, in memory, handed to the arm, never written
         to disk, the repository, or `results/` (CLAUDE.md red line 8).
+
+        `task_grant` defaults to the corpus's own `U_task` and is what the arm
+        checks its subject token against before it will provision at all
+        (ADR 0024). Passing one explicitly is a deliberate act -- it says "this
+        run's task grant is not the corpus's" -- and the arm still refuses if
+        the token it holds does not match whatever is passed.
         """
         principal = registry_mod.load_document()["actors"][actor_id]
         return {
@@ -283,6 +313,7 @@ class GoldenThreadRunner:
             "actor_id": actor_id,
             "actor_identity_private_jwk": key_material.identity_private_jwk(self.seed, principal),
             "scope": scope,
+            "task_grant": self.task_grant() if task_grant is None else task_grant,
             "run_mode": "pilot",  # never "confirmatory": the seal is Part H's
         }
 
