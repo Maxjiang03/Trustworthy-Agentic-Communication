@@ -343,7 +343,7 @@ class B2ExchangeTaskArm:
             "scope": self._setup["scope"],
             "authorization_details": json.dumps(details),
         }
-        status, body = self._post_token(form)
+        status, body = self._post_token(form, now_epoch=hop.now_epoch)
         if status != 200 or "access_token" not in body:
             refusal = ExchangeRefusal(
                 status=status,
@@ -406,7 +406,16 @@ class B2ExchangeTaskArm:
             algorithms=ALGS,
         )
 
-    def _post_token(self, form: Mapping[str, Any]) -> tuple[int, dict[str, Any]]:
+    def token_endpoint_proof(self, now_epoch: int) -> str | None:
+        """A DPoP proof for the token endpoint, or `None` for a bearer arm.
+
+        The seam `B2-exchange-task-DPoP` fills (RFC 9449 SS 5). Bearer arms
+        return `None` and send no `DPoP` header at all, so the AS binds no
+        `cnf` -- which is exactly the difference the ladder measures.
+        """
+        return None
+
+    def _post_token(self, form: Mapping[str, Any], *, now_epoch: int) -> tuple[int, dict[str, Any]]:
         """POST the exchange over the ONE reused keep-alive connection.
 
         A dropped keep-alive is reconnected once on the SAME connection object
@@ -419,6 +428,9 @@ class B2ExchangeTaskArm:
             "Authorization": self._authorization,
             "Content-Length": str(len(body)),
         }
+        proof = self.token_endpoint_proof(now_epoch)
+        if proof is not None:
+            headers["DPoP"] = proof
         connection = self._connection
         assert connection is not None
         connection.request("POST", "/token", body=body, headers=headers)
@@ -468,6 +480,9 @@ class B2ExchangeTaskArm:
             )
         except TokenRejected as exc:
             return False, REASON_TOKEN_REJECTED, f"{exc.reason}: {exc.description}"
+        holder = self.check_holder_binding(staged, claims)
+        if holder is not None:
+            return holder
         try:
             elements = sorted(required_authority(tool, arguments))
         except RequiredAuthorityError as exc:
@@ -483,6 +498,20 @@ class B2ExchangeTaskArm:
                     f"{element} is {decision.reason}",
                 )
         return True, REASON_ADMITTED, ""
+
+    def check_holder_binding(self, staged, claims) -> "tuple[bool, str, str] | None":
+        """The holder-binding layer, or `None` when the arm is a bare bearer.
+
+        Returns a refusal triple to block, or `None` to fall through. The seam
+        `B2-exchange-task-DPoP` fills; for every bearer arm on the ladder there
+        is nothing to check, and SS E.1's `Holder-bound? = no` is that absence.
+
+        Placed AFTER token verification -- there is no `cnf` to compare
+        against until the token verifies -- and BEFORE the scope check, so a
+        holder failure is attributable to the holder plane rather than being
+        masked by an out-of-scope request.
+        """
+        return None
 
     def _audit(self, tool: str, admitted: bool, reason: str, detail: str) -> None:
         # audit=1, OFF the decision path: a sink failure never changes the outcome.

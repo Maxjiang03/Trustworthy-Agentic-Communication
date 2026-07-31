@@ -385,6 +385,45 @@ class GoldenThreadRunner:
             "run_mode": "pilot",  # never "confirmatory": the seal is Part H's
         }
 
+    def b2_dpop_setup(
+        self,
+        *,
+        access_token: str,
+        as_public_jwk: dict[str, str],
+        as_port: int,
+        as_tls_cert_pem: str,
+        as_token_endpoint: str,
+        resource_url: str = "https://mcp.aasc.local/tools/invoke",
+        holder_label: str = "holder-specialist",
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """`B2-exchange-task-DPoP`'s material: the exchange arm's plus a proof key.
+
+        The DPoP holder key is derived from the sealed seed and injected in
+        memory, never written anywhere (CLAUDE.md red line 8). It is a
+        DIFFERENT key from the AS's signing key and from any actor-assertion
+        key -- `smoke/g4/DESIGN.md` SS 7.3 warns the DPoP holder and the HTC
+        holder must never be conflated, so the label is stated rather than
+        implied.
+
+        `as_token_endpoint` is the AS's **configured** endpoint, which is what
+        it compares `htu` against; the client dials `127.0.0.1` and the two
+        differ by construction.
+        """
+        setup = self.b2_setup(
+            access_token=access_token,
+            as_public_jwk=as_public_jwk,
+            as_port=as_port,
+            as_tls_cert_pem=as_tls_cert_pem,
+            **kwargs,
+        )
+        return dict(
+            setup,
+            dpop_private_jwk=key_material.dpop_private_jwk(self.seed, holder_label),
+            as_token_endpoint=as_token_endpoint,
+            resource_url=resource_url,
+        )
+
     def run_scenario(
         self,
         scenario_id: str,

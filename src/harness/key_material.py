@@ -171,3 +171,29 @@ def b1_api_key(seed: bytes, key_id: str) -> str:
         info=B1_API_KEY_INFO + b":" + key_id.encode("ascii"),
     ).derive(seed)
     return urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+def dpop_private_jwk(seed: bytes, label: str = "holder-specialist") -> "dict[str, str]":
+    """A DPoP proof key, as `B2-exchange-task-DPoP` signs with.
+
+    Derived under the corpus rule from a `holder-*` label, so the key is this
+    campaign's material and the seed-disclosure warning above applies. It is
+    the **DPoP holder** key: `smoke/g4/DESIGN.md` SS 7.3 records that the DPoP
+    holder and the HTC holder must never be conflated, and the two arms that
+    use them are compared at G-14 precisely on that difference.
+
+    Runtime-only, runner-held, in memory -- never disk, never the repository,
+    never `results/`.
+    """
+    private = holder_private(seed, label)
+    raw = private.private_bytes(
+        serialization.Encoding.Raw,
+        serialization.PrivateFormat.Raw,
+        serialization.NoEncryption(),
+    )
+    return {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": public_wire(private),
+        "d": urlsafe_b64encode(raw).rstrip(b"=").decode("ascii"),
+    }

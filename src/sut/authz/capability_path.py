@@ -129,6 +129,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from src.sut import freshness
 from src.sut.authz.boundary import BoundaryConfig, TokenRejected, admits, verify_access_token
+from src.sut.authz.jti_cache import Consumption, JtiCache
 from src.sut.authz.registry_view import RegistryView, RegistryViewError
 from src.sut.baselines.base import ArmIdentity
 from src.sut.capability import authority
@@ -174,6 +175,15 @@ REASON_CODES = {
     "identity_plane_consistency_ok": "b3_identity_plane_consistency",
 }
 REASON_ADMITTED = "b3_admitted"
+# SS F.5's two denials. Not SS A.5 conjuncts: the `jti` is consumed AFTER
+# every conjunct passes and BEFORE the tool executes, so a duplicate is
+# reported as itself rather than being folded into an earlier condition.
+REASON_REPLAY_DUPLICATE = "b3_replay_duplicate"
+REASON_REPLAY_CAPACITY = "b3_replay_capacity"
+# The SS F.5 key namespace for INV-carried ids. G-14 attaches the same
+# cache to `B2-DPoP`, whose ids come from a DPoP proof; the tag is what
+# keeps the two from colliding.
+INV_MECHANISM_TAG = "inv"
 
 _HTC_FIELDS = {
     "schema_version",
@@ -496,6 +506,7 @@ class CapabilityDecisionPath:
         disabled: frozenset[str] = frozenset(),
         run_mode: str = "pilot",
         audit_buffer: "BoundedAuditBuffer | None" = None,
+        jti_cache: "JtiCache | None" = None,
     ) -> None:
         # ADR 0026: the sink runs inside `decide`, hence inside the measured
         # segment, so the decision path accepts ONLY a bounded in-memory
@@ -522,6 +533,9 @@ class CapabilityDecisionPath:
         self._scope = oauth_required_scope
         self._disabled = disabled
         self._audit_buffer = audit_buffer
+        # SS E.5 bit 9. `None` for `B3` -- which is why `B3` admits
+        # bit-identical replay, the residual SS E.1 says `B3+` closes.
+        self._jti_cache = jti_cache
         self._root_public = authority.root_public_from_wire(_unb64u(registry_view.as_root_pubkey))
 
     # ------------------------------------------------------------------ #
@@ -557,6 +571,13 @@ class CapabilityDecisionPath:
                     continue
                 conjuncts[name](presentation, tool, arguments, state)
                 decision.evaluated.append(name)
+            # SS F.5: the `jti` is consumed AFTER all other conjuncts pass and
+            # BEFORE the tool executes. Placed here, outside the conjunct loop,
+            # because it is not an SS A.5 conjunct -- SS A.5 lists ten and this
+            # is not one of them -- and because consuming an id for a request
+            # that was going to be refused anyway would burn it for a
+            # legitimate retry.
+            self._consume_jti(presentation, state, decision)
         except ConjunctFailed as failure:
             decision = Decision(
                 admitted=False,
@@ -566,6 +587,44 @@ class CapabilityDecisionPath:
             )
         self._audit(decision, tool)
         return decision
+
+    def _consume_jti(self, p: B3Presentation, state, decision: Decision) -> None:
+        """`B3+`'s replay layer (SS F.5, D37). Absent for `B3`, and that is the arm.
+
+        `now` is injected (`p.now_epoch`), never read from a wall clock, so an
+        over-window fixture advances a logical instant instead of waiting
+        `Delta` (ADR 0027).
+        """
+        if self._jti_cache is None:
+            return
+        inv = state.get("inv_payload")
+        if inv is None:
+            # No INV means no authenticated per-request id to consume. SS E.4's
+            # footnote makes the same point for the bare bearer arm: the replay
+            # cache cannot attach to a credential that carries no id, so this
+            # is a refusal rather than a silent pass.
+            decision.admitted = False
+            decision.reason_code = REASON_REPLAY_DUPLICATE
+            decision.detail = "no INV was verified, so there is no authenticated jti to consume"
+            return
+        outcome = self._jti_cache.consume(INV_MECHANISM_TAG, inv["invocation_id"], now=p.now_epoch)
+        if outcome is Consumption.ADMITTED:
+            decision.evaluated.append("jti_consumed")
+            return
+        decision.admitted = False
+        if outcome is Consumption.DUPLICATE:
+            decision.reason_code = REASON_REPLAY_DUPLICATE
+            decision.detail = (
+                f"invocation id {inv['invocation_id']!r} was already admitted within Delta="
+                f"{self._jti_cache.ttl_seconds}s (SS F.5: at-most-once ADMISSION per jti)"
+            )
+            return
+        decision.reason_code = REASON_REPLAY_CAPACITY
+        decision.detail = (
+            f"the replay cache holds {self._jti_cache.capacity} unexpired entries; SS F.5 "
+            "fails CLOSED on capacity rather than admitting on doubt or evicting an "
+            "unexpired entry (ADR 0027)"
+        )
 
     def _audit(self, decision: Decision, tool: str) -> None:
         # audit=1, OFF the decision path: a sink failure never changes the outcome.
