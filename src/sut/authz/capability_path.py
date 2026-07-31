@@ -118,6 +118,7 @@ prevention outcome (SS E.5).
 
 import json
 from base64 import urlsafe_b64decode
+from collections import deque
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -126,6 +127,7 @@ import rfc8785
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
+from src.sut import freshness
 from src.sut.authz.boundary import BoundaryConfig, TokenRejected, admits, verify_access_token
 from src.sut.authz.registry_view import RegistryView, RegistryViewError
 from src.sut.baselines.base import ArmIdentity
@@ -245,6 +247,62 @@ class ConjunctFailed(Exception):
 
 class PolicyConfigurationError(Exception):
     """The policy-dependent conjuncts were misconfigured. Construction-time, fail closed."""
+
+
+class AuditSinkError(Exception):
+    """The audit sink is not one the decision path will accept (ADR 0026)."""
+
+
+class BoundedAuditBuffer:
+    """`audit = 1` without charging the arm for the apparatus (ADR 0026).
+
+    `_audit` runs **inside** `decide`, hence inside the measured segment
+    (`frozen_parameters` row 1). A sink that performed disk or network I/O
+    there would put the instrument's cost inside the number the "lightweight"
+    claim is settled by, so ADR 0026 requires the sink to be a **bounded
+    in-memory buffer flushed outside the segment**, asserted structurally
+    rather than left to convention.
+
+    Structural, two ways. The decision path accepts **only** this type, so an
+    arbitrary callable cannot be wired in; and this type's `append` is a
+    `deque` push and nothing else, which a test proves by trapping `open` and
+    `socket.socket` around a real append.
+
+    **Overflow drops the oldest record and counts it** -- deliberately the
+    opposite of the `jti` cache's fail-closed overflow (ADR 0027). SS E.5 is
+    explicit that `audit` never sits on the decision path: a sink failure may
+    cost log completeness, never a prevention outcome. Turning an audit
+    overflow into a denial would make logging load-bearing, which is exactly
+    what that separation forbids. `dropped` is exposed so completeness is
+    reported rather than assumed.
+    """
+
+    __slots__ = ("_records", "dropped")
+
+    def __init__(self, capacity: int = 4096) -> None:
+        if capacity < 1:
+            raise AuditSinkError("an audit buffer needs a positive capacity")
+        self._records: deque[dict[str, Any]] = deque(maxlen=capacity)
+        self.dropped = 0
+
+    def append(self, record: dict[str, Any]) -> None:
+        if len(self._records) == self._records.maxlen:
+            self.dropped += 1
+        self._records.append(record)
+
+    def drain(self) -> list[dict[str, Any]]:
+        """Read the buffer out. Called OUTSIDE the segment, by the runner."""
+        return list(self._records)
+
+    # Sequence surface, so a caller reads `buffer[-1]` as it would a list.
+    def __len__(self) -> int:
+        return len(self._records)
+
+    def __iter__(self):
+        return iter(self._records)
+
+    def __getitem__(self, index):
+        return list(self._records)[index]
 
 
 @dataclass(frozen=True)
@@ -437,8 +495,20 @@ class CapabilityDecisionPath:
         oauth_required_scope: str = "mcp.invoke",
         disabled: frozenset[str] = frozenset(),
         run_mode: str = "pilot",
-        audit_sink: Callable[[dict[str, Any]], None] | None = None,
+        audit_buffer: "BoundedAuditBuffer | None" = None,
     ) -> None:
+        # ADR 0026: the sink runs inside `decide`, hence inside the measured
+        # segment, so the decision path accepts ONLY a bounded in-memory
+        # buffer. An arbitrary callable -- one that could write a file or
+        # open a socket on that path -- is refused at construction rather
+        # than trusted not to.
+        if audit_buffer is not None and not isinstance(audit_buffer, BoundedAuditBuffer):
+            raise AuditSinkError(
+                f"audit sink {type(audit_buffer).__name__!r} is not a BoundedAuditBuffer: "
+                "the sink runs inside the measured segment (frozen_parameters row 1), so "
+                "a sink that could perform disk or network I/O there would charge the arm "
+                "for the apparatus (ADR 0026)"
+            )
         unknown = (disabled | (enabled or frozenset())) - set(CONJUNCT_ORDER)
         if unknown:
             raise PolicyConfigurationError(f"unknown conjunct name(s) {sorted(unknown)}")
@@ -451,7 +521,7 @@ class CapabilityDecisionPath:
         self._enabled = frozenset(CONJUNCT_ORDER) if enabled is None else enabled
         self._scope = oauth_required_scope
         self._disabled = disabled
-        self._audit_sink = audit_sink
+        self._audit_buffer = audit_buffer
         self._root_public = authority.root_public_from_wire(_unb64u(registry_view.as_root_pubkey))
 
     # ------------------------------------------------------------------ #
@@ -499,10 +569,10 @@ class CapabilityDecisionPath:
 
     def _audit(self, decision: Decision, tool: str) -> None:
         # audit=1, OFF the decision path: a sink failure never changes the outcome.
-        if self._audit_sink is None:
+        if self._audit_buffer is None:
             return
         try:
-            self._audit_sink(
+            self._audit_buffer.append(
                 {
                     "layer": "capability-boundary",
                     # The arm's declared identity, in EVERY record: an ablation
@@ -698,6 +768,19 @@ class CapabilityDecisionPath:
             raise ConjunctFailed("invocation_binding_ok", "INV carries no invocation id")
         if not inv["nbf"] <= p.now_epoch <= inv["exp"]:
             raise ConjunctFailed("invocation_binding_ok", "INV outside its validity window")
+        # SS F.2 INV FRESHNESS, and it is a separate condition from the window
+        # above: `nbf`/`exp` is the issuer's chosen validity, `Delta` is the
+        # boundary's acceptance of how recently the assertion was made. ADR 0027
+        # fixes one `Delta` for this, the DPoP proof `iat` window and the `jti`
+        # cache TTL, so G-14's two arms cannot differ in window and any
+        # difference it reports is attributable to the mechanisms rather than
+        # to the clock. `now` is injected, never read from a wall clock.
+        if not freshness.is_fresh(p.now_epoch, inv["iat"]):
+            raise ConjunctFailed(
+                "invocation_binding_ok",
+                f"INV iat is outside the frozen freshness window Delta="
+                f"{freshness.DELTA_SECONDS}s (ADR 0027, frozen_parameters row 3)",
+            )
 
     def _inv_payload(self, p: B3Presentation, state, *, conjunct: str) -> tuple[dict, bytes]:
         if "inv_payload" not in state:

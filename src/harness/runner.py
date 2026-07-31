@@ -110,18 +110,37 @@ def verify_frozen_configuration() -> None:
 class TimingSeams:
     """The RQ4 measurement seams, correlated by `correlation_id`. UNMEASURED.
 
-    Four spans, decomposed as Part H's latency protocol requires -- `setup`
+    Five spans, decomposed as Part H's latency protocol requires -- `setup`
     (SS E.2 Phase 1, excluded from the delegation estimand), `delegation`
-    (SS E.2 Phase 2, the compared quantity), `boundary_verification`, and
-    `end_to_end`. The seams EXIST and are correlated; **no number is emitted,
-    reported, or interpreted in this pass** (EXP1 forbidden action 4): the
-    G-3 threshold (`frozen_parameters` row 2) and the equivalence margin
-    (row 1) are UNSET and must be fixed from external engineering need before
-    any timing measurement (Part H step 2, Part J.2 item 9). `IA-3` stays
+    (SS E.2 Phase 2, the compared quantity), `presentation`,
+    `boundary_verification`, and `end_to_end`.
+
+    **The MEASURED SEGMENT is `presentation + boundary_verification`**
+    (ADR 0026, `frozen_parameters` row 1), each bracketing exactly one call --
+    `arm.present(...)` and `arm.decide(...)` respectively -- and summed for
+    the estimand rather than folded into one widened span, because SS E.5 asks
+    for the latency to be *decomposed* and redefining an existing span's
+    meaning would silently reinterpret anything already recorded under it.
+    `tests/test_measured_segment.py` asserts both extents structurally, that
+    no effect-ledger write falls inside either, and that neither contains
+    `provision` or `delegate`.
+
+    *(Update note: this docstring read "Four spans" and named rows 1 and 2 as
+    UNSET. Both were true when written; ADR 0025/0026 set them and added the
+    `presentation` seam. `presentation` exists because the previous segment
+    bracketed `decide` alone and therefore omitted `B3`'s principal
+    per-invocation cost -- JCS canonicalization, `access_token_hash`, the INV
+    signature -- from the very test the "lightweight" claim is settled by, an
+    omission that ran toward this project's own hypothesis.)*
+
+    **The seams EXIST and are correlated; no number is emitted, reported or
+    interpreted here.** Rows 1 and 2 being set does not authorize measurement:
+    G-3 owns timing, and ADR 0025 requires an adjudicative run on the row 9
+    sealed measurement platform, which is not yet locked. `IA-3` stays
     `[UNVERIFIED-IA]` for G-3.
 
     Spans are recorded as monotonic-clock intervals so a later measurement
-    pass needs no new instrumentation -- only a threshold, an ADR, and G-3.
+    pass needs no new instrumentation -- only G-3 and a locked platform.
     """
 
     correlation_id: str
@@ -430,7 +449,20 @@ class GoldenThreadRunner:
                 timing.mark("delegation", delegation_start, time.perf_counter_ns())
 
         def observed_present(credentials: Mapping[str, Any], invocation: Any) -> Mapping[str, Any]:
-            presentation = arm.present(credentials, invocation)
+            # ADR 0026's `presentation` span, bracketing EXACTLY
+            # `arm.present(...)` and nothing else. For B3 this is where the
+            # per-invocation cryptographic work lives -- JCS canonicalization
+            # of the arguments, `access_token_hash`, the Ed25519 INV signature
+            # -- so a segment that omitted it would leave B3's principal
+            # per-invocation cost out of the very test the "lightweight" claim
+            # is settled by, in the direction that flatters the hypothesis.
+            presentation_start = time.perf_counter_ns()
+            try:
+                presentation = arm.present(credentials, invocation)
+            finally:
+                timing.mark("presentation", presentation_start, time.perf_counter_ns())
+            # Instrument bookkeeping, deliberately OUTSIDE the span (ADR 0026
+            # excludes it by name).
             presentations.append(dict(presentation))
             return presentation
 
@@ -512,6 +544,8 @@ class GoldenThreadRunner:
             tool_result_error=tool_error.get("error", True),
             presentation=presentation,
             timing=timing,
+            # Drained OUTSIDE both spans (ADR 0026): the buffer is bounded and
+            # in-memory precisely so nothing here is charged to the arm.
             audit_log=list(getattr(arm, "audit_log", [])),
         )
 

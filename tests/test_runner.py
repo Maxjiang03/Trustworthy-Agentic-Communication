@@ -89,6 +89,7 @@ class TestScenarioRunEverywhere:
         assert set(run.timing.recorded()) == {
             "setup",
             "delegation",
+            "presentation",  # ADR 0026's new seam: `arm.present(...)` alone
             "boundary_verification",
             "end_to_end",
         }

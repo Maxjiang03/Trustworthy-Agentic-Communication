@@ -26,6 +26,7 @@ from src.sut.authz.boundary import BoundaryConfig
 from src.sut.authz.capability_path import (
     B3Presentation,
     BoundaryPolicy,
+    BoundedAuditBuffer,
     CapabilityDecisionPath,
 )
 from src.sut.authz.registry_view import build_view
@@ -65,7 +66,10 @@ class B3Arm:
         self._issuer: CapabilityIssuer | None = None
         self._decision_path: CapabilityDecisionPath | None = None
         self._staged: B3Presentation | None = None
-        self.audit_log: list[dict[str, Any]] = []
+        # ADR 0026: bounded and in-memory, because `_audit` runs inside
+        # `decide` and therefore inside the measured segment. Drained by
+        # the runner OUTSIDE the segment.
+        self.audit_log = BoundedAuditBuffer()
 
     # -- provision: Phase-1 setup (SS E.2), all inputs injected -------------- #
     def provision(self, setup: Mapping[str, Any]) -> None:
@@ -105,7 +109,7 @@ class B3Arm:
             enabled=self.bitmask.enabled_conjuncts(),
             disabled=frozenset(setup.get("disabled", ())),
             run_mode=setup["run_mode"],
-            audit_sink=self.audit_log.append,
+            audit_buffer=self.audit_log,
         )
         self._setup = dict(setup)
 
