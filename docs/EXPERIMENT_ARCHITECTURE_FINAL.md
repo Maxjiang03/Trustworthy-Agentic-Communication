@@ -262,11 +262,13 @@ Families: **F1** amplification (root / terminal / chain-tamper); **F2** identity
 | F2 unauthenticated_caller | A | **B** | **B** | **B** | **B** | **B** | **B** | **B** | **B** |
 | F3 dpop-stolen-AT-key-substitution (T-reuse) | A | A | A | A | A | **B** | A | **B** | **B** |
 | F3 dpop-first-use-body-mutation (T-tool/T-args) | A | A | A | A | A | A | A | **B** | **B** |
-| F3 audience mismatch (OAuth neg. control) | A | A | **B** | **B** | **B** | **B** | NA | **B** | **B** |
-| F3 expired token (OAuth neg. control) | A | A | **B** | **B** | **B** | **B** | NA | **B** | **B** |
+| F3 audience mismatch (OAuth neg. control) | A | A | **B** | **B** | **B** | **B** | **B** | **B** | **B** |
+| F3 expired token (OAuth neg. control) | A | A | **B** | **B** | **B** | **B** | **B** | **B** | **B** |
 | F3 dpop-captured-proof-replay (bit-identical) | A | A | A | A | A | A | A | A | **B** |
 | F4 sensitive egress, no declassification | A | A | A† | A† | A† | A† | A† | **B** | **B** |
 | F5 high-risk action, no approval artifact | A | A | A† | A† | A† | A† | A† | **B** | **B** |
+
+*Update, 2026-08-01 — corrected by ADR 0031, recorded rather than silently rewritten.* The two **OAuth neg. control** rows above read **`NA`** for `B-cap` until this date; they now read **B**. `NA` asserts that an arm **cannot express** the case (the meaning ADR 0028 pinned when it insisted the deferred `F2 wrong_principal` row is *emphatically not* `NA`), and `B-cap` can express both, does, and blocks — measured, with negative arms, in `tests/test_b_cap.py::TestOAuthAuthnIsOnAndVerifies`. §E.1's `B-cap fixed [E6]` paragraph **mandates** exactly that: `oauth_authn = 1` on the same OAuth substrate as `B3`, and it **MUST** verify audience and expiry. The table also contradicted **itself** — `B-cap` is **B** on `F2 invalid_credential` and on `F2 unauthenticated_caller`, both reached through the same OAuth verification path, while its `NA` on `F2 wrong_holder_proof / wrong_dpop_key` is **correct** and **stays**, because it genuinely carries no holder binding. The error was a *capability arm → NA* pattern applied to two rows labelled *OAuth neg. control*. **This corrects a PREDICTION, not code**: `B-cap`'s behaviour is required by §E.1/E6, so changing the arm to match the old cells would have violated the specification governing it. ADR 0031 also audits every other `NA` in this table against the §E.5 bit that governs its row and finds **no other cell with the same pattern**; `B3` and `B3⁺` carry no `NA` anywhere.
 
 † F4/F5 comparisons are valid **only** among B3 and its matched ablations, **unless** the OAuth arms are given the **same** boundary-owned context/approval reference monitor (using the mechanism-neutral `authz_context_hash`, §F.2). A difference existing only because B3 has a monitor and the OAuth arm does not **MUST NOT** be reported as a capability-vs-OAuth advantage; it is a reference-monitor-configuration difference and is labelled as such (gate G-15). The A† cells therefore denote "admitted **absent** the shared monitor"; with the shared monitor the OAuth arms also block, and F4/F5 then measure the monitor, not the mechanism.
 
