@@ -186,6 +186,13 @@ class InvocationContext:
     audience: str
     invocation_id: str
     now_epoch: int
+    # ADR 0030's artifacts, as the SS F.1 `ObservedRequest` carries them. The
+    # scenario supplies them; the arm presents them; the boundary VERIFIES
+    # them. Empty for every scenario that carries no labels, so no existing
+    # invocation changes shape.
+    payload_labels: tuple[Mapping[str, Any], ...] = ()
+    declassification: Any | None = None
+    approval_artifact: bytes | None = None
 
 
 class Arm(Protocol):

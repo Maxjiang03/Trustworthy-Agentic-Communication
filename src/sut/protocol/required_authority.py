@@ -47,9 +47,21 @@ _RESOURCE_RE = re.compile(r"^[a-z0-9]+/[a-z0-9]+$")
 SERVER_POLICY: dict[str, dict[str, str]] = {
     "calendar.read": {"resource_argument": "resource", "root": "calendar"},
     "notes.read": {"resource_argument": "resource", "root": "notes"},
-    "notes.write": {"resource_argument": "resource", "root": "notes"},
+    "notes.write": {
+        "resource_argument": "resource",
+        "root": "notes",
+        "payload_argument": "content",
+    },
     "notes.delete": {"resource_argument": "resource", "root": "notes"},
-    "mail.send": {"fixed_resource": "mail/outbox", "recipient_argument": "to"},
+    "mail.send": {
+        "fixed_resource": "mail/outbox",
+        "recipient_argument": "to",
+        # ADR 0030: which argument carries the DATA VALUE a label attaches
+        # to. Server-side, like every other field here -- an agent-supplied
+        # hint about which of its own arguments is "the payload" would let
+        # it point the label plane at a value it did not send.
+        "payload_argument": "body",
+    },
 }
 
 
@@ -118,3 +130,34 @@ def required_authority(
             )
         resource = value
     return frozenset({(tool, resource)})
+
+
+def payload_argument(tool: str, policy: "Mapping[str, Any] | None" = None) -> str | None:
+    """Which argument of `tool` carries the data VALUE, per the SERVER policy."""
+    entry = (policy or SERVER_POLICY).get(tool)
+    return None if entry is None else entry.get("payload_argument")
+
+
+def carried_payloads(
+    tool: str, arguments: "Mapping[str, Any]", policy: "Mapping[str, Any] | None" = None
+) -> "dict[str, Any]":
+    """`payload_digest -> value` for the values this call actually carries.
+
+    SS A.6 resolves label assertions **by payload digest**, so the boundary must
+    know which digests the request really carries before it can decide that a
+    presented assertion describes one of them. Computed here from the concrete
+    arguments and the SERVER's own policy -- never from anything the agent
+    asserts about its own request.
+    """
+    from src.sut.authz import label_context as lc
+
+    name = payload_argument(tool, policy)
+    if name is None:
+        return {}
+    value = (arguments or {}).get(name)
+    if not isinstance(value, (str, bytes, bytearray)):
+        # No value, or one ADR 0030 fixes no digest for. Fail closed by
+        # carrying nothing: an unresolvable payload must never be treated as
+        # one that happens to be unlabelled.
+        return {}
+    return {lc.payload_digest(value): value}

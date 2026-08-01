@@ -98,18 +98,21 @@ The `disabled` set is that seam: a disabled conjunct is skipped and recorded,
 never silently absent. This pass uses it only for the STEP 13
 would-have-failed counterfactuals; no ablation arm is built (forbidden 11).
 
-**The two policy conjuncts are load-bearing, in their REFUSAL half only**
-(rows 4/6/10 frozen by ADR 0022, composition amended by ADR 0023). The policy
-object is injected configuration and construction fails without one; both
-planes evaluate the same frozen bytes and neither imports the other's
-evaluation. What the freeze does *not* give is the acceptance half: a
-`LabelAssertion`, a `DeclassificationArtifact` and an `ApprovalArtifact` all
-hinge on constructions deferred to the F4 label-plumbing decision and
-`authz_context_hash` (ADR 0009 category (c), owned by G-15), so each is
-**refused with its reason stated** rather than read at face value. F4/F5 stay
-unscored until then.
-*(Update note: this paragraph read "Two conjuncts cannot honestly be frozen
-yet (rows 4/6/10 UNSET)" and was true when written; ADR 0022/0023 froze them.)*
+**The two policy conjuncts are load-bearing in BOTH halves** (rows 4/6/10 frozen
+by ADR 0022, composition amended by ADR 0023, constructions fixed by ADR 0030).
+The policy object is injected configuration and construction fails without one;
+both planes evaluate the same frozen bytes and neither imports the other's
+evaluation. The acceptance half is delegated to the **boundary-owned reference
+monitor** (`src/sut/authz/reference_monitor.py`), which is handed in as
+configuration: with no monitor attached both conjuncts refuse everything
+presented, exactly as before. Acceptance is earned by VERIFICATION -- a
+signature under a trusted issuer, the artifact's own window, its binding to
+THIS request's `authz_context_hash`, and its single-use rule -- never by the
+removal of a refusal.
+*(Update notes, each true when written: (1) "Two conjuncts cannot honestly be
+frozen yet (rows 4/6/10 UNSET)", superseded by ADR 0022/0023; (2) "load-bearing
+in their REFUSAL half only ... F4/F5 stay unscored until then", superseded by
+ADR 0030 on 2026-08-01.)*
 
 `audit = 1` for B3: the structured JSONL decision log is emitted OFF the
 decision path -- a sink failure can cost log completeness, never a
@@ -130,12 +133,14 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from src.sut import freshness
 from src.sut.authz.boundary import BoundaryConfig, TokenRejected, admits, verify_access_token
 from src.sut.authz.jti_cache import Consumption, JtiCache
+from src.sut.authz.reference_monitor import ContextApprovalMonitor, RequestContext
 from src.sut.authz.registry_view import RegistryView, RegistryViewError
 from src.sut.baselines.base import ArmIdentity
 from src.sut.capability import authority
 from src.sut.capability.digests import access_token_hash, commit_prefix, h_jcs
 from src.sut.protocol.required_authority import (
     RequiredAuthorityError,
+    carried_payloads,
     egress_recipient,
     required_authority,
 )
@@ -325,10 +330,10 @@ class BoundaryPolicy:
     ADR 0016 drew for `Omega`/`Gamma`. There is one policy source: the
     PILOT-PROVISIONAL stand-in is gone.
 
-    What this enables is the **refusal** half of both conjuncts. The
-    acceptance half needs `authz_context_hash` (ADR 0009 category (c), owned
-    by G-15), so a high-risk action is refused because no approval artifact
-    can verify -- not because approval is impossible in principle.
+    This supplies the POLICY both conjuncts evaluate. Whether an artifact may
+    be believed is a separate question, answered by the ADR 0030 monitor over
+    the same document; rows 4/6 are then re-evaluated over the labels that
+    verified, so a declassification is an acceptance path and never a bypass.
     """
 
     order: tuple[str, ...]
@@ -391,6 +396,24 @@ class BoundaryPolicy:
         domain = recipient.rpartition("@")[2]
         return "internal-sink" if domain == self.internal_sink_domain else "external-sink"
 
+    def join(self, labels) -> "str | None":
+        """The least upper bound of several labels in row 4's **total order**.
+
+        One request may carry several labelled payloads, and one egress carries
+        all of them, so the label that governs is the **most restrictive**
+        present -- `join(public, sensitive) = sensitive`. Taking the least would
+        let a sensitive payload ride out under a public one's label, which is
+        `F4-label-confusion` performed by the boundary itself. ADR 0022 froze
+        the vocabulary as a *total order* precisely so this join always exists.
+        """
+        ranked = [label for label in labels if label is not None]
+        if not ranked:
+            return None
+        for label in ranked:
+            if label not in self.order:
+                raise PolicyConfigurationError(f"label {label!r} is outside the frozen vocabulary")
+        return max(ranked, key=self.order.index)
+
     def egress_decision(self, label: str | None, recipient: str | None) -> str:
         """The row 4 + row 6 verdict for one egress (ADR 0023).
 
@@ -424,6 +447,15 @@ class B3Presentation:
     now_epoch: int
     payload_labels: tuple[Mapping[str, Any], ...] = ()
     approval_artifact: bytes | None = None
+    # ADR 0030: the remaining SS F.2 `authz_context_hash` inputs and the
+    # declassification. `resource_owner` and `oauth_actor` are supplied by the
+    # arm from the token it presents -- and an arm that misstated either would
+    # compute a DIFFERENT authz_context_hash from the one an approver signed
+    # over, so the artifact would not bind and the request would be refused.
+    # Lying is therefore fail-closed rather than a way through.
+    resource_owner: tuple[str, str] = ("", "")
+    oauth_actor: tuple[str, str] = ("", "")
+    declassification: Any | None = None
 
 
 @dataclass
@@ -507,6 +539,7 @@ class CapabilityDecisionPath:
         run_mode: str = "pilot",
         audit_buffer: "BoundedAuditBuffer | None" = None,
         jti_cache: "JtiCache | None" = None,
+        monitor: "ContextApprovalMonitor | None" = None,
     ) -> None:
         # ADR 0026: the sink runs inside `decide`, hence inside the measured
         # segment, so the decision path accepts ONLY a bounded in-memory
@@ -536,6 +569,10 @@ class CapabilityDecisionPath:
         # SS E.5 bit 9. `None` for `B3` -- which is why `B3` admits
         # bit-identical replay, the residual SS E.1 says `B3+` closes.
         self._jti_cache = jti_cache
+        # ADR 0030's shared reference monitor. `None` keeps the pre-ADR
+        # behaviour -- both policy conjuncts refuse everything they cannot
+        # verify -- so an arm that is not given one is not quietly relaxed.
+        self._monitor = monitor
         self._root_public = authority.root_public_from_wire(_unb64u(registry_view.as_root_pubkey))
 
     # ------------------------------------------------------------------ #
@@ -885,86 +922,112 @@ class CapabilityDecisionPath:
 
     # -- 7. context_policy_ok -------------------------------------------------- #
     def _context_policy_ok(self, p: B3Presentation, tool, arguments, state) -> None:
-        """Rows 4 and 6, frozen by ADR 0022/0023, over the concrete request.
+        """Rows 4 and 6 over VERIFIED labels, through the shared monitor (ADR 0030).
 
         Egress is DERIVED, never enumerated: the tool is egress iff the server
         policy declares a recipient argument for it, which over the frozen
         `Omega` is exactly `mail.send`.
 
-        **A presented label is REFUSED, never read**, exactly as the sibling
-        `approval_artifact_ok` refuses a presented `ApprovalArtifact`. SS F.1's
-        `LabelAssertion` declares five things that would have to be checked --
-        `signature`, `issuer_kid`, `iat`/`exp`, and a `payload_digest` bound to
-        the payload bytes -- and its digest construction is deferred to the F4
-        label-plumbing decision (ADR 0009 category (c), owned by G-15), so not
-        one of them can be verified today. Reading the bare `label` field would
-        let an agent-supplied string decide a security verdict and turn a
-        `sensitive` egress into a `permit` -- precisely what `required_authority`
-        exists to prevent. So the label plane is either verifiable or refused.
+        **The acceptance half is VERIFICATION, not a removed refusal.** Block 2
+        found this conjunct reading `entry.get("label")` off an unverified
+        mapping and the fix was to refuse every presented label. ADR 0030 does
+        not undo that: a label is believed only when its `LabelAssertion`
+        verifies under a **trusted label issuer** in the
+        `AASC-LABEL-v1` domain, sits inside its own `iat`/`exp`, carries a
+        label in the frozen vocabulary, and names a `payload_digest` this
+        request actually carries. Anything short of that is refused with the
+        condition named, exactly as before -- the difference is that a request
+        which meets all of it can now be admitted, which is what makes F4
+        scoreable at all.
 
-        Only the **refusal** half is decided here. `escalate` means admissible
-        under a valid approval or declassification artifact, and neither can
-        be verified until `authz_context_hash` is fixed -- so `escalate`
-        refuses, and says why.
+        The monitor is **boundary-owned and mechanism-neutral** (SS F.2), so the
+        same object serves an OAuth arm holding no capability token. Without
+        one, this conjunct refuses everything it cannot verify, so an arm that
+        was not given a monitor is not quietly relaxed.
         """
-        if p.payload_labels:
+        if self._monitor is None:
+            if p.payload_labels:
+                raise ConjunctFailed(
+                    "context_policy_ok",
+                    f"{len(p.payload_labels)} label assertion(s) were presented but no "
+                    "reference monitor is attached, so none can be verified; a self-declared "
+                    "label is not evidence and must not decide a verdict",
+                )
+            recipient = egress_recipient(tool, arguments)
+            if recipient is None:
+                return
+            outcome = self._policy.egress_decision(None, recipient)
+            if outcome == PERMIT:
+                return
             raise ConjunctFailed(
                 "context_policy_ok",
-                f"{len(p.payload_labels)} label assertion(s) were presented, but no "
-                "LabelAssertion can be verified: its payload_digest construction is deferred "
-                "to the F4 label-plumbing decision (ADR 0009 category (c), owned by G-15), so "
-                "the signature, issuer_kid and iat/exp it declares cannot be checked either. "
-                "A self-declared label is not evidence and must not decide a verdict",
+                f"egress of an unlabelled payload to {self._policy.sink_class(recipient)} is "
+                f"{outcome} under the frozen policy (ADR 0022/0023) and no reference monitor "
+                "is attached to verify a declassification",
             )
-        recipient = egress_recipient(tool, arguments)
-        if recipient is None:
-            # Non-egress: permit at every label, and unlabelled is permitted
-            # too -- nothing leaves, so no egress policy can apply.
-            return
-        # The SS A.6 join over the VERIFIED labels, which is empty by
-        # construction while the refusal above stands: so the frozen unlabelled
-        # rule decides. The outcome is still READ from the injected document
-        # rather than assumed, which is why the three-way dispatch stays -- it
-        # is the policy that fails this closed, not this function.
-        outcome = self._policy.egress_decision(None, recipient)
-        if outcome == PERMIT:
-            return
-        if outcome == ESCALATE:
-            raise ConjunctFailed(
-                "context_policy_ok",
-                f"egress to {self._policy.sink_class(recipient)} escalates; no "
-                "declassification or approval artifact can verify until authz_context_hash "
-                "is fixed (ADR 0009 category (c), G-15)",
-            )
-        raise ConjunctFailed(
-            "context_policy_ok",
-            f"egress of an unlabelled payload to {self._policy.sink_class(recipient)} is "
-            "blocked by the frozen policy (ADR 0022/0023): with no verifiable LabelAssertion "
-            "no permit can be established",
+        decision = self._monitor.context_decision(
+            self._request_context(p, tool, arguments),
+            assertions=p.payload_labels,
+            carried_payloads=carried_payloads(tool, arguments),
+            declassification=p.declassification,
+            recipient=egress_recipient(tool, arguments),
+            now=p.now_epoch,
+        )
+        state["verified_labels"] = decision.verified_labels
+        if decision.refused:
+            raise ConjunctFailed("context_policy_ok", decision.reason)
+
+    def _request_context(self, p: B3Presentation, tool, arguments) -> RequestContext:
+        """SS F.2's six named inputs. Nothing here is capability-specific.
+
+        `canonical_request_digest` is recomputed from the CONCRETE arguments
+        the boundary was called with, never read from the INV -- the INV is the
+        agent's own assertion about the call, and binding an artifact to it
+        would let the agent choose what the approver appeared to have signed.
+        """
+        return RequestContext(
+            task_id=p.task_id,
+            audience=p.audience,
+            tool=tool,
+            canonical_request_digest=h_jcs(dict(arguments)),
+            resource_owner=tuple(p.resource_owner),
+            oauth_actor=tuple(p.oauth_actor),
         )
 
     # -- 8. approval_artifact_ok ------------------------------------------------ #
     def _approval_artifact_ok(self, p: B3Presentation, tool, arguments, state) -> None:
-        """Row 10's high-risk set, frozen by ADR 0022.
+        """Row 10's high-risk set with a verifiable `ApprovalArtifact` (ADR 0030).
 
-        The **refusal** half only: a high-risk action requires a valid
-        `ApprovalArtifact`, and none can verify until `authz_context_hash` is
-        fixed (ADR 0009 category (c), owned by G-15). So a high-risk action
-        refuses and says exactly why, rather than pretending to verify.
+        Same shape as its sibling: the refusal stands for everything that does
+        not verify, and an artifact earns its acceptance by binding to **this**
+        request's `authz_context_hash`, verifying under a trusted **approver**
+        (a set disjoint from the label issuers), sitting inside its window and
+        inside `Delta`, declaring the single-use `replay_rule` this profile
+        accepts, and not having been consumed already.
         """
-        if tool in self._policy.high_risk_actions:
-            raise ConjunctFailed(
-                "approval_artifact_ok",
-                f"{tool!r} is a frozen high-risk action (ADR 0022 row 10) and requires an "
-                "approval artifact; none can verify until authz_context_hash is fixed "
-                "(ADR 0009 category (c), G-15)",
-            )
-        if p.approval_artifact is not None:
-            raise ConjunctFailed(
-                "approval_artifact_ok",
-                "an approval artifact was presented but authz_context_hash is unfixed, so it "
-                "cannot be verified (ADR 0009 category (c), G-15)",
-            )
+        high_risk = tool in self._policy.high_risk_actions
+        if self._monitor is None:
+            if high_risk:
+                raise ConjunctFailed(
+                    "approval_artifact_ok",
+                    f"{tool!r} is a frozen high-risk action (ADR 0022 row 10) and requires an "
+                    "approval artifact, but no reference monitor is attached to verify one",
+                )
+            if p.approval_artifact is not None:
+                raise ConjunctFailed(
+                    "approval_artifact_ok",
+                    "an approval artifact was presented but no reference monitor is attached, "
+                    "so it cannot be verified",
+                )
+            return
+        decision = self._monitor.approval_decision(
+            self._request_context(p, tool, arguments),
+            approval=p.approval_artifact,
+            now=p.now_epoch,
+            high_risk=high_risk,
+        )
+        if decision.refused:
+            raise ConjunctFailed("approval_artifact_ok", decision.reason)
 
     # -- 9. oauth_resource_authorization_ok ------------------------------------- #
     def _oauth_resource_authorization_ok(self, p: B3Presentation, tool, arguments, state) -> None:

@@ -45,7 +45,7 @@ from src.harness.effect_ledger import LedgerWriter, install_ingress_recorder, re
 from src.harness.effectors import LedgerEffector
 from src.harness.mediation.boundary import install_boundary
 from src.harness.oracle import commitment
-from src.harness.policy import frozen_policy
+from src.harness.policy import frozen_policy, label_artifacts
 from src.harness.schema import (
     ApiKeyEvidence,
     CapabilityEvidence,
@@ -239,7 +239,14 @@ class GoldenThreadRunner:
         """The SUT-visible document -- the ONLY scenario material the SUT gets."""
         return self._load_json(self._corpus_dir / "sut_visible" / f"{scenario_id}.json")
 
-    def b3_setup(self, *, access_token: str, as_public_jwk: dict[str, str]) -> dict[str, Any]:
+    def b3_setup(
+        self,
+        *,
+        access_token: str,
+        as_public_jwk: dict[str, str],
+        actor_id: str = "agent-specialist",
+        monitor_attached: bool = True,
+    ) -> dict[str, Any]:
         """The injected provisioning material for a capability arm.
 
         Everything the arm needs arrives as DATA from the composition root:
@@ -251,6 +258,8 @@ class GoldenThreadRunner:
         """
         # The ONE policy source (ADR 0022): the frozen document itself. The
         # PILOT-PROVISIONAL stand-in is deleted, not merely bypassed.
+        label_issuers, approvers = label_artifacts.trusted_sets(self.seed)
+        resource_owner = registry_mod.load_document()["resource_owners"][0]
         return {
             "gamma_document": frozen_config.load_document(),
             "registry_document": registry_mod.load_document(),
@@ -266,6 +275,19 @@ class GoldenThreadRunner:
             "resource_server": self._corpus["audience"],
             "rar_type": as_process.RAR_TYPE,
             "policy_document": frozen_policy.load_document(),
+            # ADR 0030's monitor material. The two trusted sets are DISJOINT by
+            # role and by derivation label; `policy_version` is `H(Lambda)`, so
+            # an artifact issued under one rows-4/6 policy cannot survive an
+            # amendment to it. `resource_owner` and `oauth_actor` are identity
+            # CONFIGURATION -- the same values the sealed record also carries,
+            # but reaching the SUT from the composition root rather than from a
+            # sealed document, exactly as `audience` does (red line 5).
+            "label_issuers": label_issuers,
+            "approvers": approvers,
+            "policy_version": frozen_parameters.expected_h_policy(),
+            "resource_owner": (self._corpus["issuer"], resource_owner),
+            "oauth_actor": (self._corpus["issuer"], actor_id),
+            "monitor_attached": monitor_attached,
             "run_mode": "pilot",  # never "confirmatory": the seal is Part H's
         }
 

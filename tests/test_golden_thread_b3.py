@@ -218,9 +218,10 @@ def staged(running_as):
     tests exercise the boundary alone, so no ledger directory is involved and
     they run on every platform.
     """
-    from src.harness import as_process
-    from src.harness.policy import frozen_policy
+    from src.harness import as_process, frozen_parameters
+    from src.harness.policy import frozen_policy, label_artifacts
 
+    label_issuers, approvers = label_artifacts.trusted_sets(SEED)
     setup = {
         "gamma_document": frozen_config.load_document(),
         "registry_document": reg.load_document(),
@@ -236,6 +237,15 @@ def staged(running_as):
         "resource_server": "https://mcp.aasc.local/tools",
         "rar_type": as_process.RAR_TYPE,
         "policy_document": frozen_policy.load_document(),
+        # ADR 0030's monitor material, injected exactly as the runner injects
+        # it. `monitor_attached` defaults true here because these suites are
+        # about B3's own ladder position; the SS E.4 `A^dagger` cells and gate
+        # G-15 vary it explicitly.
+        "label_issuers": label_issuers,
+        "approvers": approvers,
+        "policy_version": frozen_parameters.expected_h_policy(),
+        "resource_owner": ("https://as.aasc.local", "user-alice"),
+        "oauth_actor": ("https://as.aasc.local", "agent-specialist"),
         "run_mode": "pilot",
     }
     visible = json.loads(
@@ -716,7 +726,17 @@ class TestFrozenPolicyIsLoadBearing:
         assert admitted is False
         assert reason == REASON_CODES["context_policy_ok"]
         detail = arm.audit_log[-1]["detail"]
-        assert "no LabelAssertion can be verified" in detail and "G-15" in detail
+        # *(Updated 2026-08-01: the refusal message changed when ADR 0030 gave
+        # the conjunct a verification path, and this fixture now attaches the
+        # monitor. The GUARANTEE this pins is UNCHANGED and is the whole point
+        # of the block: the label above is signed by nobody, and claims to
+        # come from the SPECIALIST'S OWN holder key -- the presenting agent
+        # labelling its own payload. It is refused because that kid is not a
+        # trusted label issuer, i.e. the boundary reads WHO ASSERTED, never
+        # what was claimed. The remaining four negative artifact cases live in
+        # `tests/test_reference_monitor.py`.)*
+        assert "not a trusted label issuer" in detail
+        assert "kid-holder-specialist" in detail
 
     def test_the_unlabelled_path_is_unchanged_by_that_refusal(self, staged):
         """Refusing a presented label moves no pilot outcome.

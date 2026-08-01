@@ -29,6 +29,8 @@ from src.sut.authz.capability_path import (
     BoundedAuditBuffer,
     CapabilityDecisionPath,
 )
+from src.sut.authz.label_context import label_assertions_digest
+from src.sut.authz.reference_monitor import ContextApprovalMonitor
 from src.sut.authz.registry_view import build_view
 from src.sut.baselines.base import ArmBitmask, ArmIdentity, HopContext, InvocationContext
 from src.sut.capability import signer
@@ -85,6 +87,11 @@ class B3Arm:
             "resource_server",
             "rar_type",
             "policy_document",
+            "label_issuers",
+            "approvers",
+            "policy_version",
+            "resource_owner",
+            "oauth_actor",
             "run_mode",
         }
         missing = required - set(setup)
@@ -94,6 +101,20 @@ class B3Arm:
         # evaluated here independently -- never imported from the harness.
         policy = BoundaryPolicy.load(setup["policy_document"])
         registry_view = build_view(setup["registry_document"], setup["resolved_keys"])
+        # ADR 0030's boundary-owned monitor. `B3` runs it because its SS E.5
+        # bitmask sets `context = 1` and `approval = 1` -- its ladder position.
+        # The SAME class is attached to an OAuth arm as configuration, which is
+        # what gate G-15 governs; nothing here is capability-specific.
+        monitor = (
+            ContextApprovalMonitor(
+                policy=policy,
+                label_issuers=setup["label_issuers"],
+                approvers=setup["approvers"],
+                policy_version=setup["policy_version"],
+            )
+            if setup.get("monitor_attached", True)
+            else None
+        )
         self._issuer = CapabilityIssuer(setup["gamma_document"], setup["kappa_private"])
         self._decision_path = CapabilityDecisionPath(
             gamma_document=setup["gamma_document"],
@@ -110,6 +131,7 @@ class B3Arm:
             disabled=frozenset(setup.get("disabled", ())),
             run_mode=setup["run_mode"],
             audit_buffer=self.audit_log,
+            monitor=monitor,
         )
         self._setup = dict(setup)
 
@@ -191,7 +213,13 @@ class B3Arm:
             audience=invocation.audience,
             method=invocation.method,
             tool=invocation.tool,
-            label_assertions_digest="00" * 32,  # bound, not recomputed (rows 4/6; G-15)
+            # ADR 0030 closes this ADR 0009 category (c) field too: the INV
+            # binds the SORTED join keys of the labels presented with it, so a
+            # label set cannot be swapped after signing. The empty set has a
+            # real digest, so "no labels" is bound rather than left unfilled.
+            label_assertions_digest=label_assertions_digest(
+                [entry["payload_digest"] for entry in invocation.payload_labels]
+            ),
             invocation_id=invocation.invocation_id,  # the harness-minted correlation id
             iat=invocation.now_epoch,
             nbf=invocation.now_epoch,
@@ -212,6 +240,13 @@ class B3Arm:
             audience=invocation.audience,
             method=invocation.method,
             now_epoch=invocation.now_epoch,
+            payload_labels=tuple(invocation.payload_labels),
+            declassification=invocation.declassification,
+            approval_artifact=invocation.approval_artifact,
+            # SS F.2's remaining named inputs, from injected identity
+            # CONFIGURATION rather than from any sealed document (red line 5).
+            resource_owner=tuple(self._setup["resource_owner"]),
+            oauth_actor=tuple(self._setup["oauth_actor"]),
         )
         return presentation
 
