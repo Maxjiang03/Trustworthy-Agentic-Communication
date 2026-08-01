@@ -1,0 +1,67 @@
+{
+  "_banner": "SUT-VISIBLE scenario request. Carries the task grant the Supervisor legitimately holds (U_task is the one authorization input any runtime principal sees, SS A.3) and the scripted delegation. No tau_gt, no R, no sealed field appears here.",
+  "artifacts": {
+    "approval": true,
+    "declassification": true
+  },
+  "attenuation_elements": [
+    [
+      "mail.send",
+      "mail/outbox"
+    ],
+    [
+      "notes.delete",
+      "notes/project"
+    ],
+    [
+      "notes.write",
+      "notes/project"
+    ]
+  ],
+  "audience": "https://mcp.aasc.local/tools",
+  "authority_elements": [
+    [
+      "calendar.read",
+      "calendar/work"
+    ],
+    [
+      "mail.send",
+      "mail/outbox"
+    ],
+    [
+      "notes.delete",
+      "notes/project"
+    ],
+    [
+      "notes.read",
+      "notes/project"
+    ],
+    [
+      "notes.write",
+      "notes/project"
+    ]
+  ],
+  "context_label": "internal(pilot)",
+  "delegation_intent": {
+    "arguments": {
+      "body": "Q3 revenue was 4.2M against a 3.8M plan; margin 21%.",
+      "subject": "Q3 numbers",
+      "to": "partner@example.test"
+    },
+    "tool": "mail.send"
+  },
+  "labelled_values": [
+    {
+      "label": "sensitive",
+      "value": "Q3 revenue was 4.2M against a 3.8M plan; margin 21%.",
+      "value_id": "val-q3"
+    }
+  ],
+  "method": "tools/call",
+  "scenario_id": "gt-f4-declassified",
+  "specialist": "agent-specialist",
+  "supervisor": "agent-supervisor",
+  "task_id": "task-gt-pilot",
+  "validity_seconds": 3600,
+  "widening_elements": []
+}
