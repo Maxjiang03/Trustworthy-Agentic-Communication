@@ -35,7 +35,10 @@ class ReplayArbiter:
         self._proc = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            # DEVNULL for the same reason as `sut_process.py`: nothing here
+            # consumes the child's stderr, and an unread stderr pipe deadlocks
+            # the child once the OS buffer fills.
+            stderr=subprocess.DEVNULL,
             text=True,
             cwd=str(REPO_ROOT),
             env=env,
@@ -43,9 +46,10 @@ class ReplayArbiter:
         assert self._proc.stdout is not None
         line = self._proc.stdout.readline()
         if not line:
-            stderr = self._proc.stderr.read() if self._proc.stderr else ""
             self.stop()
-            raise ReplayArbiterError(f"arbiter emitted no start-up line: {stderr.strip()[:400]}")
+            raise ReplayArbiterError(
+                f"arbiter emitted no start-up line (exit code {self._proc.poll()})"
+            )
         startup = json.loads(line)
         self.port: int = startup["port"]
         self.pid: int = startup["pid"]

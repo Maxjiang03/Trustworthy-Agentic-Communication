@@ -78,7 +78,14 @@ class SutProcess:
             [sys.executable, "-m", SUT_MODULE],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            # DEVNULL, not PIPE. An unread stderr pipe is a latent DEADLOCK:
+            # once the OS buffer fills (64 KiB on Linux, larger on Windows --
+            # which is why this bit CI and not the local suite), the child
+            # blocks writing stderr, stops reading stdin, and the parent blocks
+            # writing stdin. Nothing here consumes the child's stderr, so it
+            # must not be a pipe. Diagnostics travel on the JSON channel as an
+            # `error` reply, which the parent DOES read.
+            stderr=subprocess.DEVNULL,
             text=True,
             cwd=str(REPO_ROOT),
             env=env,
@@ -86,9 +93,11 @@ class SutProcess:
         assert self._proc.stdout is not None and self._proc.stdin is not None
         line = self._proc.stdout.readline()
         if not line:
-            stderr = self._proc.stderr.read() if self._proc.stderr else ""
             self.stop()
-            raise SutProcessError(f"SUT process emitted no start-up line: {stderr.strip()[:400]}")
+            raise SutProcessError(
+                f"SUT process emitted no start-up line (exit code {self._proc.poll()}); "
+                "stderr is DEVNULL by design -- see the constructor"
+            )
         startup = json.loads(line)
         self.pid: int = startup["pid"]
         self.operations: list[str] = startup.get("operations", [])
