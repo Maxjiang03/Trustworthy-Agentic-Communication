@@ -21,11 +21,25 @@ the others are unbuildable.
 **The masking trap, and the pattern that avoids it** (STEP 6). A far-future
 `now` fails `Γ`'s own expiry check first and hides the OAuth limb, so the block
 would be attributable to the capability plane rather than to the token. Instead:
-a **short-lived base token** (5 s) with the capability's own window left at its
-corpus value of 3600 s, judged 10 s later. At that instant the token is expired
-and the capability, the HTC hops and the INV are all still valid — so the only
-thing that can refuse is the OAuth limb, and the audit detail is asserted to
-name `exp`.
+a **short-lived base token** (`TOKEN_LIFETIME`, 30 s) with the capability's own
+window left at its corpus value of 3600 s, judged `JUDGED_AFTER` (45 s) later.
+At that instant the token is expired and the capability, the HTC hops and the
+INV are all still valid — so the only thing that can refuse is the OAuth limb,
+and the audit detail is asserted to name `exp`. The three inequalities the
+argument rests on (`45 > 30`, `45 < Δ = 60`, `45 < 3600`) are **asserted** in
+`test_the_construction_cannot_be_masked_by_delta_or_by_gamma`, so this prose
+cannot drift from the constants without a test failing.
+
+*Update, 2026-08-01: these read 5 s and 10 s when first written, which is what
+the first green run used. Widened to 30 s and 45 s for the direction that could
+actually flake — not the expired one, which is safe at any AS uptime because
+Phase-1 tokens expire at `as_start + TOKEN_LIFETIME` while judging happens at
+`delegate_time + JUDGED_AFTER ≥ as_start + JUDGED_AFTER`, but the opposite one:
+every exchange arm's AS round trip must COMPLETE inside `TOKEN_LIFETIME`, and 5 s
+is a thin budget on a slow CI runner. A breach would fail loudly rather than pass
+quietly — a refused exchange reads `b2_exchange_refused`, which is not the
+`b2_oauth_token_rejected` the row expects — but a loud flake is still a flake,
+and 30 s removes the question. Only the margin changed; the argument did not.*
 
 **The Δ constraint on the replay row** (ADR 0027, forbidden action 7). The
 replay MUST be built **within Δ**: outside it, `B3` blocks on INV freshness
