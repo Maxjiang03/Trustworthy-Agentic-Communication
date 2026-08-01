@@ -5,13 +5,31 @@ directory is instrument-side rather than request-side: **an effect's recorded
 labels must not depend on what the request claimed.** If they did, stripping a
 label would make an exfiltration look harmless to `realized_harm_F4`, which is
 the one thing that predicate must never do.
+
+**Platform gate, per class rather than per file** (block 1's rule). The
+directory is pure computation and runs everywhere; only the class that opens a
+`LedgerWriter` sits behind the Windows gate, because ADR 0014 makes the
+ledger's independence enforcement Win32 share-mode locking with no POSIX
+equivalent. Gating the whole module would take the label-resolution assertions
+off Linux for a reason that has nothing to do with them, and those are the
+assertions that carry the F4 property.
 """
+
+import sys
 
 import pytest
 
 from src.harness.policy import frozen_policy, label_directory
 from src.harness.verifier import label_context as lc
 from src.sut.authz.capability_path import BoundaryPolicy
+
+WINDOWS_LEDGER_ONLY = pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="ADR 0014 (recorded platform decision, not a gap): the ledger's independence "
+    "enforcement is Win32 share-mode locking (CreateFileW, FILE_SHARE_READ only), which has "
+    "no direct POSIX equivalent; Windows is the sealed measurement platform and the POSIX "
+    "variant is deferred to after submission",
+)
 
 SECRET = "quarterly revenue: 4.2M"
 PUBLIC = "the weather is fine"
@@ -108,7 +126,14 @@ class TestTheDirectoryIsNotTheRequest:
         assert len(label_directory.EMPTY) == 0
 
 
+@WINDOWS_LEDGER_ONLY
 class TestTheEffectLedgerRecordsWhatItObserved:
+    """The only class here that opens a ledger, and therefore the only one
+    ADR 0014's platform decision applies to. No fallback writer exists and none
+    is introduced: a stub would make these assertions pass on a platform where
+    the property they assert -- that the ledger is independently enforced --
+    does not hold."""
+
     def test_an_effector_populates_the_three_fields(self, tmp_path, directory, order):
         from src.harness.effect_ledger import LedgerWriter, read_ledger
         from src.harness.effectors import LedgerEffector
