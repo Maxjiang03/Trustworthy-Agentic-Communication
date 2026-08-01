@@ -43,9 +43,9 @@ added as **authorizer** facts — never token facts, never string-interpolated:
 
 ```python
 Fact("operation({action}, {resource})", {"action": action, "resource": resource})
-Fact("time({t})",               {"t":    context.now})       # datetime
-Fact("request_audience({aud})", {"aud":  context.audience})
-Fact("request_task({task})",    {"task": context.task})
+Fact("time({t})", {"t": context.now})  # datetime
+Fact("request_audience({aud})", {"aud": context.audience})
+Fact("request_task({task})", {"task": context.task})
 ```
 
 `x ∈ C_i` iff `Authorizer.authorize()` returns an allow-policy index. `AuthorizationError` — whether

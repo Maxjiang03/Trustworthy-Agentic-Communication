@@ -7,8 +7,33 @@ Trustworthy Agentic Communication: a pre-registered, reproducible testbed that m
 `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` is the SINGLE source of truth (baselines, capability/HTC/INV, oracle, smoke-gate DAG, freeze/seal loop, workflow). Do not contradict it. If a change is needed, record an ADR in `adr/` and update the doc — never silently diverge.
 
 ## Current phase
-Experimental apparatus, pilot corpus only. Nine smoke gates pass (`smoke/README.md`); the golden thread runs end to end — Supervisor → A2A hop (behind a port, ADR 0020) → Specialist → MCP tool call over the frozen `Ω`. Since 2026-07-31 **all nine §E.1 ladder arms are built** — `B0`, `B1`, `B2-broad-noexchange`, `B2-exchange-broad`, `B2-exchange-task`, `B2-exchange-task-DPoP`, `B-cap`, `B3`, `B3⁺` — over a four-scenario pilot corpus (`gt-benign`, `gt-f1-root`, `gt-f1-terminal`, `gt-f1-chain-tamper`), and the full nine-arm × four-scenario matrix agrees with §E.4 in every cell. The §E.6 matched ablations are not built. **9 of 11 `frozen_parameters` rows are set** — 4/6/10 as `H(Λ)` (ADR 0022/0023), 8 as `H(Γ)` (ADR 0016), 11 as `H(R)` (ADR 0019), and 1/2/3/7 as scalars (ADR 0025/0026/0027); row 5 is **deferred by decision** (ADR 0028) and only row 9 remains, read off the measurement box at seal time. **G-13 PASSES over all five strong baselines and its two previously open limbs are CLOSED** (re-adjudicated 2026-07-31). Gates G-3, G-9, G-10, G-12, G-14, G-15 remain; `IA-3` and `IA-9` are both untouched. Pre-registration still a stub; `fixtures/confirmatory/` still empty; **no timing number has been measured or reported anywhere**. Rows 1 and 2 being SET does **not** authorize measurement: G-3 owns timing and ADR 0025 requires an adjudicative run on the row 9 sealed platform, which is not yet locked.
-*(Update notes, each true when written and superseded by the next: (1) "Repository skeleton, pre-smoke-test. Implementation logic has NOT begun" — 2026-07-30, superseded by the apparatus pass; (2) "under `B0` and `B3` (the other seven arms are not built)" — superseded by the strong-baseline pass; (3) "four arms are built", with G-13's two limbs recorded as open and rows 1–2 UNSET — superseded by the full-ladder pass, 2026-07-31.)*
+Experimental apparatus, pilot corpus only. **Eleven smoke gates pass** (`smoke/README.md`); the
+golden thread runs end to end — Supervisor → A2A hop (behind a port, ADR 0020) → Specialist → MCP
+tool call over the frozen `Ω`. All nine §E.1 ladder arms are built. Since 2026-08-01 the study
+**scores four of the five §E.3 families**: F1 (three subcases), three F2 subfamilies, **F3** (the
+expired-token and captured-proof-replay rows, over all nine arms), and **F4/F5** (four labelled
+fixtures — two attacks and two benign controls — over all nine arms under **both** monitor
+configurations). **ADR 0030 closed ADR 0009's last category (c) fields**, so `payload_digest`,
+`authz_context_hash` and `label_assertions_digest` have constructions and the boundary-owned
+`ContextApprovalMonitor` verifies all three artifact types. **Gate G-15 PASSES**, and its residual
+is a *result*, not a limitation: with the shared monitor F4/F5 measure the **monitor**, not the
+mechanism — and without one, `B3`/`B3⁺` refuse the benign controls too, so the capability policy
+plane is useful **only when a monitor is configured**. Two §E.4 drafting errors on `B-cap` were
+adjudicated into **ADR 0031** (`NA → B` on the F3 OAuth controls) and **ADR 0032** (`A† → A` on
+F4/F5); both corrected **predictions**, never code. The pilot corpus now carries **two authority
+chains** — F4/F5 run on one where their actions are inside `C_1`, or `containment_ok` would mask
+the policy conjuncts. **9 of 11 `frozen_parameters` rows are set**; row 5 is deferred by decision
+(ADR 0028) and only row 9 remains, read off the measurement box at seal time. Gates G-3, G-9, G-10,
+G-12, G-14 remain; `IA-3` and `IA-9` are both untouched. Pre-registration still a stub;
+`fixtures/confirmatory/` still empty; **no timing number has been measured or reported anywhere**.
+Rows 1 and 2 being SET does **not** authorize measurement: G-3 owns timing and ADR 0025 requires an
+adjudicative run on the row 9 sealed platform, which is not yet locked.
+*(Update notes, each true when written and superseded by the next: (1) "Repository skeleton,
+pre-smoke-test. Implementation logic has NOT begun" — 2026-07-30; (2) "under `B0` and `B3` (the
+other seven arms are not built)"; (3) "four arms are built", G-13's two limbs open, rows 1–2 UNSET;
+(4) "Nine smoke gates pass … F3, F4 and F5 cannot be scored at all, because `authz_context_hash`
+has been ADR 0009 category (c) since the beginning" — superseded by the ADR 0030 / G-15 pass,
+2026-08-01.)*
 
 ## Pre-registration status
 Not yet authored. Per Part H, the pre-registration is written and sealed only AFTER the smoke gates pass, and is derived from the architecture doc. `docs/PRE_REGISTRATION.md` is a stub. Any earlier draft is superseded and must not be reused.

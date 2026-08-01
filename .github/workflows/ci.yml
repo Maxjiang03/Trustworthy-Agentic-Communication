@@ -48,3 +48,13 @@ jobs:
       # a change that quietly breaks matched per-hop authority fails CI.
       - name: Gate G-13 spike (cross-platform)
         run: uv run python smoke/g13/spike.py
+
+      # G-15 touches the frozen policy, the arms and the boundary but NOT the
+      # effect ledger, so it is platform-independent for the same reason as the
+      # three above -- confirmed by running it here rather than assumed. It runs
+      # all nine arms over the F4/F5 fixtures under BOTH monitor configurations,
+      # so a change that quietly made the shared monitor unreachable from an
+      # OAuth arm, or that let a cell be recorded without its configuration,
+      # fails CI.
+      - name: Gate G-15 spike (cross-platform)
+        run: uv run python smoke/g15/spike.py

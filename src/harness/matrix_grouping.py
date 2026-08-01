@@ -54,6 +54,31 @@ STRONG: tuple[str, ...] = (
 # are its ladder position (a bearer capability with no policy plane).
 POLICY_PLANE: tuple[str, ...] = ("B3", "B3+")
 
+# The arms whose DECISION PATH can reach an attached monitor without changing
+# the arm's bitmask -- i.e. the arms whose F4/F5 cell actually flips with
+# `monitor_attached`, and therefore the only arms entitled to wear `A-dagger`
+# (ADR 0032).
+#
+# Three groups are excluded and for three different reasons, which is why this
+# cannot be derived from the bitmask alone:
+#
+#   B0, B1     run no boundary check at all; there is nothing to attach to.
+#   B-cap      shares `B3`'s decision path, in which the monitor's verdicts
+#              arrive THROUGH `context_policy_ok` and `approval_artifact_ok` --
+#              the very conjuncts its bitmask gates off. Setting them to 1 is
+#              not a configuration change, it is `B3`.
+#   B3, B3+    always run the conjuncts; their cell is B in both
+#              configurations, so it never flips either.
+#
+# The four OAuth arms have no SS A.5 conjunct plane, so the monitor sits beside
+# their decision path and `monitor_attached` is genuinely a property of the run.
+MONITOR_REACHABLE: tuple[str, ...] = (
+    "B2-broad-noexchange",
+    "B2-exchange-broad",
+    "B2-exchange-task",
+    "B2-exchange-task-DPoP",
+)
+
 # Which families group which way. Data, so a new family must choose.
 LADDER_FAMILIES = frozenset({"F1", "F2", "F3"})
 CONFIGURATION_FAMILIES = frozenset({"F4", "F5"})
@@ -146,13 +171,34 @@ def comparison_is_sound(cells: "Mapping[str, Cell] | list[Cell]") -> tuple[bool,
     return True, ""
 
 
-def label(cell: Cell) -> str:
+def label(cell: Cell, *, monitored: "Cell | None" = None) -> str:
     """The cell as it must appear in any report: never a bare `A` or `B`.
 
-    An `A` from a configuration family renders as `A†` with its configuration,
-    so the dagger cannot be flattened away by a copy-paste into a table.
+    A configuration-family cell always renders with its configuration, so the
+    annotation cannot be flattened away by a copy-paste into a table.
+
+    **The dagger is narrower than "admitted without a monitor", twice over**,
+    and gate G-15 caught this renderer applying it too widely on both counts.
+    `A†` means *admitted ABSENT the shared monitor -- **and blocks WITH it***, so:
+
+    1. it belongs only to an arm whose decision can actually reach a monitor
+       (ADR 0032): an `A` from `B-cap`, `B0` or `B1` is a plain `A`, because
+       attaching a monitor to them moves nothing; and
+    2. it belongs only to a cell that actually **flips**. Pass the companion
+       `monitored` cell and the dagger is decided by the measured pair rather
+       than by the arm alone -- which matters for the benign controls, where an
+       OAuth arm is admitted under BOTH configurations because the artifact is
+       valid, not because the monitor is absent. Daggering those would claim a
+       monitor would block them, which is false.
+
+    Without `monitored` the arm-level rule applies, which is correct for §E.4's
+    own rows (all attacks) and deliberately conservative elsewhere.
     """
-    if cell.family in CONFIGURATION_FAMILIES:
-        dagger = "†" if cell.admitted and not cell.monitor_attached else ""
-        return f"{cell.outcome}{dagger} (monitor_attached={str(cell.monitor_attached).lower()})"
-    return cell.outcome
+    if cell.family not in CONFIGURATION_FAMILIES:
+        return cell.outcome
+    if monitored is not None:
+        flips = monitored.admitted is False
+    else:
+        flips = cell.arm in MONITOR_REACHABLE
+    dagger = "†" if cell.admitted and not cell.monitor_attached and flips else ""
+    return f"{cell.outcome}{dagger} (monitor_attached={str(cell.monitor_attached).lower()})"
