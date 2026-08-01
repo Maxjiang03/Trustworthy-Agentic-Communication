@@ -106,7 +106,11 @@ class Campaign:
     def __init__(self) -> None:
         registry_document = reg.load_document()
         self.runner = GoldenThreadRunner()
-        self.u_task = self.runner.task_grant()
+        # NAMED, since the corpus grew a second authority chain when the F4/F5
+        # families joined it (EXP4 STEP 10). G-13 runs the four F1-family
+        # scenarios listed above, so it provisions for that family; asking
+        # without a name now fails closed rather than picking one.
+        self.u_task = self.runner.task_grant(SCENARIOS[0])
         document = golden_thread_as_document(
             corpus={"issuer": ISSUER, "audience": AUDIENCE},
             registry_document=registry_document,
@@ -124,12 +128,14 @@ class Campaign:
             as_public_jwk=self.process.public_jwk,
         )
         self.b2_setup = self.runner.b2_setup(
+            scenario_id=SCENARIOS[0],
             access_token=self.process.phase1_tokens["agent-supervisor"],
             as_public_jwk=self.process.public_jwk,
             as_port=self.process.port,
             as_tls_cert_pem=self.process.tls_cert_pem,
         )
         self.b2_dpop_setup = self.runner.b2_dpop_setup(
+            scenario_id=SCENARIOS[0],
             access_token=self.process.phase1_tokens["agent-supervisor"],
             as_public_jwk=self.process.public_jwk,
             as_port=self.process.port,
