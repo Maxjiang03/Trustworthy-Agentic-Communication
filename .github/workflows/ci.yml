@@ -58,3 +58,12 @@ jobs:
       # fails CI.
       - name: Gate G-15 spike (cross-platform)
         run: uv run python smoke/g15/spike.py
+
+      # G-12's structural limbs (the oracle-independence AST scan, the
+      # log_integrity_failure behaviour, and the four correlation-fault
+      # predicates) are pure computation and run everywhere. Its ledger-backed
+      # limbs report NOT ADJUDICATED on POSIX rather than passing -- ADR 0014,
+      # the ledger does not degrade -- so this step confirms what it can and
+      # never launders a Windows-only property into a green Linux tick.
+      - name: Gate G-12 spike (structural limbs cross-platform)
+        run: uv run python smoke/g12/spike.py
