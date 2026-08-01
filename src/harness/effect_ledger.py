@@ -36,6 +36,7 @@ from mcp.server.fastmcp.tools.base import Tool
 from pydantic import BaseModel
 
 from src.harness.oracle.jcs_digest import h_jcs
+from src.harness.policy import label_directory
 from src.harness.schema import ToolIngressEvent
 
 CorrelationFn = Callable[[], str]
@@ -145,6 +146,8 @@ def install_ingress_recorder(
     audience: str,
     correlation_provider: CorrelationFn,
     writer: LedgerWriter,
+    labels: "label_directory.LabelDirectory | None" = None,
+    label_order: tuple[str, ...] = (),
 ) -> None:
     """Wrap every registered tool so entry emits a ToolIngressEvent.
 
@@ -153,12 +156,18 @@ def install_ingress_recorder(
     The digest is computed recorder-side over the arguments mapping the tool
     is invoked with, excluding the SDK-injected context parameter (ADR 0012).
     """
+    directory = labels if labels is not None else label_directory.EMPTY
     for tool in server._tool_manager._tools.values():
-        _wrap_with_recorder(tool, audience, correlation_provider, writer)
+        _wrap_with_recorder(tool, audience, correlation_provider, writer, directory, label_order)
 
 
 def _wrap_with_recorder(
-    tool: Tool, audience: str, correlation_provider: CorrelationFn, writer: LedgerWriter
+    tool: Tool,
+    audience: str,
+    correlation_provider: CorrelationFn,
+    writer: LedgerWriter,
+    labels: "label_directory.LabelDirectory",
+    label_order: tuple[str, ...],
 ) -> None:
     original = tool.fn
     if getattr(original, _RECORDED_MARKER, False):
@@ -167,14 +176,18 @@ def _wrap_with_recorder(
 
     def record_ingress(kwargs: dict[str, Any]) -> None:
         arguments = {k: v for k, v in kwargs.items() if k != context_kwarg}
+        # ADR 0030: the same join key the ledger records, computed at ingress
+        # over the same values -- so the oracle can compare what ARRIVED with
+        # what was ACTED ON without either side supplying the other's digest.
+        payload_digest, value_id, _ = labels.observe(arguments, order=label_order)
         writer.append(
             ToolIngressEvent(
                 correlation_id=correlation_provider(),
                 tool=tool_name,
                 audience=audience,
                 ingress_request_digest=h_jcs(arguments),
-                payload_digest=None,
-                value_id=None,
+                payload_digest=payload_digest,
+                value_id=value_id,
                 ingress_ts_ns=time.time_ns(),
             )
         )

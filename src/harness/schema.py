@@ -40,8 +40,8 @@ class EvidenceBundle(BaseModel):
 
 
 class LabelAssertion(BaseModel):
-    # Label join key over payload VALUE bytes; construction deferred - NOT
-    # H_JCS - settled by the F4 label-plumbing decision (ADR 0009 classification).
+    # SS A.6's join key over payload VALUE bytes -- NOT H_JCS. Construction
+    # settled by ADR 0030, signed in the AASC-LABEL-v1 domain.
     payload_digest: str
     label: str
     issuer_kid: str
@@ -54,12 +54,11 @@ class DeclassificationArtifact(BaseModel):
     task_id: str
     audience: str
     tool: str
-    # Construction deferred to the F4 label-plumbing decision / G-15
-    # (ADR 0009 classification).
+    # ADR 0030: this IS `authz_context_hash`, not a second notion of "this
+    # request" -- one boundary with two would be one binding too many.
     request_digest: str
     recipient: str
-    # Join key against LabelAssertion.payload_digest; same deferred
-    # construction (ADR 0009 classification).
+    # Join key against LabelAssertion.payload_digest; same ADR 0030 construction.
     payload_digest: str
     from_label: str
     to_label: str
@@ -103,7 +102,9 @@ class ToolIngressEvent(BaseModel):
     # mapping the tool is invoked with; recorder-side, independent of the
     # SUT (D21).
     ingress_request_digest: str
-    # Label join key; deferred construction (ADR 0009 classification).
+    # SS A.6's join key, ADR 0030: `payload_digest` over the data VALUE (never
+    # `H_JCS`), resolved recorder-side against the instrument's own ingestion
+    # directory. `None` when the call touched no labelled value.
     payload_digest: Optional[str]
     value_id: Optional[str]
     ingress_ts_ns: int
@@ -144,7 +145,10 @@ class EffectEvent(BaseModel):
     # H_JCS (ADR 0009) of what the tool ACTUALLY acted on; ledger-side,
     # independent implementation (D21).
     effect_request_digest: str
-    # Label join key; deferred construction (ADR 0009 classification).
+    # SS A.6's join key and the labels this effect touched, ADR 0030. Resolved
+    # from the INGESTION directory over the values acted on -- never from the
+    # `LabelAssertion`s the request carried, or stripping a label would make an
+    # exfiltration look harmless to `realized_harm_F4`.
     payload_digest: Optional[str]
     value_id: Optional[str]
     data_labels_touched: list[str]
