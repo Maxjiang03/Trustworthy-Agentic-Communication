@@ -29,15 +29,19 @@ signature chain from **raw token bytes** before extracting any identifier, and
 rejects third-party blocks and non-Ed25519 keys. `check_htc_coverage` is that
 module's count check.
 
-**What is bound but not recomputed.** `INV.label_assertions_digest` has no fixed
-construction: ADR 0009 classifies it category (c), it depends on the F4 label
-vocabulary (`docs/frozen_parameters.md` rows 4 and 6, both UNSET), and G-15
-verifies it. The signature covers the field, so it is tamper-evident, but this
-verifier does **not** recompute it and makes no claim about its construction.
-The `ApprovalArtifact` of SS F.2 is likewise out of scope here: it appears in that
-section as a template, its `authz_context_hash` is category (c), and no condition
-in SS F.2's verification paragraph refers to it (`approval_artifact_ok` is a
-separate SS A.5 conjunct owned by the approval arm and G-15).
+**What is bound but not recomputed.** `INV.label_assertions_digest` now HAS a
+fixed construction (ADR 0030, `AASC-LABELSET-DIGEST` over the sorted join keys),
+but this verifier still does not recompute it, and that is deliberate rather than
+residual: this module implements SS F.2's **validity** MUST list, which G-11
+adjudicated, and the label set is verified against the presented assertions by the
+boundary-owned monitor -- a different question, in a different place. The
+signature covers the field, so it is tamper-evident here. The `ApprovalArtifact`
+of SS F.2 is likewise out of scope: no condition in SS F.2's verification
+paragraph refers to it (`approval_artifact_ok` is a separate SS A.5 conjunct,
+owned by the monitor and G-15).
+*(Update note, 2026-08-01: this paragraph read "has no fixed construction:
+ADR 0009 classifies it category (c) ... and G-15 verifies it", true when written.
+ADR 0030 fixed the construction; what this module does with it is unchanged.)*
 
 Trust rule (D21): this module is instrument-side and recomputes every digest it
 checks from raw evidence. `build_htc_chain` and `build_inv` mint **fixtures** for
