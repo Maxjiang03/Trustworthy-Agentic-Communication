@@ -19,21 +19,17 @@ result and must never be scored as one.
 Nothing here is timed (EXP3 forbidden action 1). Platform-independent: every
 cell runs without the effect ledger, which changes no admission outcome.
 
-**FORWARD NOTE for the block that adds F4/F5 -- read this before extending
-`EXPECTED`.** The table below derives its arm grouping from a hardcoded
-`STRONG` tuple. That is the right shape for **F1**, where whether an arm
-blocks is a **ladder property**: an arm either receives per-hop `C_i` or it
-does not. It is **NOT** the right shape for **F4/F5**. Those rows carry
-SS E.4's **A-dagger** annotation, where the OAuth arms admit **ABSENT** the
-shared boundary-owned context/approval reference monitor and **block WITH**
-it -- a grouping determined by a **configuration condition**, not by where an
-arm sits on the ladder. Flattening those cells into a plain `A` would report a
-**reference-monitor-configuration difference as a capability-versus-OAuth
-advantage**, which is the precise error SS E.4's footnote and gate **G-15**
-exist to prevent. Extending `EXPECTED` will therefore need the monitor
-configuration as an explicit axis rather than a second hardcoded tuple.
-Recorded here, where the next block will read it; **not built now** (EXP3
-forbidden action 7).
+**The grouping, and why it is imported rather than local** (EXP4 STEP 12,
+discharging this module's forward note). F1's grouping is a **ladder property**:
+an arm either receives per-hop `C_i` or it does not, and no configuration moves
+it. F4/F5's is a **configuration condition** -- SS E.4 marks the OAuth arms
+`A-dagger`, *admitted ABSENT the shared monitor*, and they block WITH it. Both
+groupings now live in `src/harness/matrix_grouping.py`, so extending the matrix
+means choosing one rather than copying a tuple: a family is declared LADDER or
+CONFIGURATION, and a configuration family's cell cannot be constructed without
+its `monitor_attached`. Flattening such a cell into a plain `A` would report a
+reference-monitor-configuration difference as a capability-versus-OAuth
+advantage, which is the precise error gate **G-15** exists to prevent.
 """
 
 import json
@@ -42,6 +38,7 @@ from pathlib import Path
 import pytest
 
 from src.harness import key_material
+from src.harness import matrix_grouping as grouping
 from src.harness.as_process import ASProcess, golden_thread_as_document
 from src.harness.authorizer import frozen_config
 from src.harness.runner import GoldenThreadRunner
@@ -62,19 +59,14 @@ ISSUER = "https://as.aasc.local"
 AUDIENCE = "https://mcp.aasc.local/tools"
 
 SCENARIOS = ("gt-benign", "gt-f1-root", "gt-f1-terminal", "gt-f1-chain-tamper")
-# SS E.1's ladder, in its own order.
-ARMS = (
-    "B0",
-    "B1",
-    "B2-broad-noexchange",
-    "B2-exchange-broad",
-    "B2-exchange-task",
-    "B2-exchange-task-DPoP",
-    "B-cap",
-    "B3",
-    "B3+",
-)
-STRONG = ("B2-exchange-task", "B2-exchange-task-DPoP", "B-cap", "B3", "B3+")
+# SS E.1's ladder and F1's grouping, now imported from `matrix_grouping` rather
+# than hardcoded here (EXP4 STEP 12). The forward note below said this table
+# derived its grouping from a local `STRONG` tuple and that the shape was right
+# for F1 and wrong for F4/F5; that is now expressed rather than warned about --
+# `STRONG` is F1's LADDER grouping, and F4/F5's CONFIGURATION grouping lives
+# beside it in the same module. `tests/test_f45_matrix.py` uses the other one.
+ARMS = grouping.ARMS
+STRONG = grouping.STRONG
 
 _ADMIT = {
     "B0": "b0_no_boundary_check",
@@ -142,7 +134,7 @@ def as_document(runner):
         # ONE AS serves all nine arms. `task_grant` narrows the delegating
         # client's base token to `C_0 = U_task` (ADR 0024) and mints the same
         # client a named coarse `Omega` grant for the broad rows (ADR 0029).
-        task_grant=runner.task_grant(),
+        task_grant=runner.task_grant("gt-benign"),
     )
 
 
@@ -165,16 +157,19 @@ def matrix(runner, running_as, as_document):
         "as_tls_cert_pem": running_as.tls_cert_pem,
     }
     broad_setup = runner.b2_setup(
+        scenario_id="gt-benign",
         access_token=running_as.phase1_tokens["agent-supervisor:broad"],
         ladder_grant="broad",
         **common,
     )
     task_setup = runner.b2_setup(
+        scenario_id="gt-benign",
         access_token=running_as.phase1_tokens["agent-supervisor"],
         ladder_grant="task",
         **common,
     )
     dpop_setup = runner.b2_dpop_setup(
+        scenario_id="gt-benign",
         access_token=running_as.phase1_tokens["agent-supervisor"],
         as_token_endpoint=as_document["token_endpoint"],
         **common,
