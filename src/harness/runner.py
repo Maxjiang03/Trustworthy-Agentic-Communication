@@ -55,6 +55,7 @@ from src.harness.schema import (
     OAuthEvidence,
     ObservedRequest,
 )
+from src.harness.sut_process import SutProcess
 from src.harness.verifier import registry as registry_mod
 from src.sut.agents.specialist import Specialist
 from src.sut.agents.supervisor import Supervisor
@@ -492,8 +493,25 @@ class GoldenThreadRunner:
         *,
         setup: Mapping[str, Any] | None = None,
         ledger_backed: bool = True,
+        sut_mode: str = "in-process",
+        fault: str = "none",
     ) -> ScenarioRun:
         """One scenario, one arm, one invocation; returns the SS F.1 records.
+
+        `sut_mode` selects where the SUT runs, and **`"in-process"` is the
+        default on purpose**: ten gates were adjudicated in-process, and a
+        default flip would silently re-adjudicate all of them (EXP5 STEP 3).
+        `"separate"` spawns `src/sut/sut_process` and runs the agents, the arm
+        and the arm's decision there, over the pipe.
+
+        **Both modes drive the SAME stack.** The MCP server, the mediation
+        boundary, the ingress recorder, the effector and the ledger writer are
+        built once, above, and used by both -- a second stack for the separated
+        path would let the two modes diverge silently, which would defeat the
+        reason for keeping both.
+
+        `fault` is G-12's injection and reaches the SUT only in `"separate"`
+        mode, where the child owns its own self-report.
 
         `ledger_backed=False` runs the whole thread **without the effect
         ledger**: no `LedgerWriter`, no ingress recorder, and an effector that
@@ -506,6 +524,12 @@ class GoldenThreadRunner:
         evidence from such a run **raises** (see `ledger_entries`), so no test
         can mistake the absence of a ledger for the absence of an effect.
         """
+        # Configuration is validated FIRST, before a ledger, an AS pipe or a
+        # child process is opened: an unrecognised mode is a configuration
+        # error, and failing closed on it late would leave resources open and
+        # report the wrong cause.
+        if sut_mode not in ("in-process", "separate"):
+            raise RunnerError(f"unknown sut_mode {sut_mode!r} (in-process | separate)")
         visible = self.visible(scenario_id)
         sealed = sealed_truth.load_sealed(scenario_id)
         correlation_id = mint_correlation_id()
@@ -561,11 +585,23 @@ class GoldenThreadRunner:
                 writer=writer,
             )
 
+        # In separated mode the arm's decision arrives over the pipe with the
+        # invocation; `decide` below returns it so the SAME boundary emits the
+        # SAME `MediationEvent` in both modes. The RECORD stays the
+        # instrument's and the DECISION stays the SUT's, which is exactly the
+        # split Part I rests on.
+        remote_decision: dict[str, Any] = {}
+
         def decide(tool: str, arguments: dict[str, Any]) -> tuple[bool, str]:
             # Non-bypassable observation point (gate G-6): every dispatch path
             # converges here, so the observed tool/arguments are recorded by
             # the harness whatever the SUT does or claims.
             boundary_observations.append({"tool": tool, "arguments": dict(arguments)})
+            if sut_mode == "separate":
+                if not remote_decision:
+                    # No decision reached us for this dispatch: fail closed.
+                    return False, "sut_process_no_decision"
+                return bool(remote_decision["decision"]), str(remote_decision["reason_code"])
             # Part I "NOT the SUT" concerns the RECORD's provenance (this
             # trusted layer emits the MediationEvent); the decision itself is
             # the arm's -- the mechanism under measurement. An arm that raises
@@ -641,6 +677,19 @@ class GoldenThreadRunner:
 
         # --- drive it: sync agents bridged onto the async MCP session --------
         tool_error: dict[str, bool] = {}
+        sut_outcome: dict[str, Any] = {}
+        sut_process = None
+        if sut_mode == "separate":
+            sut_process = SutProcess()
+            provisioned = sut_process.call(
+                "provision", arm=arm.name, setup=dict(setup or {}), fault=fault
+            )
+            if "error" in provisioned:
+                sut_process.stop()
+                raise RunnerError(
+                    f"the SUT process refused to provision {arm.name}: "
+                    f"{provisioned.get('error')} {provisioned.get('detail', '')}"
+                )
 
         async def drive() -> None:
             async with create_connected_server_and_client_session(server._mcp_server) as client:
@@ -654,12 +703,53 @@ class GoldenThreadRunner:
                     tool_error["error"] = bool(result.isError)
                     return result
 
-                tool_caller.target = call_over_session
-                await asyncio.to_thread(supervisor.run, visible)
+                if sut_mode == "separate":
+                    # The child runs BOTH agents and the A2A hop and emits one
+                    # `invoke` event per tool call. This handler is the parent
+                    # half: it seals the intent, hands the arm's decision to
+                    # the boundary, and calls the tool over the SAME session
+                    # the in-process path uses -- so the same boundary, the
+                    # same ingress recorder and the same effector run either
+                    # way.
+                    def on_invoke(message: Mapping[str, Any]) -> dict[str, Any]:
+                        remote_decision.clear()
+                        remote_decision.update(
+                            {
+                                "decision": message.get("decision", False),
+                                "reason_code": message.get("reason_code", "sut_process_no_reason"),
+                                # Recorded but NEVER read by the oracle: this is
+                                # the SUT's claim, and G-12 makes it disagree.
+                                "self_verdict": message.get("self_verdict"),
+                            }
+                        )
+                        presentations.append(dict(message.get("presentation") or {}))
+                        if "intent" not in sealed_intent:
+                            sealed_intent["intent"] = self._complete_intent(
+                                sealed, correlation_id, message.get("credentials") or {}
+                            )
+                        try:
+                            call_over_session(message["tool"], message["arguments"])
+                        except Exception as exc:  # noqa: BLE001 -- a denial, not a crash
+                            return {"result": None, "error": type(exc).__name__}
+                        return {"result": None}
+
+                    outcome = await asyncio.to_thread(
+                        sut_process.run_task,
+                        visible=visible,
+                        now_epoch=run_epoch,
+                        invocation_id=correlation_id,
+                        on_invoke=on_invoke,
+                    )
+                    sut_outcome.update(outcome if isinstance(outcome, dict) else {})
+                else:
+                    tool_caller.target = call_over_session
+                    await asyncio.to_thread(supervisor.run, visible)
 
         try:
             asyncio.run(drive())
         finally:
+            if sut_process is not None:
+                sut_process.stop()
             if writer is not None:
                 writer.close()
 

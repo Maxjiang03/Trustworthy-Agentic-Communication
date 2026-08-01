@@ -197,6 +197,11 @@ class Session:
                     "tool": tool,
                     "arguments": arguments,
                     "presentation": self.presented,
+                    # The parent seals the intent from these BEFORE the tool
+                    # runs, so the sealed record can never be a function of the
+                    # boundary outcome (the rule the in-process path keeps by
+                    # sealing inside `seal_and_receive`).
+                    "credentials": self.credentials,
                     **decision,
                 }
             )
@@ -289,6 +294,51 @@ class Session:
             "refused_requests": list(self.refused_requests),
         }
 
+    def op_probe_ledger_from_the_sut(self, message: dict) -> dict:
+        """G-7's five checks, attempted from a **genuinely separate process**.
+
+        The child is handed the ledger path DELIBERATELY here — the point is
+        that even with the path it cannot touch the file, because ADR 0014's
+        protection is the parent's Win32 exclusive-share handle and not path
+        secrecy. G-7 ran these from a same-process caller; STEP 4 asks for them
+        from a real process boundary, which is where a co-resident SUT's
+        remaining reachability argument finally ends.
+
+        Every attempt MUST fail. A success is an enforcement hole and is
+        reported as one rather than swallowed.
+        """
+        import os as _os
+
+        path = str(message.get("path", ""))
+        attempts = []
+        probes = [
+            ("append open('a')", lambda: open(path, "a")),
+            ("truncate open('w')", lambda: open(path, "w")),
+            ("binary append open('ab')", lambda: open(path, "ab")),
+            ("in-place modify open('r+b')", lambda: open(path, "r+b")),
+            ("delete os.remove", lambda: _os.remove(path)),
+        ]
+        for label, attack in probes:
+            try:
+                handle = attack()
+                getattr(handle, "close", lambda: None)()
+                attempts.append({"probe": label, "refused": False, "detail": "SUCCEEDED"})
+            except OSError as exc:
+                attempts.append(
+                    {"probe": label, "refused": True, "detail": f"{type(exc).__name__}: {exc}"}
+                )
+        # Reading is allowed by FILE_SHARE_READ and must stay allowed: the
+        # ledger is auditable, not secret. Reported so "all refused" cannot be
+        # a file that simply is not there.
+        readable, size = False, -1
+        try:
+            with open(path, "rb") as handle:
+                size = len(handle.read())
+                readable = True
+        except OSError:
+            pass
+        return {"attempts": attempts, "readable": readable, "bytes_read": size, "pid": _os.getpid()}
+
     def op_ping(self, message: dict) -> dict:
         return {"pid": os.getpid(), "fault": self.fault, "arm": self.arm_name}
 
@@ -301,6 +351,7 @@ OPERATIONS = {
     "decide": Session.op_decide,
     "gc_sweep": Session.op_gc_sweep,
     "sealed": Session.op_sealed,
+    "probe_ledger_from_the_sut": Session.op_probe_ledger_from_the_sut,
     "ping": Session.op_ping,
 }
 

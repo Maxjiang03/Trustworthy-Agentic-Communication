@@ -70,16 +70,70 @@ class TestPropertyTwoTheLedgerWriterStaysInTheParent:
         sweep = sut.call("gc_sweep", types=["LedgerWriter", "LedgerEffector"])
         assert sweep["found"] == {"LedgerWriter": 0, "LedgerEffector": 0}
 
-    def test_the_channel_exposes_no_ledger_operation(self, sut):
-        """Structural: the child's operation vocabulary is closed and contains
-        nothing that could open, append to or truncate a ledger."""
-        for forbidden in ("ledger", "write", "append", "truncate", "delete", "open"):
-            assert not any(forbidden in op for op in sut.operations), sut.operations
+    def test_the_channel_exposes_no_ledger_SERVICE_operation(self, sut):
+        """Structural: the child's operation vocabulary is closed, and the only
+        entry naming the ledger is the ATTACK PROBE whose contract is that
+        every attempt fails. Nothing here serves a ledger operation."""
+        probe = "probe_ledger_from_the_sut"
+        assert probe in sut.operations
+        for op in sut.operations:
+            if op == probe:
+                continue
+            for forbidden in ("ledger", "write", "append", "truncate", "delete", "open"):
+                assert forbidden not in op, (op, forbidden)
 
     def test_an_unknown_operation_is_refused_rather_than_dispatched(self, sut):
         reply = sut.call("ledger_append", path="x", row={})
         assert reply["error"] == "unknown-op"
         assert sut.alive
+
+
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="ADR 0014 (recorded platform decision, not a gap): the ledger's independence "
+    "enforcement is Win32 share-mode locking (CreateFileW, FILE_SHARE_READ only), which has "
+    "no direct POSIX equivalent; Windows is the sealed measurement platform and the POSIX "
+    "variant is deferred to after submission",
+)
+class TestTheLedgerResistsTheSeparateProcess:
+    """G-7's five checks, re-run from a GENUINELY separate process (STEP 4).
+
+    G-7 ran them from a same-process caller and recorded a residual: *"in-process
+    reachability inside the harness process excluded by SUT process separation
+    and stressed at G-12"*. This is that stress, and the child is handed the
+    ledger path **deliberately** — the protection is the parent's exclusive-share
+    handle, not path secrecy, and a test that withheld the path would prove the
+    weaker thing.
+    """
+
+    def test_all_five_write_paths_are_refused_from_the_child(self, sut, tmp_path):
+        from src.harness.effect_ledger import LedgerWriter
+
+        path = tmp_path / "ledger.jsonl"
+        writer = LedgerWriter(str(path))
+        try:
+            reply = sut.call("probe_ledger_from_the_sut", path=str(path))
+            assert reply["pid"] == sut.pid != os.getpid()
+            refused = {entry["probe"]: entry["refused"] for entry in reply["attempts"]}
+            assert len(refused) == 5
+            assert all(refused.values()), reply["attempts"]
+            # Reading stays allowed (FILE_SHARE_READ): the ledger is auditable,
+            # not secret -- and this is what makes "all refused" a refusal
+            # rather than a file that was never there.
+            assert reply["readable"] is True
+        finally:
+            writer.close()
+
+    def test_the_probe_is_not_vacuous_once_the_writer_lets_go(self, sut, tmp_path):
+        """Negative arm: with no exclusive handle held, the same five attempts
+        from the same child SUCCEED. So the refusals above are the handle's
+        doing and not the child's inability to touch any file at all."""
+        from src.harness.effect_ledger import LedgerWriter
+
+        path = tmp_path / "ledger.jsonl"
+        LedgerWriter(str(path)).close()
+        reply = sut.call("probe_ledger_from_the_sut", path=str(path))
+        assert any(not entry["refused"] for entry in reply["attempts"]), reply["attempts"]
 
 
 class TestPropertyThreeTheChannelCarriesDataNotCapability:
