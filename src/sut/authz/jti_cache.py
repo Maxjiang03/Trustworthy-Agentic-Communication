@@ -37,6 +37,15 @@ what lets an over-window fixture advance a logical instant instead of waiting
 `Delta` per repetition -- hours of measuring nothing, and a suite whose runtime
 would depend on `Delta`.
 
+*(Update, 2026-08-01: **gate G-9 now PASSES**, and this paragraph's honest
+statement of what was missing is what it was missing. ADR 0033 puts this same
+class inside a **single-writer arbiter process** (`src/sut/replay_arbiter/`),
+reached through `src/sut/authz/replay_client.py`, so the check-and-insert is
+atomic ACROSS processes and the induced-backend-error path exists. Nothing
+below changed: the arbiter runs THIS implementation with THESE frozen
+defaults, and the paragraph is kept because it remains true of this class used
+directly, in one process. `IA-9` has moved to verified.)*
+
 **This is NOT gate G-9, and must not be described as if it were.** G-9
 adjudicates atomic multi-process check-and-insert under concurrency and induced
 backend error. What this construction has: the SS F.5 check-and-insert order,

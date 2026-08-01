@@ -67,3 +67,10 @@ jobs:
       # never launders a Windows-only property into a green Linux tick.
       - name: Gate G-12 spike (structural limbs cross-platform)
         run: uv run python smoke/g12/spike.py
+
+      # G-9 is cross-platform by construction (ADR 0033: loopback sockets and a
+      # spawned arbiter, deliberately NOT an OS primitive that would have made
+      # the replay cache Windows-only). It fills the frozen 2^16 capacity, so
+      # it is the longest of the spikes and still well under a minute.
+      - name: Gate G-9 spike (cross-platform)
+        run: uv run python smoke/g9/spike.py
