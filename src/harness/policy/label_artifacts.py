@@ -149,3 +149,94 @@ def issue_approval(
             "signature": key_material.urlsafe_b64encode(signature).rstrip(b"=").decode(),
         }
     ).encode("utf-8")
+
+
+def mint_for_scenario(
+    seed: bytes,
+    visible: "dict[str, Any]",
+    *,
+    now: int,
+    resource_owner: "tuple[str, str]",
+    oauth_actor: "tuple[str, str]",
+    policy_version: str,
+    declassify_to: str = "public",
+) -> "dict[str, Any]":
+    """Mint the ADR 0030 artifacts a corpus scenario's SPEC calls for.
+
+    The fixtures store `labelled_values` and an `artifacts` flag pair, never a
+    minted artifact and never a signature (ADR 0007) -- exactly the rule that
+    keeps tokens out of the corpus, for the same reason. This is where the
+    specification becomes signed bytes, at run time, in memory.
+
+    Minted **harness-side with the harness's own implementation** of
+    `authz_context_hash` (D21): the instrument signs what the measured system
+    must independently verify. If the two constructions disagreed, every
+    artifact would fail to bind and the F4/F5 controls would refuse -- which is
+    why `tests/test_label_context_agreement.py` pins them byte-for-byte.
+
+    Returns `{payload_labels, declassification, approval_artifact}`, shaped for
+    an `InvocationContext`. A scenario that declares no artifacts gets empty
+    values, so an unlabelled scenario is unaffected.
+    """
+    from src.harness.oracle.jcs_digest import h_jcs
+
+    intent = visible["delegation_intent"]
+    tool, arguments = intent["tool"], intent["arguments"]
+    labels = [
+        issue_label_assertion(
+            seed,
+            value=entry["value"],
+            label=entry["label"],
+            # SS A.6: labels exist BEFORE task-time issuance. A day-old
+            # assertion valid for a further day is the NORMAL case, and Delta
+            # deliberately does not apply to it (ADR 0030).
+            iat=now - 86_400,
+            exp=now + 86_400,
+        )
+        for entry in visible.get("labelled_values", [])
+    ]
+    wanted = visible.get("artifacts", {})
+    context_hash = lc.authz_context_hash(
+        task_id=visible["task_id"],
+        audience=visible["audience"],
+        tool=tool,
+        canonical_request_digest=h_jcs(dict(arguments)),
+        resource_owner=resource_owner,
+        oauth_actor=oauth_actor,
+    )
+    declassification = None
+    if wanted.get("declassification"):
+        entry = visible["labelled_values"][0]
+        declassification = issue_declassification(
+            seed,
+            task_id=visible["task_id"],
+            audience=visible["audience"],
+            tool=tool,
+            # The SAME notion of "this request" the approval binds to: one
+            # boundary with two would be one binding too many (ADR 0030).
+            request_digest=context_hash,
+            recipient=arguments.get("to", ""),
+            value=entry["value"],
+            from_label=entry["label"],
+            to_label=declassify_to,
+            policy_version=policy_version,
+            iat=now,
+            nbf=now - 5,
+            exp=now + 300,
+            jti=f"declass-{visible['scenario_id']}",
+        )
+    approval = None
+    if wanted.get("approval"):
+        approval = issue_approval(
+            seed,
+            authz_context_hash=context_hash,
+            iat=now,
+            nbf=now - 5,
+            exp=now + 300,
+            jti=f"approval-{visible['scenario_id']}",
+        )
+    return {
+        "payload_labels": tuple(labels),
+        "declassification": declassification,
+        "approval_artifact": approval,
+    }

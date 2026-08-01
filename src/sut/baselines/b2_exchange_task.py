@@ -82,8 +82,15 @@ from src.sut.authz.boundary import (
     allowed_authority,
     verify_access_token,
 )
+from src.sut.authz.boundary_policy import BoundaryPolicy
+from src.sut.authz.reference_monitor import ContextApprovalMonitor, RequestContext
 from src.sut.baselines.base import ArmBitmask, HopContext, InvocationContext
-from src.sut.protocol.required_authority import RequiredAuthorityError, required_authority
+from src.sut.protocol.required_authority import (
+    RequiredAuthorityError,
+    carried_payloads,
+    egress_recipient,
+    required_authority,
+)
 
 # Wire-level protocol constants, duplicated rather than imported (ADR 0015
 # rule 3). They are RFC-defined URNs, not project decisions.
@@ -103,6 +110,12 @@ REASON_EXCHANGE_REFUSED = "b2_exchange_refused"  # the AS issued no token at all
 REASON_MALFORMED_REQUEST = "b2_no_required_authority"
 REASON_NOT_PROVISIONED = "b2_not_provisioned"
 REASON_NOT_PRESENTED = "b2_nothing_presented"
+# The SHARED monitor's two refusals. Distinct codes because the monitor is a
+# distinct layer -- an OAuth arm that blocks here blocked on the CONFIGURATION
+# it was given, not on its ladder position, and gate G-15 exists to keep those
+# two attributions apart.
+REASON_CONTEXT_POLICY = "b2_context_policy"
+REASON_APPROVAL_ARTIFACT = "b2_approval_artifact"
 
 
 class B2ConfigurationError(Exception):
@@ -136,6 +149,16 @@ class B2Presentation:
     audience: str
     now_epoch: int
     refusal: ExchangeRefusal | None = None
+    # ADR 0030's inputs, carried by an OAuth arm exactly as `B3Presentation`
+    # carries them. That they fit here WITHOUT a capability, an HTC or an INV
+    # is the mechanism-neutrality SS F.2 designed `authz_context_hash` for.
+    task_id: str = ""
+    tool: str = ""
+    payload_labels: tuple[Mapping[str, Any], ...] = ()
+    declassification: Any | None = None
+    approval_artifact: bytes | None = None
+    resource_owner: tuple[str, str] = ("", "")
+    oauth_actor: tuple[str, str] = ("", "")
 
 
 class B2ExchangeTaskArm:
@@ -177,6 +200,9 @@ class B2ExchangeTaskArm:
         self._staged: B2Presentation | None = None
         self.exchanges: list[dict[str, Any]] = []  # one record per hop, for the matrix
         self.audit_log: list[dict[str, Any]] = []
+        # ADR 0030. `None` unless provisioning attaches one: `monitor_attached`
+        # is a property of the RUN, not of the arm (SS E.4's `A-dagger`).
+        self._monitor: ContextApprovalMonitor | None = None
 
     # -- provision: Phase-1 setup (SS E.2); everything parsed ONCE ------------ #
     def provision(self, setup: Mapping[str, Any]) -> None:
@@ -241,6 +267,24 @@ class B2ExchangeTaskArm:
         credentials = f"{setup['client_id']}:{setup['client_secret']}".encode()
         self._authorization = "Basic " + base64.b64encode(credentials).decode("ascii")
         self._check_subject_token_matches_the_ladder_grant(setup)
+        # ADR 0030 / gate G-15. The monitor is CONFIGURATION: attached when the
+        # run says so, `None` otherwise, and this arm's SS E.5 bitmask does not
+        # move either way (`context = 0`, `approval = 0` remain its LADDER
+        # position). It is the same `ContextApprovalMonitor` class over the same
+        # frozen policy document that `B3` constructs -- not a second
+        # implementation that behaves alike -- because a monitor attachable only
+        # to `B3` would make SS E.4's `A-dagger` untestable and the comparison
+        # G-15 governs impossible.
+        self._monitor = (
+            ContextApprovalMonitor(
+                policy=BoundaryPolicy.load(setup["policy_document"]),
+                label_issuers=setup["label_issuers"],
+                approvers=setup["approvers"],
+                policy_version=setup["policy_version"],
+            )
+            if setup.get("monitor_attached")
+            else None
+        )
         self._setup = dict(setup)
 
     # -- the ADR 0024/0029 guarantee, held by the ARM -------------------------- #
@@ -452,6 +496,13 @@ class B2ExchangeTaskArm:
             audience=invocation.audience,
             now_epoch=invocation.now_epoch,
             refusal=refusal,
+            task_id=invocation.task_id,
+            tool=invocation.tool,
+            payload_labels=tuple(invocation.payload_labels),
+            declassification=invocation.declassification,
+            approval_artifact=invocation.approval_artifact,
+            resource_owner=tuple(self._setup.get("resource_owner", ("", ""))),
+            oauth_actor=tuple(self._setup.get("oauth_actor", ("", ""))),
         )
         # A refused hop leaves the delegate with NOTHING to present. The wire is
         # empty, and the SS F.1 bundle built from it is empty too -- which is
@@ -497,6 +548,49 @@ class B2ExchangeTaskArm:
                     REASON_TOKEN_SCOPE,
                     f"{element} is {decision.reason}",
                 )
+        return self._monitor_decision(tool, arguments, staged)
+
+    def _monitor_decision(
+        self, tool: str, arguments: Mapping[str, Any], staged: B2Presentation
+    ) -> tuple[bool, str, str]:
+        """ADR 0030's two conjuncts, when a monitor is attached.
+
+        With no monitor this returns the arm's own verdict unchanged, which is
+        SS E.4's `A-dagger`: *admitted ABSENT the shared monitor*. The cell is
+        not a claim about OAuth -- it is a claim about a configuration.
+        """
+        if self._monitor is None:
+            return True, REASON_ADMITTED, ""
+        # The SAME constructor `B3` calls, so both arms derive one
+        # `authz_context_hash` for one request by construction (ADR 0030).
+        context = RequestContext.for_request(
+            task_id=staged.task_id,
+            audience=staged.audience,
+            tool=tool,
+            arguments=arguments,
+            resource_owner=staged.resource_owner,
+            oauth_actor=staged.oauth_actor,
+        )
+        policy = self._monitor._policy
+        recipient = egress_recipient(tool, arguments)
+        context_decision = self._monitor.context_decision(
+            context,
+            assertions=staged.payload_labels,
+            carried_payloads=carried_payloads(tool, arguments),
+            declassification=staged.declassification,
+            recipient=recipient,
+            now=staged.now_epoch,
+        )
+        if context_decision.refused:
+            return False, REASON_CONTEXT_POLICY, context_decision.reason
+        approval = self._monitor.approval_decision(
+            context,
+            approval=staged.approval_artifact,
+            now=staged.now_epoch,
+            high_risk=tool in policy.high_risk_actions,
+        )
+        if approval.refused:
+            return False, REASON_APPROVAL_ARTIFACT, approval.reason
         return True, REASON_ADMITTED, ""
 
     def check_holder_binding(self, staged, claims) -> "tuple[bool, str, str] | None":

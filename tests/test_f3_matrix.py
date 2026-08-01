@@ -172,7 +172,7 @@ def as_document(runner):
         resolved_keys=key_material.resolve_public(SEED),
         identity_jwks=key_material.identity_jwks(SEED, registry_document["principals"]),
         omega_elements=frozen_config.load_document()["omega"]["elements"],
-        task_grant=runner.task_grant(),
+        task_grant=runner.task_grant("gt-benign"),
     )
     document = copy.deepcopy(document)
     for spec in document["phase1"].values():
@@ -203,16 +203,19 @@ def factories(runner, running_as, as_document):
         as_public_jwk=running_as.public_jwk,
     )
     broad = runner.b2_setup(
+        scenario_id="gt-benign",
         access_token=running_as.phase1_tokens["agent-supervisor:broad"],
         ladder_grant="broad",
         **common,
     )
     task = runner.b2_setup(
+        scenario_id="gt-benign",
         access_token=running_as.phase1_tokens["agent-supervisor"],
         ladder_grant="task",
         **common,
     )
     dpop = runner.b2_dpop_setup(
+        scenario_id="gt-benign",
         access_token=running_as.phase1_tokens["agent-supervisor"],
         as_token_endpoint=as_document["token_endpoint"],
         **common,

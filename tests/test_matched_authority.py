@@ -63,7 +63,7 @@ def running_as(runner):
         resolved_keys=key_material.resolve_public(SEED),
         identity_jwks=key_material.identity_jwks(SEED, registry_document["principals"]),
         omega_elements=frozen_config.load_document()["omega"]["elements"],
-        task_grant=runner.task_grant(),
+        task_grant=runner.task_grant("gt-benign"),
     )
     with ASProcess(document, SEED) as process:
         yield process
@@ -92,6 +92,7 @@ def exchanged_token(runner, running_as):
     arm = B2ExchangeTaskArm()
     arm.provision(
         runner.b2_setup(
+            scenario_id="gt-benign",
             access_token=running_as.phase1_tokens["agent-supervisor"],
             as_public_jwk=running_as.public_jwk,
             as_port=running_as.port,

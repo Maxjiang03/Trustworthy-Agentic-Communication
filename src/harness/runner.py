@@ -291,15 +291,23 @@ class GoldenThreadRunner:
             "run_mode": "pilot",  # never "confirmatory": the seal is Part H's
         }
 
-    def task_grant(self) -> list[list[str]]:
+    def task_grant(self, scenario_id: str | None = None) -> list[list[str]]:
         """`U_task` as the pilot corpus itself declares it (ADR 0024).
 
         Read from the SUT-visible documents rather than accepted as an
-        argument, so the AS's Phase-1 provisioning and the arm's own
-        self-check cannot be handed two different answers by one caller
-        mistake. The corpus must declare exactly one task grant across its
-        scenarios -- they are one task with different invocations -- and more
-        than one fails closed rather than silently picking the first.
+        argument, so the AS's Phase-1 provisioning and the arm's own self-check
+        cannot be handed two different answers by one caller mistake.
+
+        **Named rather than assumed, since the corpus grew a second chain.**
+        The F4/F5 families run on a chain that includes `(mail.send,
+        mail/outbox)` and `(notes.delete, notes/project)` -- deliberately, so
+        that `containment_ok` cannot refuse a labelled egress before
+        `context_policy_ok` ever runs. So "the corpus's `U_task`" is no longer
+        a single answer, and a caller that needs one must say which family it
+        is provisioning for. Passing no `scenario_id` still works while the
+        scenarios in scope agree, and **fails closed with the disagreement
+        spelled out** when they do not -- rather than silently picking one and
+        provisioning an AS for the wrong family.
         """
         grants: dict[str, tuple[tuple[str, str], ...]] = {}
         for path in sorted((self._corpus_dir / "sut_visible").glob("*.json")):
@@ -309,21 +317,36 @@ class GoldenThreadRunner:
             )
         if not grants:
             raise RunnerError("the corpus declares no scenarios, so U_task is undefined")
+        if scenario_id is not None:
+            if scenario_id not in grants:
+                raise RunnerError(f"no such scenario in the pilot corpus: {scenario_id!r}")
+            return [[action, resource] for action, resource in sorted(grants[scenario_id])]
         distinct = set(grants.values())
         if len(distinct) != 1:
-            raise RunnerError(f"the pilot corpus declares more than one U_task: {grants}")
+            by_grant: dict[tuple, list[str]] = {}
+            for name, grant in sorted(grants.items()):
+                by_grant.setdefault(grant, []).append(name)
+            families = " | ".join(f"{sorted(names)}" for names in by_grant.values())
+            raise RunnerError(
+                f"the pilot corpus declares {len(distinct)} distinct task grants ({families}); "
+                "pass task_grant(scenario_id=...) to say which family this AS provisions for"
+            )
         return [[action, resource] for action, resource in sorted(distinct.pop())]
 
-    def ladder_grant_elements(self, ladder_grant: str) -> list[list[str]]:
+    def ladder_grant_elements(
+        self, ladder_grant: str, scenario_id: str | None = None
+    ) -> list[list[str]]:
         """The element set an SS E.1 row's base token must carry (ADR 0029).
 
-        `"task"` is the corpus's own `U_task`; `"broad"` is the whole frozen
-        `Omega`. Read from the frozen artifacts rather than passed in, so the
-        AS's provisioning and the arm's self-check cannot be handed two
-        different answers by one caller mistake.
+        `"task"` is the corpus's own `U_task` -- for the family named by
+        `scenario_id`, since the corpus carries two chains (see `task_grant`);
+        `"broad"` is the whole frozen `Omega` and is family-independent. Read
+        from the frozen artifacts rather than passed in, so the AS's
+        provisioning and the arm's self-check cannot be handed two different
+        answers by one caller mistake.
         """
         if ladder_grant == "task":
-            return self.task_grant()
+            return self.task_grant(scenario_id)
         if ladder_grant == "broad":
             omega = frozen_config.load_document()["omega"]["elements"]
             return [[action, resource] for action, resource in sorted(map(tuple, omega))]
@@ -354,6 +377,8 @@ class GoldenThreadRunner:
         scope: str = "mcp.invoke",
         ladder_grant: str = "task",
         grant_elements: list[list[str]] | None = None,
+        scenario_id: str | None = None,
+        monitor_attached: bool = False,
     ) -> dict[str, Any]:
         """The injected provisioning material for `B2-exchange-task` (SS E.2).
 
@@ -385,6 +410,13 @@ class GoldenThreadRunner:
         if ladder_grant not in ("task", "broad"):
             raise RunnerError(f"unknown SS E.1 ladder grant {ladder_grant!r} (ADR 0029)")
         principal = registry_mod.load_document()["actors"][actor_id]
+        # ADR 0030 / G-15. The SAME material `b3_setup` injects, so the shared
+        # monitor an OAuth arm attaches is configured identically to `B3`'s.
+        # `monitor_attached` defaults FALSE here: SS E.4 predicts the OAuth arms
+        # admit F4/F5 `A-dagger` -- *absent* the monitor -- and a default of
+        # true would quietly make the dagger untestable.
+        label_issuers, approvers = label_artifacts.trusted_sets(self.seed)
+        resource_owner = registry_mod.load_document()["resource_owners"][0]
         return {
             "as_port": as_port,
             "as_tls_cert_pem": as_tls_cert_pem,
@@ -400,10 +432,17 @@ class GoldenThreadRunner:
             "scope": scope,
             "ladder_grant": ladder_grant,
             "grant_elements": (
-                self.ladder_grant_elements(ladder_grant)
+                self.ladder_grant_elements(ladder_grant, scenario_id)
                 if grant_elements is None
                 else grant_elements
             ),
+            "label_issuers": label_issuers,
+            "approvers": approvers,
+            "policy_version": frozen_parameters.expected_h_policy(),
+            "policy_document": frozen_policy.load_document(),
+            "resource_owner": (self._corpus["issuer"], resource_owner),
+            "oauth_actor": (self._corpus["issuer"], actor_id),
+            "monitor_attached": monitor_attached,
             "run_mode": "pilot",  # never "confirmatory": the seal is Part H's
         }
 

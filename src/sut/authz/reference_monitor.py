@@ -54,6 +54,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from src.sut import freshness
 from src.sut.authz import label_context as lc
 from src.sut.authz.jti_cache import Consumption, JtiCache
+from src.sut.jcs import h_jcs
 
 # SS F.1 payload shapes, minus `signature`, which the signature is taken over.
 _LABEL_FIELDS = {"payload_digest", "label", "issuer_kid", "iat", "exp"}
@@ -107,6 +108,40 @@ class RequestContext:
     canonical_request_digest: str
     resource_owner: tuple[str, str]
     oauth_actor: tuple[str, str]
+
+    @classmethod
+    def for_request(
+        cls,
+        *,
+        task_id: str,
+        audience: str,
+        tool: str,
+        arguments: Mapping[str, Any],
+        resource_owner: tuple[str, str],
+        oauth_actor: tuple[str, str],
+    ) -> "RequestContext":
+        """Build the context from the arguments the BOUNDARY received.
+
+        Every arm goes through here, so `canonical_request_digest` is `H_JCS`
+        of the same object computed by the same code on every arm -- structural
+        agreement rather than each arm being trusted to remember the same rule.
+        That matters more than it looks: if an OAuth arm and `B3` computed the
+        digest even slightly differently they would derive different
+        `authz_context_hash` values for one request, and an artifact issued for
+        that request would bind on one arm and not the other. The F4/F5
+        comparison would then be measuring a digest disagreement.
+
+        The arguments are the boundary's own view -- never a requester's
+        account of its own request.
+        """
+        return cls(
+            task_id=task_id,
+            audience=audience,
+            tool=tool,
+            canonical_request_digest=h_jcs(dict(arguments)),
+            resource_owner=tuple(resource_owner),
+            oauth_actor=tuple(oauth_actor),
+        )
 
     def authz_context_hash(self) -> str:
         return lc.authz_context_hash(

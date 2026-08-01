@@ -35,7 +35,7 @@ from joserfc.jwk import OKPKey
 from src.harness import key_material
 from src.harness.as_process import RAR_TYPE, ASProcess, golden_thread_as_document
 from src.harness.authorizer import frozen_config
-from src.harness.runner import GoldenThreadRunner
+from src.harness.runner import GoldenThreadRunner, RunnerError
 from src.harness.verifier import registry as reg
 from src.sut.authz import boundary
 from src.sut.baselines import b2_exchange_task as b2mod
@@ -80,7 +80,7 @@ def as_document(runner):
     # `C_0 = U_task`, so the AS enforces `C_1 subset-of C_0` rather than
     # `C_1 subset-of Omega`. `U_task` comes from the corpus itself, which is
     # the same source the arm's own ADR 0024 check reads.
-    return _as_document(runner.task_grant())
+    return _as_document(runner.task_grant("gt-benign"))
 
 
 @pytest.fixture(scope="module")
@@ -104,6 +104,7 @@ def coarse_as():
 @pytest.fixture
 def setup(runner, running_as):
     return runner.b2_setup(
+        scenario_id="gt-benign",
         access_token=running_as.phase1_tokens["agent-supervisor"],
         as_public_jwk=running_as.public_jwk,
         as_port=running_as.port,
@@ -276,15 +277,26 @@ class TestTheArmCannotBeMisprovisioned:
         them two different answers and the check would agree with itself while
         being wrong.
         """
-        assert runner.task_grant() == sorted(_visible("gt-benign")["authority_elements"])
-        # Every scenario must declare the same task grant -- they are one task
-        # with different invocations -- or the single value would be a guess.
+        assert runner.task_grant("gt-benign") == sorted(_visible("gt-benign")["authority_elements"])
+        # Every scenario of ONE FAMILY declares the same task grant -- they are
+        # one task with different invocations. The corpus carries two families
+        # since F4/F5 joined it, on deliberately different chains, so the
+        # invariant is per-family and an UNNAMED request must fail closed
+        # rather than pick one.
         grants = {
             path.stem: sorted(json.loads(path.read_text(encoding="utf-8"))["authority_elements"])
             for path in sorted((CORPUS / "sut_visible").glob("*.json"))
         }
-        assert len(set(map(str, grants.values()))) == 1, grants
-        assert len(grants) == 4
+        f1 = {name: g for name, g in grants.items() if not name.startswith(("gt-f4", "gt-f5"))}
+        f45 = {name: g for name, g in grants.items() if name.startswith(("gt-f4", "gt-f5"))}
+        assert len(set(map(str, f1.values()))) == 1, f1
+        assert len(set(map(str, f45.values()))) == 1, f45
+        assert len(f1) == 4 and len(f45) == 4
+        # The load-bearing half: asked without a family, the runner REFUSES.
+        # Silently returning one family's grant would provision an AS for the
+        # wrong chain and every F4/F5 cell would be masked by containment.
+        with pytest.raises(RunnerError, match="distinct task grants"):
+            runner.task_grant()
 
     def test_a_token_that_does_not_verify_is_refused_before_the_comparison(self, setup):
         """Fail closed: an unverifiable token has no authority to compare."""
@@ -319,6 +331,7 @@ class TestAdr0024Counterfactual:
         arm = B2ExchangeTaskArm()
         arm.provision(
             runner.b2_setup(
+                scenario_id="gt-benign",
                 access_token=process.phase1_tokens["agent-supervisor"],
                 as_public_jwk=process.public_jwk,
                 as_port=process.port,
@@ -376,7 +389,7 @@ class TestAdr0024Counterfactual:
 
     def test_with_the_task_scoped_grant_the_as_refuses(self, running_as, runner):
         """The same hop, the same code, the same AS profile -- one difference."""
-        arm = self._arm_against(running_as, runner, runner.task_grant())
+        arm = self._arm_against(running_as, runner, runner.task_grant("gt-benign"))
         try:
             credentials = arm.delegate(_hop(_visible("gt-benign"), widening=self.WIDENING))
             assert "access_token" not in credentials

@@ -31,7 +31,11 @@ length-delimited, fail-closed on an unsupported version):
 
 import hashlib
 
-import rfc8785
+# Re-exported: the canonical home is `src/sut/jcs.py`, which belongs to NEITHER
+# plane so ADR 0030's shared monitor can reach `H_JCS` without importing the
+# capability package. The `as` form marks it a deliberate re-export rather than
+# an unused import, so a lint autofix cannot quietly delete it.
+from src.sut.jcs import h_jcs as h_jcs
 
 CAP_COMMIT_TAG = b"AASC-CAP-COMMIT"
 JCS_TAG = b"AASC-JCS-DIGEST"
@@ -61,15 +65,6 @@ def commit_prefix(block_ids: list[bytes], upto: int) -> bytes:
     if not 0 <= upto < len(block_ids):
         raise SutDigestError(f"prefix index {upto} out of range for {len(block_ids)} ids")
     return commit_ids(list(block_ids[: upto + 1]))
-
-
-def h_jcs(obj: object, *, version: int = 1) -> str:
-    """ADR 0009 `H_JCS`: canonicalization errors propagate (fail closed)."""
-    if version != VERSION:
-        raise SutDigestError(f"unsupported H_JCS version {version}")
-    canonical = rfc8785.dumps(obj)
-    material = JCS_TAG + bytes([version]) + len(canonical).to_bytes(4, "big") + canonical
-    return hashlib.sha256(material).hexdigest()
 
 
 def access_token_hash(token: str, *, version: int = 1) -> str:

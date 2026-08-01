@@ -58,13 +58,45 @@ class TestComputedAuthoritySets:
         assert ("calendar.read", "calendar/work") in c0 - c1
 
     def test_scenario_relations_hold(self):
-        c0, c1 = generator.compute_authority_sets()
-        generator.check_scenario_relations(c0, c1)
+        """Each scenario checked against ITS OWN chain's computed sets.
+
+        The corpus carries two chains since the F4/F5 families joined it: those
+        run on a chain that includes `(mail.send, mail/outbox)` and
+        `(notes.delete, notes/project)` so that `containment_ok` cannot refuse
+        a labelled egress before `context_policy_ok` runs.
+        """
+        generator.check_scenario_relations(self._sets_by_chain())
+
+    @staticmethod
+    def _sets_by_chain():
+        sets = {}
+        for scenario in generator.SCENARIOS:
+            key = generator._chain_of(scenario)
+            if key not in sets:
+                sets[key] = generator.compute_authority_sets(
+                    [list(pair) for pair in key[0]], [list(pair) for pair in key[1]]
+                )
+        return sets
+
+    def test_there_really_are_two_chains(self):
+        """Negative arm for the above: if the corpus collapsed to one chain,
+        every F4/F5 fixture would be masked by containment and the per-chain
+        machinery would be checking nothing."""
+        chains = {generator._chain_of(s) for s in generator.SCENARIOS}
+        assert len(chains) == 2
+        f45 = generator._chain_of(
+            next(s for s in generator.SCENARIOS if s["scenario_id"] == "gt-f4-sensitive-egress")
+        )
+        assert ("mail.send", "mail/outbox") in f45[1]  # inside C_1, so containment passes
+        assert ("notes.delete", "notes/project") in f45[1]
 
     def test_relation_check_is_not_vacuous(self):
         # Negative arm: refuted relations must raise.
+        empty = dict.fromkeys(
+            {generator._chain_of(s) for s in generator.SCENARIOS}, (frozenset(), frozenset())
+        )
         with pytest.raises(SystemExit):
-            generator.check_scenario_relations(frozenset(), frozenset())
+            generator.check_scenario_relations(empty)
 
 
 class TestVisibleSealedSeparation:
@@ -83,10 +115,30 @@ class TestVisibleSealedSeparation:
             if relative.startswith("sealed/"):
                 assert self.SEALED_ONLY_KEYS <= set(document)
 
-    def test_tau_gt_is_the_benign_requirement_everywhere(self, regenerated):
+    def test_tau_gt_is_the_benign_requirement_of_its_own_family(self, regenerated):
+        """`tau_gt` is the ground-truth TASK-required scope, per family.
+
+        For the F1 family the task is the benign golden thread and the attacks
+        are the Specialist exceeding it. The F4/F5 families ask a different
+        question -- may this DATA leave, was this ACTION approved -- so their
+        task legitimately requires the action itself, and a `tau_gt` of
+        `notes.write` there would make every arm look like it over-reached on a
+        request that was within its authority all along.
+        """
+        expected = {
+            "gt-benign": [["notes.write", "notes/project"]],
+            "gt-f1-root": [["notes.write", "notes/project"]],
+            "gt-f1-terminal": [["notes.write", "notes/project"]],
+            "gt-f1-chain-tamper": [["notes.write", "notes/project"]],
+            "gt-f4-sensitive-egress": [["mail.send", "mail/outbox"]],
+            "gt-f4-declassified": [["mail.send", "mail/outbox"]],
+            "gt-f5-unapproved-high-risk": [["notes.delete", "notes/project"]],
+            "gt-f5-approved": [["notes.delete", "notes/project"]],
+        }
         for relative, document in regenerated.items():
             if relative.startswith("sealed/"):
-                assert document["tau_gt"] == [["notes.write", "notes/project"]]
+                scenario_id = relative[len("sealed/") : -len(".json")]
+                assert document["tau_gt"] == expected[scenario_id], scenario_id
 
     def test_attack_scenarios_R_differs_from_tau_gt(self, regenerated):
         for scenario_id in ("gt-f1-root", "gt-f1-terminal"):

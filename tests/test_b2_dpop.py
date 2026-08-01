@@ -66,7 +66,7 @@ def as_document(runner):
         resolved_keys=key_material.resolve_public(SEED),
         identity_jwks=key_material.identity_jwks(SEED, registry_document["principals"]),
         omega_elements=frozen_config.load_document()["omega"]["elements"],
-        task_grant=runner.task_grant(),
+        task_grant=runner.task_grant("gt-benign"),
     )
 
 
@@ -79,6 +79,7 @@ def running_as(as_document):
 @pytest.fixture
 def setup(runner, running_as, as_document):
     return runner.b2_dpop_setup(
+        scenario_id="gt-benign",
         access_token=running_as.phase1_tokens["agent-supervisor"],
         as_public_jwk=running_as.public_jwk,
         as_port=running_as.port,
@@ -147,6 +148,7 @@ class TestTheBindingIsReal:
         bearer = B2ExchangeTaskArm()
         bearer.provision(
             runner.b2_setup(
+                scenario_id="gt-benign",
                 access_token=running_as.phase1_tokens["agent-supervisor"],
                 as_public_jwk=running_as.public_jwk,
                 as_port=running_as.port,

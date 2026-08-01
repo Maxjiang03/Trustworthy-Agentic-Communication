@@ -59,7 +59,7 @@ def running_as(runner):
         resolved_keys=key_material.resolve_public(SEED),
         identity_jwks=key_material.identity_jwks(SEED, registry_document["principals"]),
         omega_elements=frozen_config.load_document()["omega"]["elements"],
-        task_grant=runner.task_grant(),
+        task_grant=runner.task_grant("gt-benign"),
     )
     with ASProcess(document, SEED) as process:
         yield process
@@ -79,6 +79,7 @@ def token_config(running_as):
 def _setup(runner, running_as, ladder_grant):
     client = "agent-supervisor" + ("" if ladder_grant == "task" else ":broad")
     return runner.b2_setup(
+        scenario_id="gt-benign",
         access_token=running_as.phase1_tokens[client],
         as_public_jwk=running_as.public_jwk,
         as_port=running_as.port,
@@ -163,7 +164,7 @@ class TestTheRealizedGrantMatchesTheRow:
         realized = ma.token_allowed(
             setup["access_token"], token_config, ma.omega(), now=int(time.time())
         )
-        expected = frozenset(map(tuple, runner.ladder_grant_elements(declared)))
+        expected = frozenset(map(tuple, runner.ladder_grant_elements(declared, "gt-benign")))
         assert realized == expected
         if declared == "broad":
             assert realized == ma.omega()
@@ -175,7 +176,7 @@ class TestTheRealizedGrantMatchesTheRow:
     def test_the_two_rows_really_differ(self, runner):
         """Otherwise every assertion above would hold vacuously."""
         broad = frozenset(map(tuple, runner.ladder_grant_elements("broad")))
-        task = frozenset(map(tuple, runner.ladder_grant_elements("task")))
+        task = frozenset(map(tuple, runner.ladder_grant_elements("task", "gt-benign")))
         assert task < broad
         # And the element F1-root needs is in one and not the other -- which is
         # the whole reason the two rows cannot share a grant.
