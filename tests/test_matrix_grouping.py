@@ -183,8 +183,8 @@ class TestThePolicyPlaneSetIsHonest:
         assert derived == set(grouping.POLICY_PLANE)
 
     def test_b_cap_is_deliberately_outside_it(self):
-        """The finding `tests/test_f45_matrix.py` records: `B-cap` is a
-        capability arm carrying `A†`, but it has no policy plane, so attaching
-        the shared monitor to it moves nothing."""
+        """Why §E.4's `B-cap` F4/F5 cells are a plain **A** (ADR 0032): it is a
+        capability arm with no policy plane, so attaching the shared monitor to
+        it moves nothing and the dagger was never available to it."""
         assert "B-cap" not in grouping.POLICY_PLANE
         assert "B-cap" in grouping.STRONG  # ...while still being an F1-strong arm

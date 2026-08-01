@@ -355,21 +355,21 @@ class TestWhatTheMeasurementActuallyShows:
         for scenario_id in ("gt-f4-declassified", "gt-f5-approved"):
             assert matrix[(scenario_id, arm, True)][0].admitted is True
 
-    def test_B_caps_dagger_does_NOT_flip_when_the_monitor_is_attached(self, matrix):
-        """**A finding about §E.4's own annotation, reported not adjusted.**
+    def test_B_caps_cell_is_a_PLAIN_A_under_both_configurations(self, matrix):
+        """§E.4 reads a plain **A** here, corrected from `A†` by **ADR 0032**.
 
-        `B-cap` is marked `A†` on F4/F5, and the dagger's gloss is *"admitted
-        ABSENT the shared monitor"* -- which implies attaching one changes the
-        cell. It does not. `B-cap`'s §E.5 bitmask sets `context = 0` and
-        `approval = 0`: a bearer capability with no policy plane. It never runs
-        the conjuncts the monitor answers for, so attaching one to `B-cap` is a
-        no-op and its cell stays `A` under both configurations.
+        The dagger means *this cell flips when the shared monitor is attached*.
+        `B-cap`'s does not: its §E.5 bitmask sets `context = 0` and
+        `approval = 0` -- a bearer capability with no policy plane -- so it
+        never runs the two §A.5 conjuncts a monitor answers for.
 
-        That is consistent with the §E.4 footnote as WORDED -- it says "the
-        OAuth arms also block" and `B-cap` is not an OAuth arm -- but the
-        dagger on `B-cap`'s cell is misleading in a way the four OAuth arms'
-        daggers are not. Recorded for the author; **nothing is adjusted here**,
-        and neither the cell nor the prediction may be moved toward the other.
+        The sharpest form of it: for `B-cap`, attaching the monitor is not a
+        configuration change but a **change of arm**, because the monitor's
+        verdicts reach the capability path only THROUGH those two conjuncts,
+        and `context = 1, approval = 1` is `B3`. The four OAuth arms keep their
+        daggers -- a monitor reaches their decision through a layer orthogonal
+        to their bitmask, so for them `monitor_attached` really is a property
+        of the run.
         """
         assert "B-cap" not in POLICY_PLANE
         assert BCapArm.bitmask.context == 0 and BCapArm.bitmask.approval == 0
