@@ -54,6 +54,7 @@ from joserfc.jwk import OKPKey
 
 from src.sut import dpop
 from src.sut.authz.boundary import TokenRejected, verify_dpop_request
+from src.sut.authz.jti_cache import Consumption
 from src.sut.baselines.b2_exchange_task import (
     REASON_NOT_PROVISIONED,
     B2ConfigurationError,
@@ -67,6 +68,14 @@ from src.sut.baselines.base import ArmBitmask, InvocationContext
 RESOURCE_METHOD = "POST"
 
 REASON_HOLDER_PROOF = "b2dpop_holder_proof"
+# Gate G-14's shared authenticated-request-id cache, when one is attached.
+REASON_REPLAY_DUPLICATE = "b2dpop_replay_duplicate"
+# The DPoP proof's own `jti` is this arm's authenticated request id. It is
+# NAMESPACED apart from `B3`'s INV `invocation_id` (SS F.5's
+# `(mechanism_tag, jti)` key) because the two come from different mechanisms
+# and, sharing one cache, could otherwise collide and let one arm deny the
+# other's request.
+DPOP_MECHANISM_TAG = "dpop"
 
 
 class B2ExchangeTaskDPoPArm(B2ExchangeTaskArm):
@@ -100,6 +109,11 @@ class B2ExchangeTaskDPoPArm(B2ExchangeTaskArm):
     def __init__(self) -> None:
         super().__init__()
         self._proof_key: OKPKey | None = None
+        # CONFIGURATION, exactly as ADR 0030's monitor is for the policy
+        # conjuncts: `None` unless a run attaches one, and the SS E.5 bitmask
+        # does not move either way (`jti_cache = 0` remains this arm's LADDER
+        # position). Gate G-14 attaches the SAME cache object here and on `B3`.
+        self._replay_cache: Any = None
         self._token_endpoint: str | None = None
         self._resource_url: str | None = None
         self._staged_proof: str | None = None
@@ -183,6 +197,50 @@ class B2ExchangeTaskDPoPArm(B2ExchangeTaskArm):
             )
         except TokenRejected as exc:
             return False, REASON_HOLDER_PROOF, f"{exc.reason}: {exc.description}"
+        return self._consume_request_id(staged)
+
+    # -- G-14: the shared authenticated-request-id cache --------------------- #
+    def attach_replay_cache(self, cache: Any) -> None:
+        """Attach the shared cache. Configuration, not a ladder property.
+
+        The SAME object gate G-14 attaches to `B3`, so the two arms are
+        compared on one cache rather than on two that behave alike -- the
+        discipline G-15 established for the reference monitor. A cache that is
+        merely equivalent is not the same cache, and this gate is an
+        attribution claim.
+        """
+        self._replay_cache = cache
+
+    def _consume_request_id(self, staged: Any) -> "tuple[bool, str, str] | None":
+        """SS F.5's check-and-insert, AFTER every other check has passed.
+
+        The id consumed is the DPoP proof's own `jti` -- an **authenticated**
+        request id, because the proof is signed by the key `cnf.jkt` binds the
+        token to. That is what makes the cache meaningful here and impossible
+        on a bare bearer arm (gate G-14, claim 3).
+        """
+        if self._replay_cache is None:
+            return None
+        proof = self._staged_proof
+        if proof is None:
+            return None
+        import base64
+        import json
+
+        payload = proof.split(".")[1]
+        claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+        jti = claims.get("jti")
+        if not jti:
+            # No authenticated id to consume: fail closed rather than admit.
+            return False, REASON_REPLAY_DUPLICATE, "the DPoP proof carries no jti to consume"
+        outcome = self._replay_cache.consume(DPOP_MECHANISM_TAG, str(jti), now=staged.now_epoch)
+        if outcome is not Consumption.ADMITTED:
+            return (
+                False,
+                REASON_REPLAY_DUPLICATE,
+                f"DPoP proof jti {jti!r} was already admitted within Delta "
+                f"({outcome.value}; SS F.5: at-most-once ADMISSION per jti)",
+            )
         return None
 
     # -- what a proof actually covers, exposed so a test can read it -------- #

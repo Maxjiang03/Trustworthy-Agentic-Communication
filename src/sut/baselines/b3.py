@@ -135,6 +135,21 @@ class B3Arm:
         )
         self._setup = dict(setup)
 
+    def attach_replay_cache(self, cache) -> None:
+        """Attach the shared authenticated-request-id cache (gate G-14).
+
+        The SAME method name and the SAME object `B2-DPoP` takes, so the gate
+        attaches one cache to both arms rather than two that behave alike.
+        `B3` proper carries `jti_cache = 0` as its LADDER position -- attaching
+        one here is CONFIGURATION and moves no bit, exactly as ADR 0030's
+        monitor is configuration for the policy conjuncts. (`B3+` is the arm
+        whose bitmask sets the bit; this seam is what G-14 uses to put the same
+        cache on an arm whose ladder position does not include one.)
+        """
+        if self._decision_path is None:
+            raise RuntimeError(REASON_NOT_PROVISIONED)
+        self._decision_path._jti_cache = cache
+
     # -- delegate: the offline Phase-2 hop (SS E.2) --------------------------- #
     def delegate(self, hop: HopContext) -> Mapping[str, Any]:
         if self._issuer is None or self._setup is None:

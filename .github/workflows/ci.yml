@@ -74,3 +74,10 @@ jobs:
       # it is the longest of the spikes and still well under a minute.
       - name: Gate G-9 spike (cross-platform)
         run: uv run python smoke/g9/spike.py
+
+      # G-14 attaches the shared authenticated-request-id cache to B2-DPoP and
+      # B3 and runs SS D's taxonomy. No effect ledger, so it is cross-platform
+      # like the rest -- and it is the gate that turns the DPoP/INV attribution
+      # from an argument into a measurement.
+      - name: Gate G-14 spike (cross-platform)
+        run: uv run python smoke/g14/spike.py
