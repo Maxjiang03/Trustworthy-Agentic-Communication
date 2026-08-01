@@ -50,6 +50,12 @@ _TAGS_IN_USE = (
     b"AASC-INV-v1",  # SS F.2, INV signature domain
     b"AASC-REGISTRY-DIGEST",  # ADR 0019, H(R)
     b"AASC-POLICY-DIGEST",  # ADR 0022, H(Lambda) -- frozen rows 4/6/10
+    b"AASC-PAYLOAD-DIGEST",  # ADR 0030, the SS A.6 label join key
+    b"AASC-AUTHZ-CTX",  # ADR 0030, authz_context_hash
+    b"AASC-LABELSET-DIGEST",  # ADR 0030, INV.label_assertions_digest
+    b"AASC-LABEL-v1",  # ADR 0030, LabelAssertion signature domain
+    b"AASC-DECLASS-v1",  # ADR 0030, DeclassificationArtifact domain
+    b"AASC-APPROVAL-v1",  # ADR 0030, ApprovalArtifact domain
 )
 assert TAG not in _TAGS_IN_USE, "access_token_hash tag must be unique"
 # Pairwise distinctness across the whole family, not merely against this tag:

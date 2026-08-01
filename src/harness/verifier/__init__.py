@@ -22,6 +22,9 @@ Modules:
   to exactly one principal, principal to exactly one holder key.
 * `holder_binding` -- the HTC/INV objects and the full SS F.2 verification, one
   named check per MUST with its own reason code.
+* `label_context` -- the six ADR 0030 constructions (`payload_digest`,
+  `authz_context_hash`, `label_assertions_digest`, and the three artifact
+  signing domains), closing ADR 0009's LAST category (c) fields.
 
 Commitments are **reused, never reinvented**: `prefix_hash`,
 `child_block_hash` and `INV.capability_hash` all come from
