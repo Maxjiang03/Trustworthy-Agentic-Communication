@@ -240,6 +240,100 @@ class TestTheEntryPoint:
 # ---------------------------------------------------------------------------
 # STEP 7 — the four fail-closed preconditions
 # ---------------------------------------------------------------------------
+class TestTheScenarioSetIsDerivedNotListed:
+    """The gap: `run_campaign`'s only caller passed 4 of 13 scenarios.
+
+    Nothing was wrong — every one of the nine had been read and verified in its
+    own module — but the confirmatory campaign calls `run_campaign`, so the
+    single sealed run would have produced `F1` results only and the absence
+    would have looked like a corpus that never had the other families. Same
+    shape as block 6's artifact-plumbing defect: unit tests green, the unified
+    path missing something.
+
+    A longer literal fixes today and not tomorrow. These assert the set is
+    **derived**, so a scenario that exists is reachable without editing a tuple.
+    """
+
+    def test_the_derived_set_is_exactly_what_the_corpus_HOLDS(self):
+        sealed = {p.stem for p in (CORPUS / "sealed").glob("*.json")}
+        visible = {p.stem for p in (CORPUS / "sut_visible").glob("*.json")}
+        assert set(C.corpus_scenarios(CORPUS)) == sealed == visible
+        assert len(sealed) == 13
+
+    def test_the_campaign_DEFAULTS_to_every_scenario(self):
+        """`scenarios=None` means everything. A caller wanting a subset must
+        narrow explicitly; the default is never a short list."""
+        import inspect
+
+        assert inspect.signature(C.run_campaign).parameters["scenarios"].default is None
+        source = inspect.getsource(C.run_campaign)
+        assert "corpus_scenarios(corpus_root) if scenarios is None" in source
+
+    def test_THE_GUARD_FIRES_when_a_scenario_is_added_to_the_corpus(self):
+        """**Shown failing, not assumed.** A guard that has never fired is not
+        known to work.
+
+        A scenario document is written into the corpus, the derivation is
+        checked to pick it up while a hand-written list does not, and it is
+        removed again. That is exactly how the present gap opened — silently,
+        while everything was green.
+        """
+        stale_literal = ("gt-benign", "gt-f1-root", "gt-f1-terminal", "gt-f1-chain-tamper")
+        before = C.corpus_scenarios(CORPUS)
+        assert set(stale_literal) < set(before)  # the gap, still visible
+
+        intruder = CORPUS / "sealed" / "gt-zz-guard-probe.json"
+        try:
+            intruder.write_text(json.dumps({"scenario_id": "gt-zz-guard-probe"}), encoding="utf-8")
+            after = C.corpus_scenarios(CORPUS)
+            # The derivation notices. A literal cannot.
+            assert "gt-zz-guard-probe" in after
+            assert "gt-zz-guard-probe" not in stale_literal
+            assert set(after) - set(before) == {"gt-zz-guard-probe"}
+        finally:
+            intruder.unlink(missing_ok=True)
+        assert C.corpus_scenarios(CORPUS) == before  # reverted
+
+    def test_the_configuration_families_are_derived_too(self):
+        """From each sealed record's `attack_subcase`, so a new F4/F5 scenario
+        joins by existing rather than by being remembered."""
+        assert set(C.configuration_scenarios(CORPUS)) == {
+            "gt-f4-declassified",
+            "gt-f4-sensitive-egress",
+            "gt-f5-approved",
+            "gt-f5-unapproved-high-risk",
+        }
+
+
+class TestF45RefusesAConfigurationFreeCampaign:
+    """**The decision, stated: the campaign REFUSES rather than guessing.**
+
+    §E.4 marks those cells `A†` — admitted *absent* the shared monitor — so
+    running them once under whichever configuration happened to be in force
+    would be worse than not running them: it would produce a number that looks
+    like a result (G-15). Full coverage is two runs, one per configuration.
+    """
+
+    def test_it_refuses_F4_F5_without_a_monitor_configuration(self):
+        with pytest.raises(C.PreconditionFailed, match="CONFIGURATION family"):
+            C.check_configuration_families(
+                scenarios=C.corpus_scenarios(CORPUS), monitor_attached=None, corpus_root=CORPUS
+            )
+
+    def test_a_ladder_only_run_needs_no_configuration(self):
+        C.check_configuration_families(
+            scenarios=("gt-benign", "gt-f1-root"), monitor_attached=None, corpus_root=CORPUS
+        )
+
+    def test_either_configuration_is_accepted(self):
+        for configured in (False, True):
+            C.check_configuration_families(
+                scenarios=C.corpus_scenarios(CORPUS),
+                monitor_attached=configured,
+                corpus_root=CORPUS,
+            )
+
+
 class TestPreconditionsFailClosed:
     def test_frozen_rows_and_hashes_are_checked(self):
         C.check_frozen_rows()  # the real documents agree; raises if they drift

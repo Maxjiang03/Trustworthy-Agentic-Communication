@@ -65,6 +65,38 @@ REQUIRED_ROWS = (
 )
 
 
+def corpus_scenarios(corpus_root: Path = PILOT_CORPUS) -> tuple[str, ...]:
+    """Every scenario the corpus holds, **derived, never listed**.
+
+    The gap this closes: `scenarios` was supplied by the caller, the only caller
+    passed four of thirteen, and nine rows had never run through this entry
+    point. Nothing was wrong — every one had been read and verified in its own
+    module — but the confirmatory campaign calls `run_campaign`, so the single
+    sealed run would have produced `F1` results only and the absence would have
+    looked like a corpus that never had the other families.
+
+    A longer literal would have fixed today and not tomorrow. Deriving the set
+    from the sealed records makes an incomplete run **impossible to write**: a
+    scenario that exists is reachable without anyone editing a tuple.
+    """
+    sealed = corpus_root / "sealed"
+    return tuple(sorted(path.stem for path in sealed.glob("*.json")))
+
+
+def configuration_scenarios(corpus_root: Path = PILOT_CORPUS) -> tuple[str, ...]:
+    """The scenarios whose family is grouped by CONFIGURATION (§E.4's `A†`).
+
+    Read from each sealed record's `attack_subcase`, so a new F4/F5 scenario
+    joins this set by existing rather than by being remembered.
+    """
+    return tuple(
+        scenario_id
+        for scenario_id in corpus_scenarios(corpus_root)
+        if _family_of(str(_sealed_document(corpus_root, scenario_id).get("attack_subcase", "")))
+        in matrix_grouping.CONFIGURATION_FAMILIES
+    )
+
+
 class CampaignError(Exception):
     """A precondition refused. The campaign never runs in a configuration it
     cannot describe: an unrunnable configuration must raise, not produce a
@@ -270,6 +302,39 @@ def check_single_process_campaign(*, run_mode: str, sut_mode: str) -> None:
         "one lifts this refusal, and would also put a loopback round trip inside ADR 0026's "
         "measured segment for exactly one arm"
     )
+
+
+def check_configuration_families(
+    *, scenarios: Sequence[str], monitor_attached: bool | None, corpus_root: Path
+) -> None:
+    """**Decision: a configuration-free campaign REFUSES to run F4/F5.**
+
+    §E.4 marks those cells `A†` — *admitted **absent** the shared monitor* — so
+    the same arm produces different cells under different configurations, and a
+    cell recorded without its configuration **is not a result** (gate G-15).
+    Running them once under whichever configuration happened to be in force
+    would be **worse than not running them**: it would produce a number that
+    looks like a result.
+
+    So the campaign refuses rather than guessing, and full coverage of those
+    families is **two runs**, one per configuration — which is what
+    `tests/test_f45_matrix.py` already does and what G-15 adjudicated on. The
+    alternative, running both configurations inside one call, was rejected
+    because `monitor_attached` is baked into each arm's provisioning material:
+    one call would need two setup sets and would hide that fact behind a
+    parameter.
+    """
+    if monitor_attached is not None:
+        return
+    present = sorted(set(scenarios) & set(configuration_scenarios(corpus_root)))
+    if present:
+        raise PreconditionFailed(
+            f"scenarios {present} belong to a CONFIGURATION family (§E.4's `A†`) and this campaign "
+            "was given no `monitor_attached`. Those cells are meaningless without it -- the same "
+            "arm produces a different cell under each configuration -- so running them once would "
+            "produce a number that looks like a result (G-15). Pass monitor_attached=False and "
+            "again with True, or narrow the scenario set"
+        )
 
 
 def check_ledger_available(*, ledger_backed: bool, ledger_dir: Path | None) -> None:
@@ -514,7 +579,7 @@ def run_campaign(
     *,
     runner: GoldenThreadRunner,
     factories: Mapping[str, tuple[Any, Mapping[str, Any]]],
-    scenarios: Sequence[str],
+    scenarios: Sequence[str] | None = None,
     seed: bytes,
     as_issuer: str,
     as_public_jwk: Mapping[str, str],
@@ -542,8 +607,15 @@ def run_campaign(
     """
     import time
 
+    # DEFAULT TO EVERYTHING. A caller that needs a subset must narrow this
+    # explicitly; the campaign never runs a short list because someone forgot a
+    # scenario existed.
+    scenarios = corpus_scenarios(corpus_root) if scenarios is None else tuple(scenarios)
     the_stack_is_not_duplicated()
     check_frozen_rows()
+    check_configuration_families(
+        scenarios=scenarios, monitor_attached=monitor_attached, corpus_root=corpus_root
+    )
     check_run_mode(
         run_mode=run_mode,
         corpus_root=corpus_root,
@@ -660,7 +732,10 @@ __all__ = [
     "PreconditionFailed",
     "RunRecord",
     "build_run_record",
+    "check_configuration_families",
     "check_frozen_rows",
+    "configuration_scenarios",
+    "corpus_scenarios",
     "check_ledger_available",
     "check_run_mode",
     "check_single_process_campaign",
