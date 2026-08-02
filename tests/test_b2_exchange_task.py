@@ -293,10 +293,10 @@ class TestTheArmCannotBeMisprovisioned:
         assert len(set(map(str, f45.values()))) == 1, f45
         # Non-vacuity guards for the two `len(set(...)) == 1` assertions above:
         # a chain with one scenario would satisfy them trivially. The F1 chain
-        # carries 6 since EXP7 put the two credential subcases on it -- they run
+        # carries 8 since EXP7 put the two credential subcases on it -- they run
         # the BENIGN call there so `containment_ok` cannot refuse before the
         # credential conjunct does.
-        assert len(f1) == 6 and len(f45) == 4
+        assert len(f1) == 8 and len(f45) == 4
         # The load-bearing half: asked without a family, the runner REFUSES.
         # Silently returning one family's grant would provision an AS for the
         # wrong chain and every F4/F5 cell would be masked by containment.

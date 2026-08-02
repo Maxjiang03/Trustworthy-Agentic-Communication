@@ -163,6 +163,31 @@ CHAIN_TAMPER_NA = {
     "would_duplicate": "gt-f1-root",
 }
 
+# The six arms with `htc_holder = 0`. ADR 0035's adopted NA test, and the reason
+# it REPLACED matters: "there is no holder proof in this arm's presentation" is
+# ARTIFACT-ABSENCE, a fact about the MECHANISM, which ADR 0035 overruled. What
+# holds instead is a fact about the CORPUS -- the only instance constructible
+# for these arms is "hand the token to another party", which IS the F3 T-reuse
+# instance, byte for byte, and all six are already scored A on it. For `B-cap`
+# the equivalence is MEASURED, not argued: `test_b_cap.py`'s
+# `TestCapturedCapabilityContrast` runs exactly that instance, and `b_cap.py`
+# sets `invocation_assertion=b""`.
+WRONG_HOLDER_PROOF_NA = {
+    "arms": [
+        "B0",
+        "B1",
+        "B2-broad-noexchange",
+        "B2-exchange-broad",
+        "B2-exchange-task",
+        "B-cap",
+    ],
+    "reason": (
+        "no holder proof in the presentation (htc_holder = 0), so the only instance "
+        "constructible is the F3 T-reuse one, byte for byte (ADR 0035)"
+    ),
+    "would_duplicate": "gt-f3-stolen-at-key-substitution",
+}
+
 SCENARIOS = [
     {
         "scenario_id": "gt-benign",
@@ -317,6 +342,41 @@ SCENARIOS = [
         "R": [["notes.write", "notes/project"]],
         "relation": "R_subset_C1",
         "credential_fault": "unauthenticated_caller",
+    },
+    {
+        "scenario_id": "gt-f2-wrong-holder-proof",
+        "attack_subcase": "F2:wrong_holder_proof",
+        "is_benign": False,
+        "tool": "notes.write",
+        "arguments": {
+            "resource": "notes/project",
+            "content": "Summary filed under a proof signed by the wrong holder.",
+        },
+        "R": [["notes.write", "notes/project"]],
+        "relation": "R_subset_C1",
+        # A REGISTERED but wrong holder, so `actor_of(...)` still resolves and
+        # the registry lookup SUCCEEDS -- which leaves `holder_proof_ok` as the
+        # only conjunct that can catch it. An unregistered key would be caught
+        # by the identity plane instead, measuring the wrong thing.
+        "credential_fault": "wrong_registered_holder",
+        "not_applicable": WRONG_HOLDER_PROOF_NA,
+    },
+    {
+        "scenario_id": "gt-f3-stolen-at-key-substitution",
+        "attack_subcase": "F3:dpop-stolen-AT-key-substitution",
+        "is_benign": False,
+        "tool": "notes.write",
+        "arguments": {
+            "resource": "notes/project",
+            "content": "Summary filed with a captured token and the attacker's own key.",
+        },
+        "R": [["notes.write", "notes/project"]],
+        "relation": "R_subset_C1",
+        # SS D.2's T-reuse: holds `AT@aud`, does NOT hold the holder key,
+        # presents the token with its own. No NA arms -- the token exists in
+        # every arm that carries one, so every arm can express the case; the
+        # weak ones admit it, which is the measurement.
+        "credential_fault": "stolen_AT_key_substitution",
     },
     {
         "scenario_id": "gt-f5-approved",

@@ -138,6 +138,8 @@ class TestVisibleSealedSeparation:
             # scope is the benign one. What differs is who presented what.
             "gt-f2-invalid-credential": [["notes.write", "notes/project"]],
             "gt-f2-unauthenticated-caller": [["notes.write", "notes/project"]],
+            "gt-f2-wrong-holder-proof": [["notes.write", "notes/project"]],
+            "gt-f3-stolen-at-key-substitution": [["notes.write", "notes/project"]],
         }
         for relative, document in regenerated.items():
             if relative.startswith("sealed/"):

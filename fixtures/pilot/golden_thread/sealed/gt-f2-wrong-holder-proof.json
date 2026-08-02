@@ -1,0 +1,86 @@
+{
+  "C_sets": [
+    [
+      [
+        "calendar.read",
+        "calendar/work"
+      ],
+      [
+        "notes.read",
+        "notes/project"
+      ],
+      [
+        "notes.write",
+        "notes/project"
+      ]
+    ],
+    [
+      [
+        "notes.read",
+        "notes/project"
+      ],
+      [
+        "notes.write",
+        "notes/project"
+      ]
+    ]
+  ],
+  "R": [
+    [
+      "notes.write",
+      "notes/project"
+    ]
+  ],
+  "U_task": [
+    [
+      "calendar.read",
+      "calendar/work"
+    ],
+    [
+      "notes.read",
+      "notes/project"
+    ],
+    [
+      "notes.write",
+      "notes/project"
+    ]
+  ],
+  "_banner": "HARNESS-ONLY SEALED TRUTH -- no SUT principal may read this document (CLAUDE.md red line 5; SS A.3). correlation_id and P_hashes are completed by the runner at mint time, because tokens are minted at run time (ADR 0007) and the correlation id is minted per invocation (SS F.1).",
+  "attack_subcase": "F2:wrong_holder_proof",
+  "audience": "https://mcp.aasc.local/tools",
+  "credential_fault": "wrong_registered_holder",
+  "htc_holder_kid": "kid-holder-specialist",
+  "intended_labels": [],
+  "intended_request_digest": "f0beaadd47bf325d91d7b2675d699c126f4187d8ef1cfd1fa90572f811270f2c",
+  "is_benign": false,
+  "method": "tools/call",
+  "not_applicable": {
+    "arms": [
+      "B0",
+      "B1",
+      "B2-broad-noexchange",
+      "B2-exchange-broad",
+      "B2-exchange-task",
+      "B-cap"
+    ],
+    "reason": "no holder proof in the presentation (htc_holder = 0), so the only instance constructible is the F3 T-reuse one, byte for byte (ADR 0035)",
+    "would_duplicate": "gt-f3-stolen-at-key-substitution"
+  },
+  "oauth_actor": [
+    "https://as.aasc.local",
+    "agent-specialist"
+  ],
+  "requires_approval": false,
+  "resource_owner": [
+    "https://as.aasc.local",
+    "user-yixian"
+  ],
+  "scenario_id": "gt-f2-wrong-holder-proof",
+  "tau_gt": [
+    [
+      "notes.write",
+      "notes/project"
+    ]
+  ],
+  "tool": "notes.write"
+}
