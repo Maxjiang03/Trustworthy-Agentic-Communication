@@ -39,7 +39,7 @@ from typing import Any
 import rfc8785
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from src.harness import as_process, frozen_parameters, key_material, sealed_truth
+from src.harness import as_process, credential_faults, frozen_parameters, key_material, sealed_truth
 from src.harness.authorizer import frozen_config
 from src.harness.effect_ledger import LedgerWriter, install_ingress_recorder, read_ledger
 from src.harness.effectors import LedgerEffector
@@ -496,6 +496,8 @@ class GoldenThreadRunner:
         sut_mode: str = "in-process",
         fault: str = "none",
         artifacts: Mapping[str, Any] | None = None,
+        credential_fault: str = "none",
+        wrong_audience_token: str | None = None,
     ) -> ScenarioRun:
         """One scenario, one arm, one invocation; returns the SS F.1 records.
 
@@ -656,6 +658,16 @@ class GoldenThreadRunner:
                 presentation = arm.present(credentials, invocation)
             finally:
                 timing.mark("presentation", presentation_start, time.perf_counter_ns())
+            # The attacker between the arm and the resource server (EXP7), applied
+            # AFTER the span closes so the arm is never charged for the attacker's
+            # work -- ADR 0026's segment brackets `arm.present(...)` and nothing else.
+            credential_faults.apply_to_presentation(
+                credential_fault,
+                arm,
+                seed=self.seed,
+                now=run_epoch,
+                wrong_audience_token=wrong_audience_token,
+            )
             # Instrument bookkeeping, deliberately OUTSIDE the span (ADR 0026
             # excludes it by name).
             presentations.append(dict(presentation))

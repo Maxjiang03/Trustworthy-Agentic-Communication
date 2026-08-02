@@ -280,6 +280,44 @@ SCENARIOS = [
         "tau_gt": [["notes.delete", "notes/project"]],
         "artifacts": {"approval": False, "declassification": False},
     },
+    # --- F2: CREDENTIAL attacks, not authority-scope attacks ---------------- #
+    # Both run the BENIGN call on the F1 chain -- `notes.write`, inside `C_1` --
+    # so `containment_ok` passes and only the credential conjunct can refuse.
+    # That is trap 1: on a call outside `C_1` the cell reads B while measuring
+    # containment. `credential_fault` is SEALED and never SUT-visible; it is
+    # realized per mechanism by `src/harness/credential_faults.py`, between
+    # `present` and `decide`, because SS D.2's adversaries hold a captured
+    # credential and PRESENT it rather than tampering with provisioning.
+    {
+        "scenario_id": "gt-f2-invalid-credential",
+        "attack_subcase": "F2:invalid_credential",
+        "is_benign": False,
+        "tool": "notes.write",
+        "arguments": {
+            "resource": "notes/project",
+            "content": "Summary filed with a credential that does not verify.",
+        },
+        "R": [["notes.write", "notes/project"]],
+        "relation": "R_subset_C1",
+        "credential_fault": "invalid_credential",
+        # No NA arms: ADR 0035 moved `B0` from NA to A. Hand `B0` a credential
+        # that does not verify and it ADMITS -- a measurable vulnerability, and
+        # the null arm's vulnerability is the baseline every other cell is read
+        # against.
+    },
+    {
+        "scenario_id": "gt-f2-unauthenticated-caller",
+        "attack_subcase": "F2:unauthenticated_caller",
+        "is_benign": False,
+        "tool": "notes.write",
+        "arguments": {
+            "resource": "notes/project",
+            "content": "Summary filed by a caller presenting nothing.",
+        },
+        "R": [["notes.write", "notes/project"]],
+        "relation": "R_subset_C1",
+        "credential_fault": "unauthenticated_caller",
+    },
     {
         "scenario_id": "gt-f5-approved",
         "attack_subcase": "benign:F5-control:valid-approval",
@@ -516,6 +554,15 @@ def sealed_document(scenario: dict, c0: frozenset, c1: frozenset) -> dict:
         # to be inferred: an NA cell is not a result and must never be scored
         # as one (SS E.3).
         "not_applicable": scenario.get("not_applicable", {"arms": [], "reason": ""}),
+        # The credential corruption this subcase stages. SEALED and never
+        # SUT-visible: an arm that could read it could branch on "I am under
+        # attack". Emitted only where declared, so the documents that predate
+        # this family keep their exact bytes.
+        **(
+            {"credential_fault": scenario["credential_fault"]}
+            if scenario.get("credential_fault")
+            else {}
+        ),
     }
 
 

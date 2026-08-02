@@ -40,7 +40,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from src.harness import frozen_parameters, key_material, matrix_grouping
+from src.harness import credential_faults, frozen_parameters, key_material, matrix_grouping
 from src.harness.authorizer import frozen_config
 from src.harness.oracle import predicates as P
 from src.harness.oracle.artifacts import OracleConfig
@@ -526,6 +526,7 @@ def run_campaign(
     ledger_backed: bool = False,
     corpus_root: Path = PILOT_CORPUS,
     now: int | None = None,
+    wrong_audience_token: str | None = None,
 ) -> CampaignResult:
     """Run every applicable cell once and score it from evidence.
 
@@ -568,6 +569,9 @@ def run_campaign(
         sealed = _sealed_document(corpus_root, scenario_id)
         visible = _visible_document(corpus_root, scenario_id)
         family = _family_of(str(sealed.get("attack_subcase", "")))
+        # SEALED, never SUT-visible: the arm sees only a credential that
+        # happens not to verify, never a flag saying it is under attack.
+        fault = credential_faults.validate(str(sealed.get("credential_fault", "none")))
         not_applicable = set(sealed.get("not_applicable", {}).get("arms", ()))
         config = OracleConfig(
             policy=policy,
@@ -598,6 +602,8 @@ def run_campaign(
                     ledger_backed=ledger_backed,
                     sut_mode=sut_mode,
                     artifacts=artifacts,
+                    credential_fault=fault,
+                    wrong_audience_token=wrong_audience_token,
                 )
             except RunnerError as exc:
                 unscorable.append((scenario_id, arm_name, f"the run did not complete: {exc}"))

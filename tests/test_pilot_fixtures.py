@@ -134,6 +134,10 @@ class TestVisibleSealedSeparation:
             "gt-f4-declassified": [["mail.send", "mail/outbox"]],
             "gt-f5-unapproved-high-risk": [["notes.delete", "notes/project"]],
             "gt-f5-approved": [["notes.delete", "notes/project"]],
+            # The credential subcases run the BENIGN call, so their task-required
+            # scope is the benign one. What differs is who presented what.
+            "gt-f2-invalid-credential": [["notes.write", "notes/project"]],
+            "gt-f2-unauthenticated-caller": [["notes.write", "notes/project"]],
         }
         for relative, document in regenerated.items():
             if relative.startswith("sealed/"):
