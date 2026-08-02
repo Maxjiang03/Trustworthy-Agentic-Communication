@@ -65,10 +65,19 @@ class TestTheValuesAreTheAdrValues:
 
 
 class TestUnsetRowsFailClosed:
-    def test_row_9_is_unset_and_raises(self):
-        """Read off the measurement box at seal time, never defaulted."""
-        with pytest.raises(fp.RowUnset):
-            fp.sealed_measurement_platform()
+    def test_row_9_is_SET_and_was_read_from_the_machine(self):
+        """*Update, 2026-08-02: this asserted row 9 RAISED `RowUnset`, which was
+        correct until the platform was locked (EXP8B STEP 3).*
+
+        It is the only frozen row that is **read rather than chosen**, so what
+        is asserted now is that it resolves and that it carries the identity the
+        machine reported — not a transcription. ADR 0025: any change to it
+        invalidates a G-3 adjudication on the previous platform.
+        """
+        platform = fp.sealed_measurement_platform()
+        assert platform  # resolves rather than raising
+        for machine_read in ("26200.8875", "i7-12700H", "12P/8E"):
+            assert machine_read in platform, machine_read
 
     def test_row_5_is_deferred_by_decision_not_merely_unset(self):
         """The distinction is the whole point of ADR 0028's annotation.
@@ -202,11 +211,14 @@ class TestTheAdrsLanded:
 
     def test_the_document_header_counts_what_is_set(self):
         header = DOCUMENT.read_text(encoding="utf-8").splitlines()[0]
-        assert "9 of 11 set" in header
+        assert "10 of 11 set" in header
         assert "1 deferred by decision" in header
 
-    def test_no_row_other_than_9_is_still_open(self):
+    def test_NO_row_is_still_open(self):
+        """*Update, 2026-08-02: this asserted exactly one open row -- row 9 --
+        which was correct until it was locked.* Ten of eleven are now set and
+        row 5 is deferred by decision (ADR 0028), so nothing is merely
+        awaiting a value."""
         text = DOCUMENT.read_text(encoding="utf-8")
         open_rows = [line for line in text.splitlines() if "⟨UNSET" in line]
-        assert len(open_rows) == 1
-        assert open_rows[0].startswith("| 9 |")
+        assert open_rows == []
