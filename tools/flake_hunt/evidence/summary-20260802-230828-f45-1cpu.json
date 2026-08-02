@@ -1,0 +1,59 @@
+{
+  "condition": {
+    "target": "tests/test_f45_matrix.py",
+    "runs": 4,
+    "contention_workers": 3,
+    "spikes_first": false,
+    "no_randomly": false,
+    "pytest_randomly_installed": false,
+    "platform": "win32",
+    "cpu_count": 20,
+    "pinned_to_cpu": 2
+  },
+  "reproductions": "0/4",
+  "reproduced": 0,
+  "total_runs": 4,
+  "every_failure_named": [],
+  "runs": [
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 44
+      },
+      "wall_seconds": 15.1,
+      "log": "run-000.log",
+      "spikes": null
+    },
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 44
+      },
+      "wall_seconds": 14.7,
+      "log": "run-001.log",
+      "spikes": null
+    },
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 44
+      },
+      "wall_seconds": 15.4,
+      "log": "run-002.log",
+      "spikes": null
+    },
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 44
+      },
+      "wall_seconds": 13.8,
+      "log": "run-003.log",
+      "spikes": null
+    }
+  ]
+}

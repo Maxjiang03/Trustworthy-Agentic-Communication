@@ -1,0 +1,78 @@
+{
+  "condition": {
+    "target": "tests/test_f45_matrix.py",
+    "runs": 6,
+    "contention_workers": 6,
+    "spikes_first": false,
+    "no_randomly": false,
+    "pytest_randomly_installed": false,
+    "platform": "win32",
+    "cpu_count": 20
+  },
+  "reproductions": "0/6",
+  "reproduced": 0,
+  "total_runs": 6,
+  "every_failure_named": [],
+  "runs": [
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 44
+      },
+      "wall_seconds": 2.5,
+      "log": "run-000.log",
+      "spikes": null
+    },
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 44
+      },
+      "wall_seconds": 2.5,
+      "log": "run-001.log",
+      "spikes": null
+    },
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 44
+      },
+      "wall_seconds": 2.5,
+      "log": "run-002.log",
+      "spikes": null
+    },
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 44
+      },
+      "wall_seconds": 2.6,
+      "log": "run-003.log",
+      "spikes": null
+    },
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 44
+      },
+      "wall_seconds": 2.6,
+      "log": "run-004.log",
+      "spikes": null
+    },
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 44
+      },
+      "wall_seconds": 2.6,
+      "log": "run-005.log",
+      "spikes": null
+    }
+  ]
+}

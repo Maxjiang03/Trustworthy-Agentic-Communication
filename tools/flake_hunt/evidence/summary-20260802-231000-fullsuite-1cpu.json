@@ -1,0 +1,58 @@
+{
+  "condition": {
+    "target": "tests",
+    "runs": 3,
+    "contention_workers": 3,
+    "spikes_first": false,
+    "no_randomly": false,
+    "pytest_randomly_installed": false,
+    "platform": "win32",
+    "cpu_count": 20,
+    "pinned_to_cpu": 2
+  },
+  "reproductions": "2/3",
+  "reproduced": 2,
+  "total_runs": 3,
+  "every_failure_named": [
+    "tests/test_b3_plus.py::TestTheCellB3PlusExistsFor::test_the_replay_is_constructed_WITHIN_delta",
+    "tests/test_frozen_authorizer_semantics.py::test_appended_widening_verifies_but_does_not_widen"
+  ],
+  "runs": [
+    {
+      "returncode": 1,
+      "failures": [
+        "tests/test_b3_plus.py::TestTheCellB3PlusExistsFor::test_the_replay_is_constructed_WITHIN_delta"
+      ],
+      "counts": {
+        "failed": 1,
+        "passed": 1228
+      },
+      "wall_seconds": 230.7,
+      "log": "run-000.log",
+      "spikes": null
+    },
+    {
+      "returncode": 1,
+      "failures": [
+        "tests/test_frozen_authorizer_semantics.py::test_appended_widening_verifies_but_does_not_widen"
+      ],
+      "counts": {
+        "failed": 1,
+        "passed": 1228
+      },
+      "wall_seconds": 353.8,
+      "log": "run-001.log",
+      "spikes": null
+    },
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 1229
+      },
+      "wall_seconds": 382.0,
+      "log": "run-002.log",
+      "spikes": null
+    }
+  ]
+}
