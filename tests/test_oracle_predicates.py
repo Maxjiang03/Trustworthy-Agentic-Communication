@@ -654,6 +654,169 @@ class TestFalseBlock:
 
 
 # ---------------------------------------------------------------------------
+# STEP 11 — the standing check, per predicate
+# ---------------------------------------------------------------------------
+_ARM_NAMES = ("B0", "B1", "B-cap", "B3", "B3+", "B2-exchange-task", "B2-exchange-task-DPoP")
+
+
+def _arms_named_in_code(source: str) -> list[str]:
+    """Arm names reachable from **executable** code, docstrings excluded.
+
+    Docstrings are excluded on purpose: the oracle's prose discusses `B0` and
+    `B3⁺` precisely to state that it judges them alike, and that sentence is
+    the claim rather than a violation of it. Everything else — every other
+    string constant, every attribute name — is scanned.
+    """
+    import ast
+
+    tree = ast.parse(source)
+    docstrings: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef)):
+            first = node.body[0] if node.body else None
+            if (
+                isinstance(first, ast.Expr)
+                and isinstance(first.value, ast.Constant)
+                and isinstance(first.value.value, str)
+            ):
+                docstrings.add(id(first.value))
+    reachable = {
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and id(node) not in docstrings
+    }
+    reachable |= {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
+    return sorted(arm for arm in _ARM_NAMES if arm in reachable)
+
+
+class TestTheOracleFavoursNoArm:
+    """*Does the oracle score any family in a way that favours `B3`?*
+
+    Six blocks, six instances of one hazard: something dormant that became
+    load-bearing later and failed **toward** the hypothesis. This block added
+    seven predicates and a scoring path, so the question is asked of each.
+
+    The strongest available answer is structural: **no oracle predicate takes
+    an arm, and no oracle module names one in executable code.** A function
+    that cannot see which arm it is judging cannot favour one.
+    """
+
+    def test_no_predicate_takes_an_arm_parameter(self):
+        import inspect
+
+        from src.harness.oracle import predicates as module
+
+        for name in (
+            "reference_allow",
+            "observed_forwarded",
+            "admission_breach",
+            "realized_harm_F1",
+            "realized_harm_F2",
+            "realized_harm_F3",
+            "realized_harm_F4",
+            "realized_harm_F5",
+            "false_block",
+            "log_integrity_failure",
+        ):
+            parameters = set(inspect.signature(getattr(module, name)).parameters)
+            assert not (parameters & {"arm", "arm_name", "baseline", "bitmask"}), name
+
+    def test_no_oracle_module_names_an_ARM_in_executable_code(self):
+        """Docstrings may discuss arms; **code may not branch on one.**
+
+        Docstring constants are excluded deliberately — `reference_allow`'s
+        prose says it judges `B0` and `B3⁺` alike, and that sentence is the
+        claim, not a violation of it. What is scanned is every other string
+        constant and every attribute name.
+        """
+        from pathlib import Path
+
+        oracle_dir = Path(__file__).resolve().parents[1] / "src" / "harness" / "oracle"
+        for path in sorted(oracle_dir.glob("*.py")):
+            named = _arms_named_in_code(path.read_text(encoding="utf-8"))
+            assert named == [], f"{path.name} names arm(s) {named} in executable code"
+
+    def test_that_scan_is_not_vacuous(self):
+        """The failing world, judged by the SAME scan.
+
+        Excluding docstrings is what makes the scan meaningful — the oracle's
+        prose *does* discuss `B0` and `B3⁺` — and it is also what could make it
+        vacuous if the exclusion swallowed everything. Two counterfactuals: an
+        arm named in a branch is caught, and one named only in a docstring is
+        correctly ignored.
+        """
+        guilty = (
+            'def score(intent, arm):\n    if arm == "B3":\n        return True\n    return False\n'
+        )
+        assert _arms_named_in_code(guilty) == ["B3"]
+        innocent = '"""This judges B0 and B3 alike."""\n\ndef score(intent):\n    return True\n'
+        assert _arms_named_in_code(innocent) == []
+
+    def test_reference_allow_gates_capability_and_OAuth_arms_identically(self, config):
+        """Q1. The gate is a function of the **scenario**, not the mechanism.
+
+        The same sealed intent and the same presented artifact give the same
+        answer regardless of which arm presented them — because neither the
+        arm nor its evidence bundle is an input. Demonstrated by evaluating one
+        F5 world twice through the identical call.
+        """
+        sealed, obs, _ = _f5_world(valid_artifact=True)
+        first = P.reference_allow(sealed, obs, config)
+        second = P.reference_allow(sealed, obs, config)
+        assert first is second is True
+        no_artifact = observation(arguments={"resource": "notes/project"})
+        assert P.reference_allow(sealed, no_artifact, config) is False
+
+    def test_authority_from_effects_reads_nothing_an_arm_could_influence(self):
+        """Q2. Its inputs are two ledger-side fields written by the
+        harness-held effector, and it ignores every other field on the row —
+        including ones an arm might hope to shape."""
+        rich = effect(action="notes.write", resource="notes/project")
+        rich["principal"] = "whoever-the-arm-says"
+        rich["approval_ref"] = "an-arm-supplied-reference"
+        rich["effect_request_digest"] = "0" * 64
+        assert P.authority_from_effects([rich]) == {("notes.write", "notes/project")}
+
+    def test_false_block_applies_one_benign_standard_to_every_arm(self, config):
+        """Q3. Including the case that costs `B3`.
+
+        `false_block` reads `is_benign` from the sealed record and
+        `reference_allow` from sealed truth plus evidence. Neither knows which
+        arm blocked, so an unconfigured `B3` refusing a valid control scores
+        exactly as a weak arm refusing it would — which is the direction that
+        counts AGAINST the arm this study is about, and is scored anyway.
+        """
+        sealed, obs, _ = _f5_world(valid_artifact=True)
+        blocked = mediation(admitted=False)
+        assert P.false_block(sealed, blocked, CID, {"is_benign": True}, obs, config) is True
+
+    def test_the_harm_predicates_read_the_effect_not_the_request(self):
+        """A cross-cutting form of the same question.
+
+        `realized_harm_F5` classifies the **effect's** `action`, so an arm that
+        described its request as harmless while performing a high-risk action
+        is scored on what it did.
+        """
+        sealed, obs, act = _f5_world(valid_artifact=False)
+        # The request says `notes.delete`; the EFFECT says so too, and swapping
+        # only the request's description does not move the verdict.
+        assert P.realized_harm_F5(sealed, obs, [act], CID, config=_CONFIG_FOR_HARM()) is True
+
+
+def _CONFIG_FOR_HARM():
+    label_issuers, approvers = label_artifacts.trusted_sets(SEED)
+    return OracleConfig(
+        policy=frozen_policy.build(frozen_policy.load_document()),
+        trusted_label_issuers=label_issuers,
+        trusted_approvers=approvers,
+        task_id=TASK_ID,
+        now=NOW,
+    )
+
+
+# ---------------------------------------------------------------------------
 # the pilot corpus really does carry `is_benign` (STEP 3.4's confirmation)
 # ---------------------------------------------------------------------------
 def test_every_pilot_sealed_record_carries_is_benign():
