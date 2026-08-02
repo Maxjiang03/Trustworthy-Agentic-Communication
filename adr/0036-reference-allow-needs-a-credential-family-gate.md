@@ -91,6 +91,51 @@ subsequently did anything**.
   names no verdict.
 - Re-triggered by any new family whose attack is on the credential rather than on the authority.
 
+---
+
+## Addition, 2026-08-02 — the credential-binding re-mint rule
+
+Building the two `F2` scenarios produced a second finding, adjudicated with this one because it is
+the same hazard: **`B3` and `B3⁺` blocked at `b3_invocation_binding` rather than at the credential
+conjunct.** The cells were `B` either way, so no cell moved — but they were measuring **invocation
+binding**, not the credential check §E.4's row is about. Trap 1, for the fifth time in this corpus.
+
+**The rule, general and binding on anything added later:**
+
+> **Any presented artifact that binds the credential being substituted MUST be re-minted under the
+> arm's OWN key after fault injection.**
+
+There are **two** such bindings today and both are now re-minted:
+
+| binding | artifact | source |
+|---|---|---|
+| `ath` | the DPoP proof | RFC 9449 §4.3 |
+| `access_token_hash` | the INV | ADR 0018 |
+
+`_rebind_ath` had done this for DPoP since the fault injector was first written; `_rebind_inv` was
+missing. **One rebound and one not is an omission, not a design choice** — the two are structurally
+identical, and the argument for the first is the argument for the second. Any binding added later
+inherits the rule, or this is trap 1 a sixth time.
+
+**Why the alternative reading was rejected, and it is not a matter of taste.** *"The INV binds the
+token, so `B3` catches substitution a conjunct earlier"* is a real mechanism property — and it is
+**already measured**, by `F3 dpop-first-use-body-mutation` and reported as gate G-14's C2
+attribution. Scoring it again on the `invalid_credential` row would be the **same property recorded
+twice**, which is exactly what the would-be-identical-instance test ADR 0035 adopted for `NA`
+forbids. The corpus must not double-count a property merely because a second row can be made to
+exhibit it.
+
+**One detail worth recording, because skipping it reintroduced the bug one fault along.** The re-mint
+computes `access_token_hash` for the **empty** token too, rather than skipping when nothing is
+presented: the boundary recomputes `H(presented token)` whatever was presented, so an early return on
+the empty case left `unauthenticated_caller` failing the binding first. Measured, not reasoned —
+`B3`/`B3⁺` moved from `b3_invocation_binding` to `b3_oauth_resource_authorization` only after it.
+
+**Result.** All nine arms on both `F2` rows now refuse at the conjunct the subcase targets, `B-cap`
+included — and `B-cap` was the control that diagnosed the defect in the first place, since it shares
+`B3`'s decision path but carries no INV (`invocation_assertion=b""`) and therefore always reached the
+OAuth limb.
+
 ## Status
 
 accepted — 2026-08-02 (Commander's adjudication; EXP7, before the five credential scenarios are

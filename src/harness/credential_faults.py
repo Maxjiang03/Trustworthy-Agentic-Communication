@@ -42,6 +42,7 @@ from typing import Any
 from joserfc.jwk import OKPKey
 
 from src.harness import key_material
+from src.harness.verifier.at_digest import access_token_hash
 from src.harness.verifier.holder_binding import INV_TAG, seal
 
 FAULTS = (
@@ -163,8 +164,59 @@ def _restage_token(arm: Any, fault: str, *, now: int, other: "str | None") -> bo
             )
         replacement = other
     arm._staged = dataclasses.replace(staged, access_token=replacement)
+    # THE GENERAL RULE (EXP7): **any presented artifact that binds the credential
+    # being substituted must be re-minted under the ARM'S OWN key after fault
+    # injection.** There are two today -- DPoP's `ath` (RFC 9449 SS 4.3) and the
+    # INV's `access_token_hash` (ADR 0018) -- and any binding added later
+    # inherits it. Otherwise the binding fails FIRST and the cell reads B while
+    # measuring the binding instead of the credential: trap 1, which this corpus
+    # has now sprung five times.
     _rebind_ath(arm, replacement, now)
+    _rebind_inv(arm, replacement)
     return True
+
+
+def _rebind_inv(arm: Any, token: str) -> None:
+    """Re-mint the staged INV under the arm's OWN holder key (ADR 0018).
+
+    Structurally identical to `_rebind_ath`: the INV binds `access_token_hash`,
+    so a swapped token breaks `invocation_binding_ok` before the OAuth limb is
+    reached. Re-signed with the arm's own key and its own payload, changing
+    exactly one field -- so the TOKEN stays the only attack surface, which is
+    what SS E.4's credential rows are about.
+
+    Reading this instead as *"B3's INV catches token substitution a conjunct
+    earlier"* would double-count: that property is already measured by
+    `F3 dpop-first-use-body-mutation` and reported as G-14's C2 attribution, and
+    scoring it again here is the duplication ADR 0035's NA test forbids.
+    """
+    staged = getattr(arm, "_staged", None)
+    wire = getattr(staged, "invocation_assertion", None) if staged is not None else None
+    setup = getattr(arm, "_setup", None)
+    if not wire or not setup:
+        return
+    holders = setup.get("holder_privates") or {}
+    raw = holders.get("holder-specialist")
+    if raw is None:
+        return
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    envelope = json.loads(bytes(wire))
+    payload = dict(envelope["payload"])
+    if "access_token_hash" not in payload:
+        return
+    # Computed for the EMPTY token too, not skipped: the boundary recomputes
+    # `H(presented token)` whatever was presented, so a skipped re-mint would
+    # leave `unauthenticated_caller` failing the binding first -- the same trap
+    # one fault along.
+    try:
+        payload["access_token_hash"] = access_token_hash(token)
+    except Exception:  # noqa: BLE001 -- a token that cannot be hashed binds to nothing
+        payload["access_token_hash"] = ""
+    arm._staged = dataclasses.replace(
+        staged,
+        invocation_assertion=seal(INV_TAG, payload, Ed25519PrivateKey.from_private_bytes(raw)),
+    )
 
 
 def _rebind_ath(arm: Any, token: str, now: int) -> None:
