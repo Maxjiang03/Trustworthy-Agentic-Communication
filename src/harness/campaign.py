@@ -414,9 +414,9 @@ def score_cell(
             "zero effect records would be indistinguishable from zero effects"
         )
 
-    reference = P.reference_allow(intent, observation, config)
+    reference = P.reference_allow(intent, observation, config, sealed)
     forwarded = P.observed_forwarded(events, cid)
-    breach = P.admission_breach(intent, events, cid, observation, config)
+    breach = P.admission_breach(intent, events, cid, observation, config, sealed)
     false_block = P.false_block(intent, events, cid, sealed, observation, config)
     integrity = P.log_integrity_failure(events, ledger, cid) if ledger_backed else False
     linkage, _detail = P.linkage_of(intent, events, ledger, cid) if ledger_backed else (None, "")
