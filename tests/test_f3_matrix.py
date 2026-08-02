@@ -486,3 +486,144 @@ class TestBothRowsCoverEveryArm:
         """
         assert EXPECTED_EXPIRED["B-cap"] == (False, "b3_oauth_resource_authorization")
         assert BCapArm.bitmask.oauth_authn == 1
+
+
+# --------------------------------------------------------------------------
+# STEP 13 — the replay cell measured ACROSS the process boundary
+# --------------------------------------------------------------------------
+class TestTheReplayCellAcrossTheProcessBoundary:
+    """`B3⁺`'s single cell, re-asked after EXP5 put the SUT in a child process.
+
+    The rows above judge both submissions through **one arm object in one
+    process**, which is what the in-process campaign does. EXP5 STEP 3 moved
+    the arm into a spawned child, so the cell now has a scope question the
+    in-process form could not raise: *the cache is `B3⁺`'s own attribute, so
+    which process holds it?* Answered by measurement, in both shapes.
+
+    Neither shape is a defect in the arm. Together they say what the cell
+    means: **duplicate detection is bounded by the cache's scope**, which is
+    precisely why §F.5 demands multi-process atomicity and why ADR 0033 built
+    the arbiter. Nothing here changes an arm, a prediction or a frozen value.
+    """
+
+    @staticmethod
+    def _submit(process, setup, *, now, invocation_id):
+        """One full SUT-side submission inside a child: provision → decide."""
+        visible = _visible("gt-benign")
+        provisioned = process.call("provision", arm="B3+", setup=setup)
+        assert provisioned.get("ok"), provisioned
+        delegated = process.call(
+            "delegate",
+            task_id=visible["task_id"],
+            audience=visible["audience"],
+            from_agent=visible["supervisor"],
+            to_agent=visible["specialist"],
+            authority_elements=visible["authority_elements"],
+            attenuation_elements=visible["attenuation_elements"],
+            widening_elements=visible["widening_elements"],
+            now_epoch=now,
+            expiry_epoch=now + int(visible["validity_seconds"]),
+        )
+        assert delegated.get("ok"), delegated
+        presented = process.call(
+            "present",
+            tool=TOOL,
+            arguments=ARGS,
+            method=visible["method"],
+            task_id=visible["task_id"],
+            audience=visible["audience"],
+            invocation_id=invocation_id,
+            now_epoch=now,
+        )
+        assert presented.get("ok"), presented
+        decided = process.call("decide", tool=TOOL, arguments=ARGS)
+        assert decided.get("ok"), decided
+        return bool(decided["decision"]), str(decided["reason_code"])
+
+    def test_within_one_sut_process_the_cell_holds(self, factories):
+        """Both submissions in the SAME child: §E.4's cell, unmoved.
+
+        This is the configuration the campaign runs — one scenario, one SUT
+        process — so the cell the ladder measures is unaffected by separation.
+        """
+        from src.harness.sut_process import SutProcess
+
+        _, setup = factories["B3+"]
+        now = int(time.time())
+        with SutProcess() as process:
+            first = self._submit(process, setup, now=now, invocation_id="cid-f3-xproc")
+            # BIT-IDENTICAL resubmission, same child, same staged credentials.
+            second = process.call("decide", tool=TOOL, arguments=ARGS)
+        assert first == (True, "b3_admitted")
+        assert (bool(second["decision"]), str(second["reason_code"])) == (
+            False,
+            "b3_replay_duplicate",
+        )
+
+    def test_across_two_sut_processes_the_cell_does_NOT_hold(self, factories):
+        """The same replay landing in a DIFFERENT child is admitted.
+
+        `B3PlusArm.__init__` constructs one `JtiCache` **per arm instance**, so
+        two children hold two caches and the second child has never seen the
+        id. Reported as measured. It is not a claim that `B3⁺` is broken: it is
+        the reason §F.5 requires the check-and-insert to be multi-process
+        atomic, and the reason ADR 0033 exists.
+        """
+        from src.harness.sut_process import SutProcess
+
+        _, setup = factories["B3+"]
+        now = int(time.time())
+        with SutProcess() as first_child, SutProcess() as second_child:
+            first = self._submit(first_child, setup, now=now, invocation_id="cid-f3-xproc2")
+            replay = self._submit(second_child, setup, now=now, invocation_id="cid-f3-xproc2")
+        assert first == (True, "b3_admitted")
+        assert replay == (True, "b3_admitted"), (
+            "a cross-process replay was blocked, which would mean the cache is "
+            "shared between children -- check what changed before believing it"
+        )
+
+    def test_no_ladder_arm_is_wired_to_the_g9_arbiter(self):
+        """The gap above is **wiring**, not capability — stated structurally.
+
+        Gate G-9 adjudicated multi-process atomicity on the arbiter (ADR 0033),
+        and the arms carry a seam that accepts any cache. No arm reaches for
+        the arbiter today, and this asserts that rather than leaving a reader
+        to infer from G-9's PASS that `B3⁺` as measured has the property. If a
+        later block wires one, this test is where it announces itself.
+        """
+        import inspect
+
+        from src.sut.authz.jti_cache import JtiCache
+        from src.sut.authz.replay_client import RemoteJtiCache
+
+        baselines = REPO_ROOT / "src" / "sut" / "baselines"
+        for module in sorted(baselines.glob("*.py")):
+            assert "RemoteJtiCache" not in module.read_text(encoding="utf-8"), module.name
+        assert "JtiCache()" in inspect.getsource(B3PlusArm.__init__)
+        # ...and the seam would take the remote one unchanged: same call, same
+        # three outcomes. So this is a configuration nobody has selected, not a
+        # capability that is missing.
+        assert inspect.signature(RemoteJtiCache.consume) == inspect.signature(JtiCache.consume)
+
+    def test_uniqueness_among_the_ladder_arms_is_unchanged_by_g14(self, factories):
+        """`B3⁺` is still the only LADDER arm that blocks it.
+
+        Gate G-14 attached the same cache to `B2-DPoP`, which blocks the replay
+        with it — but that is §E.4's own **`B2-DPoP + replay cache`** control
+        column, predicted **B** there, and a configuration rather than a rung.
+        Uniqueness is therefore a claim about the ladder in its ladder
+        configuration, and G-14 did not weaken it: no bitmask moved, and the
+        arm the matrix instantiates gets no cache.
+        """
+        assert sum(1 for arm, cell in EXPECTED_REPLAY.items() if cell[0] is False) == 1
+        assert EXPECTED_REPLAY["B3+"] == (False, "b3_replay_duplicate")
+        assert B2ExchangeTaskDPoPArm.bitmask.jti_cache == 0
+        # And the arm this module actually instantiates carries no cache --
+        # measured on the object rather than grepped for, so the row is known
+        # to have measured the ladder position and not a configured one.
+        arm = _armed(factories, "B2-exchange-task-DPoP", now=int(time.time()))
+        try:
+            assert arm._replay_cache is None
+        finally:
+            if hasattr(arm, "close"):
+                arm.close()
