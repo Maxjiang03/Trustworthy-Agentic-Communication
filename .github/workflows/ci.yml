@@ -89,3 +89,13 @@ jobs:
       # from an argument into a measurement.
       - name: Gate G-14 spike (cross-platform)
         run: uv run python smoke/g14/spike.py
+
+      # G-3 on Linux is REGRESSION PROTECTION ONLY and is NEVER ADJUDICATIVE.
+      # `frozen_parameters` row 2 names the row 9 SEALED MEASUREMENT PLATFORM,
+      # which is Windows; off-platform the spike prints NOT ADJUDICATED,
+      # completes the 1,000 pairs as a regression check and records no verdict.
+      # A Windows-platform criterion must not be laundered into a green Linux
+      # tick -- the same rule G-12 applies to its ledger-backed limbs. No
+      # timing number from this step is a result.
+      - name: Gate G-3 spike (regression only -- NOT adjudicative off-platform)
+        run: uv run python smoke/g3/spike.py
