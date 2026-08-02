@@ -37,10 +37,12 @@ from src.sut.authz.replay_client import RemoteJtiCache  # noqa: E402
 
 N = 8  # concurrent bit-identical requests
 NOW = 1_800_000_000
-# The L4 fill's budget. Generous on purpose: the cost is a fixed function of the
-# FROZEN capacity (see `l4_overflow_is_reached`), so the only two ways to make
-# the limb reliable are to give it time or to shrink the capacity -- and the
-# second is forbidden. A gate that errors on a slow machine is not a gate.
+# A TIMEOUT BUDGET, NOT A PERFORMANCE BASELINE -- nothing here is measured, and
+# 900 is not a claim that anything takes 900 s. Generous on purpose: the cost is
+# a fixed function of the FROZEN capacity (see `l4_overflow_is_reached`), so the
+# only two ways to make the limb reliable are to give it time or to shrink the
+# capacity -- and the second is forbidden. A gate that errors on a slow machine
+# is not a gate.
 FILL_TIMEOUT = 900
 RESULTS: list[tuple[str, bool, bool, str]] = []
 
