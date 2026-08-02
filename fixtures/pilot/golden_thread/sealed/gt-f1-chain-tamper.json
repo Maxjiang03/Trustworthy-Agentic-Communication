@@ -60,7 +60,8 @@
       "B2-broad-noexchange",
       "B2-exchange-broad"
     ],
-    "reason": "no per-hop authority chain to tamper with (SS E.3)"
+    "reason": "no per-hop authority chain to tamper with (SS E.3)",
+    "would_duplicate": "gt-f1-root"
   },
   "oauth_actor": [
     "https://as.aasc.local",

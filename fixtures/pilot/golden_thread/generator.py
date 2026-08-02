@@ -148,6 +148,19 @@ WIDENING_SPEC = [["mail.send", "mail/outbox"]]
 CHAIN_TAMPER_NA = {
     "arms": ["B0", "B1", "B2-broad-noexchange", "B2-exchange-broad"],
     "reason": "no per-hop authority chain to tamper with (SS E.3)",
+    # ADR 0035's adopted NA test, made MACHINE-CHECKABLE rather than left as
+    # prose: *if the instance built for an arm would be byte-identical to one
+    # already scored on another row, scoring it double-counts one instance
+    # rather than measuring a second.* It replaced artifact-absence -- "the arm
+    # holds no such object" -- which ADR 0035 overruled, and it is stronger
+    # because NA is a statement about the CORPUS (there is no second instance
+    # here to score), not about the mechanism.
+    #
+    # With no per-hop chain there is no widening block to append, so the
+    # instance IS `gt-f1-root` -- on which all four of these arms are already
+    # scored A. Naming the duplicated row is what lets a test verify the reason
+    # instead of a reader having to trust it.
+    "would_duplicate": "gt-f1-root",
 }
 
 SCENARIOS = [

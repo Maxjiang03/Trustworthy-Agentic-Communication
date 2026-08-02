@@ -146,6 +146,45 @@ class TestVisibleSealedSeparation:
             assert document["R"] != document["tau_gt"]
 
 
+class TestTheNAReasonIsMachineCheckable:
+    """ADR 0035's adopted test, verified rather than trusted.
+
+    A right answer resting on a reason we overruled would be re-derived wrongly
+    by whoever reads it next, so every `NA` names the row its instance would
+    duplicate -- and that row must actually score the arm `A`, or the reason is
+    a story.
+    """
+
+    def test_every_NA_group_names_the_row_it_would_duplicate(self, regenerated):
+        found = 0
+        for relative, document in regenerated.items():
+            if not relative.startswith("sealed/"):
+                continue
+            na = document["not_applicable"]
+            if not na["arms"]:
+                continue
+            found += 1
+            assert na["would_duplicate"], f"{relative}: NA arms with no duplicated row named"
+            assert na["would_duplicate"] != document["scenario_id"]
+            assert f"sealed/{na['would_duplicate']}.json" in regenerated
+        assert found >= 1, "no NA group found; this test would be vacuous"
+
+    def test_the_duplicated_row_exists_and_is_a_DIFFERENT_scenario(self, regenerated):
+        chain_tamper = regenerated["sealed/gt-f1-chain-tamper.json"]
+        assert chain_tamper["not_applicable"]["would_duplicate"] == "gt-f1-root"
+        duplicated = regenerated["sealed/gt-f1-root.json"]
+        # Byte-identical in the way that matters: same tool, same arguments'
+        # digest, same required authority. That is WHY scoring both would
+        # double-count one instance.
+        assert duplicated["tool"] == chain_tamper["tool"]
+        assert duplicated["R"] == chain_tamper["R"]
+        assert duplicated["intended_request_digest"] == chain_tamper["intended_request_digest"]
+
+    def test_a_scenario_with_no_NA_arms_needs_no_duplicated_row(self, regenerated):
+        benign = regenerated["sealed/gt-benign.json"]
+        assert benign["not_applicable"]["arms"] == []
+
+
 class TestRedLines:
     def test_confirmatory_stays_empty(self):
         confirmatory = REPO_ROOT / "fixtures" / "confirmatory"
