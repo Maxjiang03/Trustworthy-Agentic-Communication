@@ -39,6 +39,7 @@ class Specialist:
         audience: str,
         clock: Callable[[], int],
         invocation_id_provider: Callable[[], str],
+        artifacts: "Mapping[str, Any] | None" = None,
     ) -> None:
         self._arm = arm
         self._tool_caller = tool_caller
@@ -46,6 +47,13 @@ class Specialist:
         self._audience = audience
         self._clock = clock
         self._invocation_id_provider = invocation_id_provider
+        # The ADR 0030 artifacts this invocation carries: the label assertions
+        # over its payload, a declassification, an approval. Injected by the
+        # composition root exactly as the credentials and the clock are -- the
+        # agent neither mints nor verifies one, it presents what it was given.
+        # Absent for an unlabelled scenario, which is why the default is empty
+        # rather than a sentinel (EXP6 STEP 6).
+        self._artifacts: Mapping[str, Any] = dict(artifacts or {})
 
     def receive(self, envelope: DelegationEnvelope) -> Any:
         """The transport handler: one scripted tool call per delegation."""
@@ -61,6 +69,9 @@ class Specialist:
                 audience=self._audience,
                 invocation_id=self._invocation_id_provider(),
                 now_epoch=self._clock(),
+                payload_labels=tuple(self._artifacts.get("payload_labels", ())),
+                declassification=self._artifacts.get("declassification"),
+                approval_artifact=self._artifacts.get("approval_artifact"),
             ),
         )
         return self._tool_caller(tool, arguments)

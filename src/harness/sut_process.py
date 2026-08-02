@@ -131,7 +131,15 @@ class SutProcess:
         except json.JSONDecodeError as exc:
             return {"error": "sut-reply-unparseable", "detail": str(exc)[:200]}
 
-    def run_task(self, *, visible: dict, now_epoch: int, invocation_id: str, on_invoke) -> dict:
+    def run_task(
+        self,
+        *,
+        visible: dict,
+        now_epoch: int,
+        invocation_id: str,
+        on_invoke,
+        artifacts: "dict | None" = None,
+    ) -> dict:
         """Drive one scenario in the child, servicing its nested tool calls.
 
         The child runs both agents and the A2A hop and emits an `invoke` event
@@ -150,6 +158,9 @@ class SutProcess:
                     "visible": visible,
                     "now_epoch": now_epoch,
                     "invocation_id": invocation_id,
+                    # Data, not capability: the artifacts cross as JSON like
+                    # everything else on this channel (`wire.py` is not pickle).
+                    "artifacts": dict(artifacts or {}),
                 }
             ),
             ensure_ascii=True,

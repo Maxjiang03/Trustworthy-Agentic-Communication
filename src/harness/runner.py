@@ -495,6 +495,7 @@ class GoldenThreadRunner:
         ledger_backed: bool = True,
         sut_mode: str = "in-process",
         fault: str = "none",
+        artifacts: Mapping[str, Any] | None = None,
     ) -> ScenarioRun:
         """One scenario, one arm, one invocation; returns the SS F.1 records.
 
@@ -512,6 +513,15 @@ class GoldenThreadRunner:
 
         `fault` is G-12's injection and reaches the SUT only in `"separate"`
         mode, where the child owns its own self-report.
+
+        `artifacts` are the ADR 0030 artifacts the invocation carries —
+        `payload_labels`, `declassification`, `approval_artifact`, as
+        `label_artifacts.mint_for_scenario` shapes them. They reach the arm
+        through the `InvocationContext` **and** the `ObservedRequest`, because
+        Part I's `realized_harm_F4`/`_F5` and `reference_allow` read them from
+        the observation and an observation that always said `None` would make
+        every F4/F5 cell unscorable (EXP6 STEP 6). Empty for an unlabelled
+        scenario, which is every F1 scenario — so no existing caller changes.
 
         `ledger_backed=False` runs the whole thread **without the effect
         ledger**: no `LedgerWriter`, no ingress recorder, and an effector that
@@ -660,6 +670,7 @@ class GoldenThreadRunner:
             audience=audience,
             clock=lambda: run_epoch,
             invocation_id_provider=lambda: correlation_id,
+            artifacts=dict(artifacts or {}),
         )
 
         def seal_and_receive(envelope: Any) -> Any:
@@ -739,6 +750,7 @@ class GoldenThreadRunner:
                         now_epoch=run_epoch,
                         invocation_id=correlation_id,
                         on_invoke=on_invoke,
+                        artifacts=dict(artifacts or {}),
                     )
                     sut_outcome.update(outcome if isinstance(outcome, dict) else {})
                 else:
@@ -765,9 +777,13 @@ class GoldenThreadRunner:
             method=visible["method"],
             tool=observation["tool"],
             raw_arguments=rfc8785.dumps(observation["arguments"]),
-            payload_labels=[],
-            declassification=None,
-            approval_artifact=None,
+            # The artifacts the invocation carried, as the harness OBSERVED
+            # them. Sourced from the run's own injected material rather than
+            # from anything the arm returned: the SUT is what must verify
+            # these, so accepting its copy would be reading its arithmetic.
+            payload_labels=list((artifacts or {}).get("payload_labels", ())),
+            declassification=(artifacts or {}).get("declassification"),
+            approval_artifact=(artifacts or {}).get("approval_artifact"),
             iat=run_epoch,
         )
 

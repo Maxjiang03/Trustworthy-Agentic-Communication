@@ -187,6 +187,10 @@ class Session:
         visible = message["visible"]
         now_epoch = int(message["now_epoch"])
         invocation_id = message["invocation_id"]
+        # The ADR 0030 artifacts this invocation carries, minted HARNESS-SIDE
+        # and sent over the wire as data (EXP6 STEP 6). The child presents them
+        # and its arm verifies them; it mints none and trusts none by default.
+        artifacts = dict(message.get("artifacts") or {})
         self.presented = None
 
         def tool_caller(tool: str, arguments: dict) -> Any:
@@ -238,6 +242,7 @@ class Session:
             audience=visible["audience"],
             clock=lambda: now_epoch,
             invocation_id_provider=lambda: invocation_id,
+            artifacts=artifacts,
         )
         transport.register(visible["specialist"], specialist.receive)
         supervisor = Supervisor(arm=proxy, transport=transport, clock=lambda: now_epoch)
