@@ -37,6 +37,16 @@ credited to **INV**. Only **G-3 and G-10** remain; `IA-3` is untouched. Pre-regi
 stub; `fixtures/confirmatory/` still empty; **no timing number has been measured or reported
 anywhere**. Rows 1 and 2 being SET does **not** authorize measurement: G-3 owns timing and ADR 0025
 requires an adjudicative run on the row 9 sealed platform, which is not yet locked.
+Since 2026-08-02 the study **can score itself**: all **ten** Part I predicates exist (seven were
+built in one pass; before that five existed, every one a by-product of G-12, and the F1/F4/F5
+matrix cells were the arm's own `(admitted, reason_code)` read back). `src/harness/campaign.py` is
+the single campaign entry point over the existing stack, and the pilot matrix is now produced
+**from oracle verdicts**, agreeing with §E.4 in all 32 applicable cells. `analysis/` holds the
+pre-registered statistical procedure Part H step 3 seals — exact counts with **no** interval on the
+security side (§E.5: a fixed author-constructed suite has no random-sampling population), and
+ADR 0026's *stands*/*retracted* rule with a 95% bootstrap CI on the latency side, exercised on
+**synthetic** samples on both sides of the 20 ms margin. The estimator has seen **no** real
+measurement and the campaign records the timing seams as **names, not durations**.
 *(Update notes, each true when written and superseded by the next: (1) "Repository skeleton,
 pre-smoke-test. Implementation logic has NOT begun" — 2026-07-30; (2) "under `B0` and `B3` (the
 other seven arms are not built)"; (3) "four arms are built", G-13's two limbs open, rows 1–2 UNSET;
