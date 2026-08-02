@@ -30,3 +30,4 @@ Thumbs.db
 results/**
 !results/**/
 !results/**/.gitkeep
+smoke/g10/_ledger_tmp/

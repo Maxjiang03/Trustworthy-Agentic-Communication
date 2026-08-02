@@ -99,3 +99,12 @@ jobs:
       # timing number from this step is a result.
       - name: Gate G-3 spike (regression only -- NOT adjudicative off-platform)
         run: uv run python smoke/g3/spike.py
+
+      # G-10's criterion names `EffectEvent`, which needs the Win32
+      # exclusive-share effect ledger (ADR 0014 -- it does NOT degrade). Off
+      # platform the ledger-dependent limbs print NOT ADJUDICATED and the spike
+      # records no verdict, exactly as G-12 handles its ledger limbs. A
+      # readiness gate that certified readiness on a platform where the ledger
+      # cannot run would certify nothing.
+      - name: Gate G-10 spike (ledger limbs NOT ADJUDICATED off-platform)
+        run: uv run python smoke/g10/spike.py
