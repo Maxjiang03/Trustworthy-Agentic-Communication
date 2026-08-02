@@ -222,6 +222,56 @@ def check_run_mode(*, run_mode: str, corpus_root: Path, arms: Sequence[Any]) -> 
         )
 
 
+def ladder_reaches_the_arbiter() -> bool:
+    """Does any §E.1 baseline reach G-9's arbiter (`RemoteJtiCache`)?
+
+    Keyed on the **seam** rather than on a constant, so the refusal below
+    encodes *the reason* and not *the current answer*: a later block that wires
+    a ladder arm to the arbiter makes this `True` and the constraint lifts by
+    itself (ADR 0034).
+    """
+    baselines = REPO_ROOT / "src" / "sut" / "baselines"
+    return any(
+        "RemoteJtiCache" in path.read_text(encoding="utf-8") for path in baselines.glob("*.py")
+    )
+
+
+def check_single_process_campaign(*, run_mode: str, sut_mode: str) -> None:
+    """ADR 0034: a **confirmatory** campaign runs single-process.
+
+    Gate G-9 established that the §F.5 check-and-insert is atomic across
+    processes — **on the arbiter**. The ladder's `B3⁺` carries its own
+    in-process `JtiCache`, one per arm instance, so two SUT processes hold two
+    caches and a replay landing in the second is admitted. Those are two claims
+    about two different objects, and a green G-9 does not license the second.
+
+    So a confirmatory run may not be multi-process while that is still true.
+    The pilot is exempt: it is where the configuration is *explored*, and EXP5
+    STEP 13 measured the cross-process behaviour deliberately in order to find
+    this. What must not happen is a **sealed** campaign producing an F3 replay
+    row under a configuration §E.4 never predicted a cell for.
+
+    Not keyed on which arms this particular call was handed: a confirmatory
+    campaign runs the whole ladder by definition, and a check that could be
+    satisfied by omitting `B3⁺` would be a check on the caller rather than on
+    the configuration.
+    """
+    if run_mode != "confirmatory" or sut_mode == "in-process":
+        return
+    if ladder_reaches_the_arbiter():
+        return
+    raise PreconditionFailed(
+        f"run_mode='confirmatory' with sut_mode={sut_mode!r}: ADR 0034 fixes the campaign as "
+        "SINGLE-PROCESS while the ladder's replay cache is in-process. `B3PlusArm` builds one "
+        "`JtiCache` per arm instance, so across two SUT processes the bit-identical replay §E.4 "
+        "predicts BLOCKED would be ADMITTED — a cell measured under a configuration the matrix "
+        "never predicted one for. Gate G-9 adjudicated multi-process atomicity on the ARBITER, "
+        "which no baseline reaches (`RemoteJtiCache` is absent from src/sut/baselines/); wiring "
+        "one lifts this refusal, and would also put a loopback round trip inside ADR 0026's "
+        "measured segment for exactly one arm"
+    )
+
+
 def check_ledger_available(*, ledger_backed: bool, ledger_dir: Path | None) -> None:
     """ADR 0014: the effect ledger does **not** degrade.
 
@@ -498,6 +548,7 @@ def run_campaign(
         corpus_root=corpus_root,
         arms=[factory for factory, _ in factories.values()],
     )
+    check_single_process_campaign(run_mode=run_mode, sut_mode=sut_mode)
     check_ledger_available(ledger_backed=ledger_backed, ledger_dir=runner._ledger_dir)
 
     instant = int(time.time()) if now is None else int(now)
@@ -606,6 +657,8 @@ __all__ = [
     "check_frozen_rows",
     "check_ledger_available",
     "check_run_mode",
+    "check_single_process_campaign",
+    "ladder_reaches_the_arbiter",
     "key_material",
     "run_campaign",
     "score_cell",

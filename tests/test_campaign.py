@@ -291,6 +291,55 @@ class TestPreconditionsFailClosed:
             )
 
 
+class TestADR0034TheCampaignIsSingleProcess:
+    """The Commander's ruling, enforced rather than written down (EXP7 STEP 8).
+
+    Gate G-9 established multi-process atomicity **on the arbiter**; the
+    ladder's `B3⁺` carries its own in-process `JtiCache`. Those are two claims
+    about two different objects, and a confirmatory campaign may not be
+    multi-process while the second is still true — or the F3 replay row would
+    be measured under a configuration §E.4 never predicted a cell for.
+    """
+
+    def test_a_confirmatory_multi_process_run_is_REFUSED(self):
+        with pytest.raises(C.PreconditionFailed, match="SINGLE-PROCESS"):
+            C.check_single_process_campaign(run_mode="confirmatory", sut_mode="separate")
+
+    def test_a_confirmatory_in_process_run_is_allowed(self):
+        C.check_single_process_campaign(run_mode="confirmatory", sut_mode="in-process")
+
+    def test_the_PILOT_may_still_run_multi_process(self):
+        """The pilot is where the configuration is explored — EXP5 STEP 13
+        measured the cross-process behaviour deliberately, in order to find
+        this. What must not happen is a SEALED campaign doing it."""
+        C.check_single_process_campaign(run_mode="pilot", sut_mode="separate")
+
+    def test_the_refusal_is_keyed_on_the_SEAM_not_on_a_constant(self):
+        """So it lifts by itself when a baseline reaches the arbiter.
+
+        Today no baseline does, which is what makes the constraint bind; the
+        check encodes *the reason* rather than *the current answer*.
+        """
+        assert C.ladder_reaches_the_arbiter() is False
+        baselines = REPO_ROOT / "src" / "sut" / "baselines"
+        for path in sorted(baselines.glob("*.py")):
+            assert "RemoteJtiCache" not in path.read_text(encoding="utf-8"), path.name
+
+    def test_the_refusal_names_why_rather_than_just_refusing(self):
+        with pytest.raises(C.PreconditionFailed) as raised:
+            C.check_single_process_campaign(run_mode="confirmatory", sut_mode="separate")
+        message = str(raised.value)
+        assert "ADR 0034" in message
+        assert "per arm instance" in message
+        assert "ARBITER" in message
+
+    def test_the_campaign_routes_through_the_check(self, runner, factories):
+        """Not merely available — actually called by `run_campaign`."""
+        import inspect
+
+        assert "check_single_process_campaign(" in inspect.getsource(C.run_campaign)
+
+
 class TestTheRunRecord:
     def test_it_captures_what_part_H_step_6_will_hash(self, result):
         record = result.record.as_dict()
