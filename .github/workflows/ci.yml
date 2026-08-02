@@ -71,7 +71,15 @@ jobs:
       # G-9 is cross-platform by construction (ADR 0033: loopback sockets and a
       # spawned arbiter, deliberately NOT an OS primitive that would have made
       # the replay cache Windows-only). It fills the frozen 2^16 capacity, so
-      # it is the longest of the spikes and still well under a minute.
+      # it is BY FAR the longest of the spikes: minutes, not seconds.
+      #
+      # This comment read "still well under a minute" until 2026-08-02, which
+      # was true of the machines it had run on and false in general. EXP5
+      # STEP 13's standing check found the L4 fill is QUADRATIC in the frozen
+      # capacity -- 2,147,450,880 scan steps -- so its runtime is a function of
+      # the runner, and the spike's 120 s socket timeout made the limb a coin
+      # flip. The budget stays at 2^16 (shrinking it is forbidden action 6) and
+      # the limb was given the time it costs; expect this step to dominate CI.
       - name: Gate G-9 spike (cross-platform)
         run: uv run python smoke/g9/spike.py
 

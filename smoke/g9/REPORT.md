@@ -62,6 +62,21 @@ inserted *before* the cache filled is still present: **no unexpired entry was ev
 which is the flooding bypass ADR 0027 rejects. The budget exists so this path can be exercised, not
 so the campaign stays below it.
 
+*Update, 2026-08-02 — EXP5 STEP 13's standing check, recorded rather than quietly patched. This
+limb was FLAKY and passed only because the machines it had run on were fast enough.* Reaching the
+frozen `2^16` through the real `consume` path is **quadratic in the capacity**, because
+`JtiCache._evict_expired` scans every entry on every call: **2,147,450,880 scan steps**, counted
+exactly with an instrumented subclass rather than estimated. The spike's socket read had a **120 s**
+budget, so on a slower machine the fill did not finish and the gate **errored with every other limb
+green** — a flaky gate, which is worse than a failing one, and it would have surfaced first during a
+confirmatory run. The tempting fix was to fill to a smaller capacity; that is **forbidden action 6**
+(moving a frozen parameter to suit a test) and would mean overflow was never *reached*, which is the
+entire point of the limb. **`2^16` is unchanged and the limb was given the time that budget costs**
+(`FILL_TIMEOUT = 900 s`), after which it passes with the same four assertions and the same values.
+**The `O(n)`-per-`consume` eviction was NOT optimised**, deliberately: the replay cache's cost is
+part of what **G-3** exists to measure, and improving it before the cost gate runs would silently
+change the thing being measured. It is recorded here as a known cost property, not fixed.
+
 **L5 enforces the freeze by absence.** The arbiter accepts **no** `--capacity` or `--ttl` flag, so a
 frozen parameter cannot be moved to suit a test — EXP5 forbidden action 6 held structurally rather
 than by discipline.

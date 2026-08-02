@@ -37,6 +37,11 @@ from src.sut.authz.replay_client import RemoteJtiCache  # noqa: E402
 
 N = 8  # concurrent bit-identical requests
 NOW = 1_800_000_000
+# The L4 fill's budget. Generous on purpose: the cost is a fixed function of the
+# FROZEN capacity (see `l4_overflow_is_reached`), so the only two ways to make
+# the limb reliable are to give it time or to shrink the capacity -- and the
+# second is forbidden. A gate that errors on a slow machine is not a gate.
+FILL_TIMEOUT = 900
 RESULTS: list[tuple[str, bool, bool, str]] = []
 
 
@@ -152,9 +157,29 @@ def l4_overflow_is_reached(arbiter) -> None:
     import socket
 
     def raw(message: dict) -> dict:
-        with socket.create_connection(("127.0.0.1", arbiter.port), timeout=120) as conn:
+        # FILL_TIMEOUT, not 120 s. Found by EXP5 STEP 13's standing check, and
+        # recorded here rather than quietly patched: reaching the frozen 2^16
+        # through the real `consume` path is QUADRATIC in the capacity, because
+        # `JtiCache._evict_expired` scans every entry on every call --
+        # 2,147,450,880 scan steps, counted exactly, not estimated. The limb
+        # therefore takes minutes on a slow machine and finished inside 120 s
+        # only on the machines it happened to be adjudicated on; on a slower one
+        # the socket read timed out and the gate errored with every OTHER limb
+        # green. That is a flaky gate, which is worse than a failing one.
+        #
+        # The tempting fix is to fill to a smaller capacity. That is EXP5
+        # forbidden action 6 -- moving a frozen parameter to suit a test -- and
+        # it would mean overflow was never REACHED, which is the whole point of
+        # this limb. So the budget stays at 2^16 and the limb is simply given
+        # the time that budget costs.
+        with socket.create_connection(("127.0.0.1", arbiter.port), timeout=FILL_TIMEOUT) as conn:
             conn.sendall((json.dumps(message) + "\n").encode())
             return json.loads(conn.makefile("r", encoding="utf-8").readline())
+
+    print(
+        f"    ...filling the cache to the frozen capacity {arbiter.capacity} through the real "
+        f"check-and-insert; this is quadratic in the capacity and takes minutes"
+    )
 
     filled = raw({"op": "fill", "count": arbiter.capacity, "now": NOW, "mechanism_tag": "fill"})
     size = raw({"op": "size"})
