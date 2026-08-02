@@ -143,6 +143,27 @@ not** `NA`, per ADR 0028.) Each is reported with the reason it rests on:
 **No `NA` cell in §E.4 now rests on artifact-absence, and none rests on anything else.** Nothing
 beyond the reasons was corrected.
 
+### Addition, 2026-08-02 (second) — `B1`'s secret plane is missing from a SECOND abstraction
+
+The limit recorded above — *§E.5's ten columns carry no bit for `B1`'s static shared secret* — turned
+out not to be a one-off. Building EXP7's credential faults, the **fault vocabulary carried no term
+for it either**: every token fault operates on `access_token`, and `B1` has none. Its credential is
+`api_key_secret`. So `B1` was left untouched by `invalid_credential` and `unauthenticated_caller`
+and **admitted**, while §E.4 predicts **B** — two cells disagreeing for a reason that is neither the
+arm's nor the prediction's.
+
+**The pattern, which matters more than the fix.** `B1`'s secret plane is **systematically absent
+from this project's abstractions**: absent from the §E.5 bitmask, absent from the fault vocabulary,
+and in both cases the absence produced a wrong answer about `B1` that looked like an answer about
+something else. `B1` is the one arm whose credential is neither an OAuth token nor a capability, and
+every abstraction built around those two silently drops it.
+
+**Obligation, not just a fix:** any future mechanism that enumerates credentials — a fault
+vocabulary, a bitmask column, an evidence schema, a verification path — **must ask what `B1`
+carries** rather than enumerating the two mechanisms that happen to be interesting. The fix itself is
+small and changes no cell: a `B1` limb in the two token faults, corrupting or removing
+`api_key_secret`.
+
 ### Consequence for the corpus
 
 The `F2 wrong_holder_proof` sealed record carries these six `NA` arms with the **would-be-identical-
