@@ -7,9 +7,10 @@ Trustworthy Agentic Communication: a pre-registered, reproducible testbed that m
 `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` is the SINGLE source of truth (baselines, capability/HTC/INV, oracle, smoke-gate DAG, freeze/seal loop, workflow). Do not contradict it. If a change is needed, record an ADR in `adr/` and update the doc — never silently diverge.
 
 ## Current phase
-Experimental apparatus, pilot corpus only. **Eleven smoke gates pass** (`smoke/README.md`); the
+Experimental apparatus, pilot corpus only. **Thirteen smoke gates pass** (`smoke/README.md`); the
 golden thread runs end to end — Supervisor → A2A hop (behind a port, ADR 0020) → Specialist → MCP
-tool call over the frozen `Ω`. All nine §E.1 ladder arms are built. Since 2026-08-01 the study
+tool call over the frozen `Ω`, **in-process or in a spawned SUT child process**, the two modes
+measured identical over all 32 applicable nine-arm cells. All nine §E.1 ladder arms are built. Since 2026-08-01 the study
 **scores four of the five §E.3 families**: F1 (three subcases), three F2 subfamilies, **F3** (the
 expired-token and captured-proof-replay rows, over all nine arms), and **F4/F5** (four labelled
 fixtures — two attacks and two benign controls — over all nine arms under **both** monitor
@@ -23,17 +24,26 @@ adjudicated into **ADR 0031** (`NA → B` on the F3 OAuth controls) and **ADR 00
 F4/F5); both corrected **predictions**, never code. The pilot corpus now carries **two authority
 chains** — F4/F5 run on one where their actions are inside `C_1`, or `containment_ok` would mask
 the policy conjuncts. **9 of 11 `frozen_parameters` rows are set**; row 5 is deferred by decision
-(ADR 0028) and only row 9 remains, read off the measurement box at seal time. Gates G-3, G-9, G-10,
-G-12, G-14 remain; `IA-3` and `IA-9` are both untouched. Pre-registration still a stub;
-`fixtures/confirmatory/` still empty; **no timing number has been measured or reported anywhere**.
-Rows 1 and 2 being SET does **not** authorize measurement: G-3 owns timing and ADR 0025 requires an
-adjudicative run on the row 9 sealed platform, which is not yet locked.
+(ADR 0028) and only row 9 remains, read off the measurement box at seal time. Since 2026-08-02 the
+SUT runs **out of process** — both agents, the arm and the arm's decision in a spawned child, with
+the runner, the mediation record, the ledger writer, the effector, the oracle and every sealed
+object in the parent — so G-6's and G-7's in-process reachability residuals are closed by **address
+space** rather than by assumption; **in-process stays the default**, so the earlier gates are not
+silently re-adjudicated. **Gates G-12, G-9 and G-14 PASS** and **`IA-9` moves to verified** (ADR
+0033: the replay cache is a single-writer arbiter process). G-14's attribution belongs in the
+results chapter: **DPoP and invocation binding block different things** — indistinguishable on
+captured-proof-replay given the same cache, separated on first-use body mutation, the residual
+credited to **INV**. Only **G-3 and G-10** remain; `IA-3` is untouched. Pre-registration still a
+stub; `fixtures/confirmatory/` still empty; **no timing number has been measured or reported
+anywhere**. Rows 1 and 2 being SET does **not** authorize measurement: G-3 owns timing and ADR 0025
+requires an adjudicative run on the row 9 sealed platform, which is not yet locked.
 *(Update notes, each true when written and superseded by the next: (1) "Repository skeleton,
 pre-smoke-test. Implementation logic has NOT begun" — 2026-07-30; (2) "under `B0` and `B3` (the
 other seven arms are not built)"; (3) "four arms are built", G-13's two limbs open, rows 1–2 UNSET;
 (4) "Nine smoke gates pass … F3, F4 and F5 cannot be scored at all, because `authz_context_hash`
 has been ADR 0009 category (c) since the beginning" — superseded by the ADR 0030 / G-15 pass,
-2026-08-01.)*
+2026-08-01; (5) "Eleven smoke gates pass … Gates G-3, G-9, G-10, G-12, G-14 remain; `IA-3` and
+`IA-9` are both untouched" — superseded by the EXP5 process-separation block, 2026-08-02.)*
 
 ## Pre-registration status
 Not yet authored. Per Part H, the pre-registration is written and sealed only AFTER the smoke gates pass, and is derived from the architecture doc. `docs/PRE_REGISTRATION.md` is a stub. Any earlier draft is superseded and must not be reused.
