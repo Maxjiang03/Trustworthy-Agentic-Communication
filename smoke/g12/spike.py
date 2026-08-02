@@ -67,6 +67,16 @@ SUT_SUPPLIED_NAMES = (
     "sut_verdict",
     "arm_verdict",
     "claimed",
+    # Added by EXP6 STEP 4, when seven predicates joined the oracle. Each is a
+    # name a SUT-computed verdict could arrive under in the new families: the
+    # arm's own conjunct outcomes, its policy decision, and its monitor's
+    # answer. None is read; the point is that adding one would now fail here.
+    "conjunct",
+    "conjuncts",
+    "decision_path",
+    "monitor_verdict",
+    "policy_verdict",
+    "admitted_by_arm",
 )
 
 
@@ -75,47 +85,64 @@ def l2_oracle_reads_no_sut_verdict() -> None:
 
     The criterion's second half matters as much as its first: detection is
     worth nothing if the detector consults the thing it is detecting. So the
-    oracle's module is scanned for any mention of a SUT-supplied verdict field,
-    and for any import of SUT code.
+    oracle's modules are scanned for any mention of a SUT-supplied verdict
+    field, and for any import of SUT code.
+
+    *EXP6 STEP 4 widened this from one file to the whole `src/harness/oracle/`
+    package.* Scanning `predicates.py` alone was right when the oracle was one
+    module; it became a hole the moment a predicate could delegate to a helper
+    in a sibling file, because the scan would then certify a module that reads
+    nothing while the module it calls reads everything. **The property G-12
+    adjudicates is about the oracle, not about a filename.**
     """
-    source = (REPO_ROOT / "src" / "harness" / "oracle" / "predicates.py").read_text(
-        encoding="utf-8"
-    )
-    tree = ast.parse(source)
+    oracle_dir = REPO_ROOT / "src" / "harness" / "oracle"
+    modules = sorted(path for path in oracle_dir.glob("*.py") if path.name != "__init__.py")
 
     imported: set[str] = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            imported.update(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imported.add(node.module)
+    reachable: set[str] = set()
+    for path in modules:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported.add(node.module)
+        # Every string constant the oracle uses to reach into a record. A
+        # verdict field can only be read by NAMING it, so the absence of the
+        # names is the absence of the reading.
+        reachable |= {
+            node.value
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+        reachable |= {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
     no_sut_import = not any(name.startswith("src.sut") for name in imported)
-
-    # Every string constant the oracle uses to reach into a record. A verdict
-    # field can only be read by NAMING it, so the absence of the names is the
-    # absence of the reading.
-    literals = {
-        node.value
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Constant) and isinstance(node.value, str)
-    }
-    attributes = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
-    reachable = literals | attributes
     forbidden_present = sorted(name for name in SUT_SUPPLIED_NAMES if name in reachable)
 
     # ...and what it DOES read, so this is not a scan that would pass on an
-    # empty file.
-    trusted = {"admitted", "effect_id", "correlation_id", "intended_request_digest"}
+    # empty file. Extended with the fields the seven new predicates read, so
+    # non-vacuity keeps pace with the oracle rather than testing only F3.
+    trusted = {
+        "admitted",
+        "effect_id",
+        "correlation_id",
+        "intended_request_digest",
+        "action",  # authority_from_effects, ledger-side
+        "resource",
+        "data_labels_touched",  # realized_harm_F4, ledger-side
+        "is_benign",  # false_block, sealed-side
+        "C_sets",  # reference_allow, sealed-side
+    }
     reads_trusted = trusted <= reachable
 
     record(
         "G-12.L2",
         True,
         no_sut_import and not forbidden_present and reads_trusted,
-        f"the oracle imports no src.sut module: {no_sut_import}; it names none of the "
-        f"SUT-supplied verdict fields {list(SUT_SUPPLIED_NAMES)} "
-        f"(found: {forbidden_present or 'none'}); "
-        f"and it DOES name the trusted-source fields {sorted(trusted)}: {reads_trusted}, so the "
+        f"all {len(modules)} oracle modules ({', '.join(p.name for p in modules)}) import no "
+        f"src.sut module: {no_sut_import}; they name none of the {len(SUT_SUPPLIED_NAMES)} "
+        f"SUT-supplied verdict fields (found: {forbidden_present or 'none'}); "
+        f"and they DO name the trusted-source fields {sorted(trusted)}: {reads_trusted}, so the "
         "scan is not vacuous",
     )
 
