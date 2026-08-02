@@ -1,0 +1,78 @@
+{
+  "C_sets": [
+    [
+      [
+        "calendar.read",
+        "calendar/work"
+      ],
+      [
+        "notes.read",
+        "notes/project"
+      ],
+      [
+        "notes.write",
+        "notes/project"
+      ]
+    ],
+    [
+      [
+        "notes.read",
+        "notes/project"
+      ],
+      [
+        "notes.write",
+        "notes/project"
+      ]
+    ]
+  ],
+  "R": [
+    [
+      "notes.write",
+      "notes/project"
+    ]
+  ],
+  "U_task": [
+    [
+      "calendar.read",
+      "calendar/work"
+    ],
+    [
+      "notes.read",
+      "notes/project"
+    ],
+    [
+      "notes.write",
+      "notes/project"
+    ]
+  ],
+  "_banner": "HARNESS-ONLY SEALED TRUTH -- no SUT principal may read this document (CLAUDE.md red line 5; SS A.3). correlation_id and P_hashes are completed by the runner at mint time, because tokens are minted at run time (ADR 0007) and the correlation id is minted per invocation (SS F.1).",
+  "attack_subcase": "F3:audience_mismatch",
+  "audience": "https://mcp.aasc.local/tools",
+  "credential_fault": "audience_mismatch",
+  "htc_holder_kid": "kid-holder-specialist",
+  "intended_labels": [],
+  "intended_request_digest": "730f7ba658d2cf7a96756b69f83ab5bf06f36ff351673f1e1a704a5289be4c15",
+  "is_benign": false,
+  "method": "tools/call",
+  "not_applicable": {
+    "arms": [],
+    "reason": ""
+  },
+  "oauth_actor": [
+    "https://as.aasc.local",
+    "agent-specialist"
+  ],
+  "requires_approval": false,
+  "resource_owner": [
+    "https://as.aasc.local",
+    "user-yixian"
+  ],
+  "scenario_id": "gt-f3-audience-mismatch",
+  "tau_gt": [
+    [
+      "notes.write",
+      "notes/project"
+    ]
+  ],
+  "tool": "notes.write"
+}

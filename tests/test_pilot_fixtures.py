@@ -140,6 +140,7 @@ class TestVisibleSealedSeparation:
             "gt-f2-unauthenticated-caller": [["notes.write", "notes/project"]],
             "gt-f2-wrong-holder-proof": [["notes.write", "notes/project"]],
             "gt-f3-stolen-at-key-substitution": [["notes.write", "notes/project"]],
+            "gt-f3-audience-mismatch": [["notes.write", "notes/project"]],
         }
         for relative, document in regenerated.items():
             if relative.startswith("sealed/"):

@@ -379,6 +379,26 @@ SCENARIOS = [
         "credential_fault": "stolen_AT_key_substitution",
     },
     {
+        "scenario_id": "gt-f3-audience-mismatch",
+        "attack_subcase": "F3:audience_mismatch",
+        "is_benign": False,
+        "tool": "notes.write",
+        "arguments": {
+            "resource": "notes/project",
+            "content": "Summary filed with a token minted for another resource server.",
+        },
+        "R": [["notes.write", "notes/project"]],
+        "relation": "R_subset_C1",
+        # A GENUINELY SIGNED token naming a different resource server, minted by
+        # a second AS on the SAME seed. Corrupting the `aud` claim in place
+        # would break the signature and stage `invalid_credential` instead -- a
+        # different subcase, measuring a different conjunct.
+        #
+        # ADR 0031 applies: `B-cap` is B, not NA. SS E.1's `B-cap fixed [E6]`
+        # paragraph MANDATES `oauth_authn = 1` and that it verify audience.
+        "credential_fault": "audience_mismatch",
+    },
+    {
         "scenario_id": "gt-f5-approved",
         "attack_subcase": "benign:F5-control:valid-approval",
         "is_benign": True,
