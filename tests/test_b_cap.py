@@ -115,6 +115,22 @@ def _invocation(visible: dict, now: int, *, tool: str, arguments: dict) -> Invoc
     )
 
 
+def _token_window(token: str) -> tuple[int, int]:
+    """`(iat, exp)` read from the access token's own claims, **unverified**.
+
+    Unverified on purpose, and it is a test reading the artifact under test to
+    find an instant inside its window -- never a verification path. The point
+    is that the instant a window-sensitive assertion uses must come from the
+    window, not from a wall clock that has nothing to do with when the AS
+    happened to mint.
+    """
+    import base64
+
+    payload = token.split(".")[1]
+    claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+    return int(claims["iat"]), int(claims["exp"])
+
+
 def _armed(arm, setup, visible, *, tool=BENIGN_TOOL, arguments=None, now=None):
     """Provision, delegate and present in one construction, on one clock."""
     now = int(time.time()) if now is None else now
@@ -225,34 +241,74 @@ class TestOAuthAuthnIsOnAndVerifies:
         assert "aud" in arm.audit_log[-1]["detail"]
 
     def test_expiry_is_verified(self, setup, running_as):
-        """A one-second base token, judged five seconds later.
+        """A one-second base token, judged five seconds past its own `exp`.
 
         The capability's own window is an hour, so it is still valid at that
         instant -- which is what makes the block attributable to the TOKEN's
         expiry rather than to the capability's.
+
+        **Both instants are derived from the token's own claims, and neither
+        re-reads the wall clock.** The negative arm previously staged at
+        `int(time.time())`, which made it a race against the module-scoped AS:
+        the `agent-worker` token lives one second from AS start-up, so once the
+        fixture had been up longer than that, the arm that must ADMIT was
+        staged past `exp` and the test flipped. It failed intermittently on
+        Linux, passed in isolation, and never showed on Windows.
+
+        That is the two-clocks shape for the fourth time -- the OAuth plane
+        mints against the wall clock while the capability plane is judged at an
+        injected instant (blocks 2, 4 and G-14 each hit it). The fix is the one
+        those three used: inject the instant. It is taken from `iat`/`exp`
+        rather than from a clock, so the window cannot drift out from under it
+        however long the AS has been up, and the token's lifetime is left at one
+        second -- widening it would have hidden the defect rather than removed
+        it.
         """
-        now = int(time.time())
+        token = running_as.phase1_tokens["agent-worker"]
+        issued_at, expires_at = _token_window(token)
+        assert issued_at < expires_at, "the worker token has no window to be inside"
+
         arm, _, _ = _armed(
             BCapArm(),
-            dict(setup, access_token=running_as.phase1_tokens["agent-worker"]),
+            dict(setup, access_token=token),
             _visible("gt-benign"),
-            now=now,
+            now=issued_at,
         )
-        # Re-stage at an instant past the token's exp but inside the capability's.
-        arm._staged = dataclasses.replace(arm._staged, now_epoch=now + 5)
+        # Re-stage at an instant past the token's exp but inside the
+        # capability's, which runs an hour from `issued_at`.
+        arm._staged = dataclasses.replace(arm._staged, now_epoch=expires_at + 5)
         admitted, reason = arm.decide(BENIGN_TOOL, BENIGN_ARGS)
         assert admitted is False
         assert reason == REASON_CODES["oauth_resource_authorization_ok"]
         assert "exp" in arm.audit_log[-1]["detail"]
-        # Negative arm: the SAME token at an instant inside its window is
-        # admitted, so the refusal is the expiry and not the token itself.
+        # Negative arm: the SAME token at an instant INSIDE its window --
+        # `iat`, read from the token itself -- is admitted, so the refusal is
+        # the expiry and not the token itself.
         fresh, _, _ = _armed(
             BCapArm(),
-            dict(setup, access_token=running_as.phase1_tokens["agent-worker"]),
+            dict(setup, access_token=token),
             _visible("gt-benign"),
-            now=int(time.time()),
+            now=issued_at,
         )
         assert fresh.decide(BENIGN_TOOL, BENIGN_ARGS) == (True, "b3_admitted")
+
+    def test_the_expiry_test_reads_no_wall_clock(self):
+        """The guard that keeps the flake removed rather than merely fixed.
+
+        The defect was a race, so "it passed" is not evidence: the old form
+        passed whenever the module-scoped AS happened to be younger than the
+        one-second token, which is most of the time on a fast machine and was
+        why Windows never showed it. What removes the race is that **both
+        instants come from the token's window**, so this asserts exactly that
+        — a future edit reintroducing a wall-clock read here fails here.
+        """
+        import inspect
+
+        source = inspect.getsource(TestOAuthAuthnIsOnAndVerifies.test_expiry_is_verified)
+        body = source.split('"""')[2]  # past the docstring, which discusses the clock
+        assert "time.time()" not in body
+        assert "_token_window(" in body
+        assert "issued_at" in body and "expires_at" in body
 
     def test_a_standalone_capability_configuration_is_not_built(self):
         """SS E.1: `oauth_authn = 0` may exist only as a separate exploratory
