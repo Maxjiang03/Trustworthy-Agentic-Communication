@@ -88,6 +88,69 @@ on the `K-none | T-reuse` cell**. §E.4 also scores `B2-exchange-task` as **A** 
 tampering point twice with two different answers for one arm. **Not corrected here**; it is reported
 for adjudication, with the evidence, exactly as this cell was.
 
+---
+
+## Addition, 2026-08-02 — the `NA` test, adjudicated and made the standard
+
+The six `F2 wrong_holder_proof` cells above were referred for adjudication. **The cells STAND as
+`NA`. Their stated reason does not, and is replaced here** — a right answer resting on a reason this
+ADR overruled would be re-derived wrongly by whoever reads it next.
+
+### The test, and it is not "is the artifact present"
+
+> **If the instance built for an arm would be byte-identical to an instance already scored on
+> another row, scoring it double-counts one instance rather than measuring a second.**
+
+This is the discriminator the `F1-chain-tamper` audit above arrived at, adopted now as **the**
+standard for every `NA` in §E.4. It replaces artifact-absence, which this ADR overruled for `B0`, and
+it is stronger for a reason worth stating: artifact-absence asks *what does the arm hold*, which is
+a fact about the mechanism, whereas this asks *what instance can be built*, which is a fact about the
+**corpus**. `NA` is a statement about the corpus — that there is no second instance here to score —
+so the test should be about instances.
+
+### Why the two rows genuinely differ, under it
+
+They test different things under similar names, and the test separates them cleanly:
+
+| | what the attacker does | can every arm express it? |
+|---|---|---|
+| **`F3 dpop-stolen-AT-key-substitution` (T-reuse)** | takes **the token** and uses it | **Yes** — the token exists in every arm that carries one. `B2-exchange-task` **admits**, because a bearer token is not bound to a holder: a measurable vulnerability, so **A**, and §D.2's matrix scores it ❌ independently |
+| **`F2 wrong_holder_proof / wrong_dpop_key`** | presents a **holder proof signed by the wrong holder** | **No**, for the six. `B2-exchange-task`'s presentation contains no such object — no DPoP proof, no INV. The only instance constructible for it is *hand the token to another party*, which **is the T-reuse instance, byte for byte** |
+
+So scoring both rows for those six would record **one** instance **twice**. That is the double-count,
+and `NA` is correct.
+
+**The row each of the six would duplicate is named, so the claim is checkable rather than asserted:**
+every one of `B0`, `B1`, `B2-broad-noexchange`, `B2-exchange-broad`, `B2-exchange-task` and `B-cap`
+is already scored **A** on `F3 dpop-stolen-AT-key-substitution`, and that is the instance their
+`wrong_holder_proof` cell would rebuild. For `B-cap` the equivalence is not merely argued — it is
+already measured, by `tests/test_b_cap.py::TestCapturedCapabilityContrast`: one capability, captured
+from its legitimate holder and presented by a different party, which `B-cap` admits and `B3` blocks.
+`B-cap` presents **no HTC chain and no INV** (`b_cap.py` sets `invocation_assertion=b""`), so there is
+no holder proof for a wrong holder to have signed.
+
+### The full audit, re-run under the adopted test
+
+§E.4 carries `NA` in exactly **two** rows, ten cells in total, after this ADR moved `B0`'s
+`invalid_credential` cell to `A`. (`F2 wrong_principal` is *deferred — unscored* and is **emphatically
+not** `NA`, per ADR 0028.) Each is reported with the reason it rests on:
+
+| row | `NA` cells | reason it rests on | verdict |
+|---|---|---|---|
+| `F1-chain-tamper` | `B0`, `B1`, `B2-broad-noexchange`, `B2-exchange-broad` | **would-be-identical-instance** — no per-hop chain to append a widening block to, so the instance is byte-identical to **`gt-f1-root`**, on which all four are already scored `A` | **sound** |
+| `F2 wrong_holder_proof / wrong_dpop_key` | `B0`, `B1`, `B2-broad-noexchange`, `B2-exchange-broad`, `B2-exchange-task`, `B-cap` | **would-be-identical-instance** — no holder proof in the presentation, so the only constructible instance is the **`F3 dpop-stolen-AT-key-substitution`** one, on which all six are already scored `A` | **sound** |
+
+**No `NA` cell in §E.4 now rests on artifact-absence, and none rests on anything else.** Nothing
+beyond the reasons was corrected.
+
+### Consequence for the corpus
+
+The `F2 wrong_holder_proof` sealed record carries these six `NA` arms with the **would-be-identical-
+instance** reason, naming the row the instance would duplicate — not *"there is no holder proof in
+this arm's presentation"*. The `F1-chain-tamper` record's existing reason (*"no per-hop authority
+chain to tamper with (§E.3)"*) is the same test stated in that row's terms and is kept, with the
+duplicated row named alongside it.
+
 ## Consequences
 
 - §E.4's `F2 invalid_credential` row is amended with a **dated update note**, not a rewrite.
