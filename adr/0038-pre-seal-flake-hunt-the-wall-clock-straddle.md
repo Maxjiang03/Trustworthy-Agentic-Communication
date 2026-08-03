@@ -1,7 +1,4 @@
-# 000X — The pre-seal flake: a **wall-clock straddle** in test fixtures
-
-*(Letter placeholder. The Commander assigns the number; this ADR is not numbered by the session
-that wrote it.)*
+# 0038 — The pre-seal flake: a **wall-clock straddle** in test fixtures
 
 ## Context
 
@@ -50,6 +47,14 @@ E     Extra items in the left set: ...
 ```
 
 An authority set computed at one instant was compared against one computed at another.
+
+> **Corrected by [0039](0039-one-clock-per-cell-the-campaign-adopts-the-cells-clock.md) — this
+> attribution only.** That module reads **no wall clock at all**: `NOW` and `EXPIRY` are frozen
+> `datetime` constants and `src/harness/authorizer/allowed.py` reads no clock, so there are not two
+> clocks here to straddle. Run 001's cause is **undetermined**; 0039 §Site A records a named
+> candidate and applies no fix on it. **Run 000's attribution also moved** — 0039 locates its
+> straddle at the OAuth access token's 300 s lifetime rather than at Δ — but the straddle diagnosis
+> itself stands for run 000. Everything else below is unaffected.
 
 ## Root cause
 
@@ -118,6 +123,18 @@ already do.
 names as the success condition; a fix landed without its own failing-world demonstration would be
 the outcome the task forbids. **No frozen parameter was touched, no window widened, no retry added,
 no test marked flaky, and nothing in `src/` changed.**
+
+## Status
+
+accepted — 2026-08-02 (the pre-seal flake hunt; reproduction and root cause, fix referred)
+
+**Partially superseded by [0039](0039-one-clock-per-cell-the-campaign-adopts-the-cells-clock.md) —
+on the run-001 root-cause attribution only.** The wall-clock straddle recorded here is **not** the
+cause of `test_appended_widening_verifies_but_does_not_widen`; that module reads no wall clock, so
+its cause is **undetermined**. 0039 also relocates run 000's straddle from Δ to the OAuth access
+token's 300 s lifetime, without disturbing the straddle diagnosis itself. **The reproduction
+condition and its rates (0/6, 0/4, 2/3), both named failures, the evidence-based exclusion of the
+shared `b3_setup` lead, and the direction-of-failure finding all stand unchanged.**
 
 ## Consequences
 

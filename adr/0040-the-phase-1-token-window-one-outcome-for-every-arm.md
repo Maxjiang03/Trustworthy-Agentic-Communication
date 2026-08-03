@@ -1,9 +1,7 @@
-# 000Z — The phase-1 token window: one expired credential, one outcome
+# 0040 — The phase-1 token window: one expired credential, one outcome
 
-*(Letter placeholder. The Commander assigns the number; this ADR is not numbered by the session that
-wrote it. It follows **"One clock per cell: the campaign adopts the cell's clock"**, which is also
-unnumbered — referenced here by title. That ADR closed Δ; this one closes the window Δ was the wrong
-instrument for.)*
+*(Follows [0039](0039-one-clock-per-cell-the-campaign-adopts-the-cells-clock.md). That ADR closed Δ;
+this one closes the window Δ was the wrong instrument for.)*
 
 ## Context
 
@@ -191,6 +189,11 @@ Each reason is recorded because the reasons are what let a novel instance be rec
 | A **sweep of module-scoped AS fixtures** across `tests/` | Test fixtures produce no results. A large change to code that cannot affect the sealed record, days before a seal. |
 | Anything in **`src/sut/`** | The asymmetry between the two arms' failure modes is real, but it is closed **in the harness**, by refusing the cell before either behaviour matters. Changing an arm would change what §E.4 measured and re-open every gate adjudicated on it. |
 
+## Status
+
+accepted — 2026-08-03 (the validity-coverage guard, its enumeration and both halves of its failing
+world)
+
 ## Consequences
 
 - **`src/sut/` is untouched.** No arm changed, no conjunct changed, no frozen parameter moved. The
@@ -200,5 +203,8 @@ Each reason is recorded because the reasons are what let a novel instance be rec
   the row 9 platform.
 - The `as_tls_cert_pem` window is now bounded rather than assumed harmless. It has never fired and,
   at a day, is unlikely to; it is covered because it is the same defect, not because it is expected.
-- `000X` still needs a superseded-by pointer for its run-001 attribution. **Noted, not added** —
-  numbering and cross-linking are the Commander's.
+- The superseded-by pointer this ADR flagged as outstanding **now exists**:
+  [0038](0038-pre-seal-flake-hunt-the-wall-clock-straddle.md) carries it at its run-001 attribution
+  and in its Status, and [0039](0039-one-clock-per-cell-the-campaign-adopts-the-cells-clock.md)
+  carries the reciprocal note in §Site A. It is scoped to that attribution alone — the rest of 0038
+  stands.

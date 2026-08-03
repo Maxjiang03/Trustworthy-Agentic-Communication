@@ -1,12 +1,8 @@
-# 000Y — One clock per cell: the campaign adopts the cell's clock
-
-*(Letter placeholder. The Commander assigns the number; this ADR is not numbered by the session that
-wrote it. It follows **"The pre-seal flake: a wall-clock straddle in test fixtures"**, which is also
-unnumbered — referenced here by title rather than by a number it does not have.)*
+# 0039 — One clock per cell: the campaign adopts the cell's clock
 
 ## Context
 
-The flake-hunt ADR identified a **wall-clock straddle** — two reads of the wall clock separated by an
+[0038](0038-pre-seal-flake-hunt-the-wall-clock-straddle.md) identified a **wall-clock straddle** — two reads of the wall clock separated by an
 unbounded amount of execution, compared as if simultaneous — and located it in test fixtures.
 Independent verification then found **the same defect at a second site, in the code that will produce
 the sealed confirmatory result**. This ADR records that site and its fix.
@@ -151,10 +147,15 @@ row is not the campaign refusing everything for an unrelated reason.
 `tests/test_campaign_clock.py` runs the healthy and straddled campaigns as real campaigns — real
 arms, real signed artifacts — and asserts all three properties.
 
-## Site A — the fixtures, and a correction to the earlier ADR
+## Site A — the fixtures, and a correction to [0038](0038-pre-seal-flake-hunt-the-wall-clock-straddle.md)
 
-**The earlier ADR's root cause is correct for one of its two reproductions and wrong for the other.**
-Both are recorded here rather than the tidier answer.
+**[0038](0038-pre-seal-flake-hunt-the-wall-clock-straddle.md)'s root cause is correct for one of its
+two reproductions and wrong for the other.** Both are recorded here rather than the tidier answer.
+
+**This partially supersedes 0038, and only here.** The correction reaches its **run-001 root-cause
+attribution** and nothing else: 0038's reproduction condition and rates, its two named failures, its
+evidence-based exclusion of the shared `b3_setup` lead, and its direction-of-failure finding all
+stand. 0038 carries the reciprocal note at the attribution and in its Status.
 
 **Run 000 — `test_b3_plus.py::…::test_the_replay_is_constructed_WITHIN_delta`. Straddle LOCATED, and
 it is not the one the earlier ADR named.** The two reads are (1) the AS minting
@@ -175,8 +176,16 @@ runtime limit exceeded under contention would silently shrink the set; the obser
 `c2 <= c1` with extra items on the left, which is what a shrunken `c1` looks like. **This has not been
 confirmed and no fix is applied on a guess.**
 
-Sightings A and B from the flake-hunt ADR remain **undetermined and are not claimed closed**. Neither
+Sightings A and B from [0038](0038-pre-seal-flake-hunt-the-wall-clock-straddle.md) remain **undetermined and are not claimed closed**. Neither
 was ever reproduced.
+
+## Status
+
+accepted — 2026-08-03 (the per-cell clock, the guard and its failing world; Site A's fixture fix
+landed in the following commit)
+
+**Partially supersedes [0038](0038-pre-seal-flake-hunt-the-wall-clock-straddle.md) — its run-001
+root-cause attribution only** (§Site A above). Everything else in 0038 stands.
 
 ## Consequences
 
