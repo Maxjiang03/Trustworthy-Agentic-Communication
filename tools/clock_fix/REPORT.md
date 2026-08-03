@@ -172,10 +172,49 @@ applied on a guess.
 
 **Sightings A and B remain undetermined and are not claimed closed.** Neither was ever reproduced.
 
+## The reproduction condition, re-run — and what 0/3 does NOT establish
+
+Same condition as the flake hunt: full suite, pinned to one CPU, three busy loops, three runs.
+`tools/clock_fix/evidence/reproduction-postfix-summary.json`.
+
+| | before | after |
+|---|:--:|:--:|
+| reproduction rate | **2/3** | **0/3** |
+| counts per run | 1 failed / 1228 passed (×2), 1229 passed | 1271 passed (×3) |
+
+**A green run is not closure**, and this one establishes less than it looks like it does:
+
+- **Three runs is a weak instrument against a 2/3 base rate.** Even if nothing had been fixed,
+  three clean runs would happen about **4%** of the time. 0/3 is consistent with a fix and also
+  consistent with luck.
+- **Run 001's failure was never fixed.** `test_appended_widening_verifies_but_does_not_widen` has no
+  located straddle and no change was made to it. Its absence from three runs is **chance, not
+  evidence**, and it is not claimed otherwise.
+- **Run 000's failure is addressed by construction, not by these three runs.** The module now takes
+  its instant from the token's own window, so elapsed module time cannot move it — that claim rests
+  on `TestTheInstantComesFromTheTokenNotFromAClock` and on the measurement at `iat + 301`, not on a
+  green suite.
+- **Sightings A and B were never reproduced at all** and remain undetermined. Three green runs say
+  nothing about either.
+
+Wall-clock durations here are **run metadata** — how long a condition took to exercise. They are not
+latency figures; G-3 owns cost and its numbers live in `smoke/g3/REPORT.md` only.
+
+## The gates, re-measured
+
+`src/harness/` changed, so *every prior DAG gate passed* — a conjunct of G-10 — stopped being
+derivable from the last measurement. All fifteen spikes were re-run on the row 9 platform, unchanged
+machine, and all fifteen pass. `smoke/` and `docs/` are untouched: no gate record was rewritten and
+no verdict was moved.
+
 ## What is NOT in this commit
 
-Site A's fixture fix. Site B is what would corrupt the sealed result; Site A only makes tests red,
-and the ordering is the point of the ordering.
+**Site A's second failure.** `test_appended_widening_verifies_but_does_not_widen` has no located
+straddle, so nothing was changed in it. Fixing a failure whose cause you have not found is the
+"plausible fix that happens to turn the suite green" this work exists to avoid.
+
+**Site A's fix landed in its own commit, after Site B's**, because Site B is what would corrupt the
+sealed result and Site A only makes tests red. The ordering is the point of the ordering.
 
 **Nothing in `src/sut/` changed. No frozen parameter moved. No window was widened, no retry added,
 nothing marked flaky, skipped or suppressed. No gate verdict was moved.**

@@ -1,0 +1,49 @@
+{
+  "condition": {
+    "target": "tests",
+    "runs": 3,
+    "contention_workers": 3,
+    "spikes_first": false,
+    "no_randomly": false,
+    "pytest_randomly_installed": false,
+    "platform": "win32",
+    "cpu_count": 20,
+    "pinned_to_cpu": 2
+  },
+  "reproductions": "0/3",
+  "reproduced": 0,
+  "total_runs": 3,
+  "every_failure_named": [],
+  "runs": [
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 1271
+      },
+      "wall_seconds": 199.4,
+      "log": "run-000.log",
+      "spikes": null
+    },
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 1271
+      },
+      "wall_seconds": 216.1,
+      "log": "run-001.log",
+      "spikes": null
+    },
+    {
+      "returncode": 0,
+      "failures": [],
+      "counts": {
+        "passed": 1271
+      },
+      "wall_seconds": 223.1,
+      "log": "run-002.log",
+      "spikes": null
+    }
+  ]
+}
