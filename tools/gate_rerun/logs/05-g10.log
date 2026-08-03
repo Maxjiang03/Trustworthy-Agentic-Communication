@@ -1,0 +1,33 @@
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+GATE G-10 -- the end-to-end pilot (EXP8C). THE LAST GATE.
+==============================================================================
+G-10.L1 [MANDATORY] PASS -- all four SS F.1 record types produced on BOTH arms, ledger-backed: B0 {'ObservedRequest': 1, 'MediationEvent': 1, 'ToolIngressEvent': 1, 'EffectEvent': 1}; B3 {'ObservedRequest': 1, 'MediationEvent': 1, 'ToolIngressEvent': 1, 'EffectEvent': 1}. `B3` admits `gt-benign` because it is the false-blocking control, so it produces an effect exactly as `B0` does
+G-10.L2 [MANDATORY] PASS -- the five Part I quantities, each computed SEPARATELY, per arm: B0 {'reference_allow': True, 'observed_forwarded': True, 'admission_breach': False, 'realized_harm': False, 'false_block': False}; B3 {'reference_allow': True, 'observed_forwarded': True, 'admission_breach': False, 'realized_harm': False, 'false_block': False}. Expected on the benign example: {'reference_allow': True, 'observed_forwarded': True, 'admission_breach': False, 'realized_harm': False, 'false_block': False}. A false_block on B3 would mean the benign control is being refused
+G-10.L3 [MANDATORY] PASS -- BEHAVIOURAL source check on THIS run, not inherited from G-12: every input the oracle was given was wrapped in a recorder, and scoring read 11 distinct field names, none of them SUT-supplied (found: none). The `MediationEvent` CARRIES reason_code and the oracle never looked at it -- which is the point, and is what makes this different from G-12's structural scan of the source text
+G-10.L3.N [MANDATORY] PASS -- ...and the recorder is not vacuous: the scoring DID read the trusted-source fields it should. Sample of what was touched: ['C_sets', 'R', 'action', 'admitted', 'correlation_id', 'credential_fault', 'effect_id', 'intended_labels', 'is_benign', 'requires_approval', 'resource']
+G-10.L5.1 [MANDATORY] PASS -- failing world 1 -- suppress EffectEvent and the L1 predicate reports FAILURE rather than completing on four-fifths of the evidence: {'ObservedRequest': 1, 'MediationEvent': 1, 'ToolIngressEvent': 1, 'EffectEvent': 0} -> complete=False
+G-10.L5.2 [MANDATORY] PASS -- failing world 2 -- an oracle that read self_verdict is caught by THIS gate's own predicate (the forbidden-name intersection above), not only by G-12's AST scan. Both halves are needed: G-12 proves the source text names no verdict field, L3 proves the run did not read one
+
+L4: running every prior DAG gate (the criterion's third conjunct, checked not recalled)
+    g1: PASS
+    g2: PASS
+    g3: PASS
+    g4: PASS
+    g5: PASS
+    g6: PASS
+    g7: PASS
+    g8: PASS
+    g9: PASS
+    g11: PASS
+    g12: PASS
+    g13: PASS
+    g14: PASS
+    g15: PASS
+G-10.L4 [MANDATORY] PASS -- all 14 prior DAG gates pass on this machine (failed: none). G-3 is adjudicated on the row 9 platform and this IS that machine; G-9's `IA-9` is verified for the arbiter while the ladder's B3+ keeps the in-process cache by ADR 0034 -- a DECISION, not an unrun gate
+
+GATE G-10: all mandatory checks passed -- THE DAG IS CLOSED
+
+SCOPE, in the row's own words: READINESS TO AUTHOR THE CONFIRMATORY CORPUS. What that does NOT mean: the confirmatory corpus does not exist and its content is not decided; nothing is sealed and the seal has not happened; and G-10 establishes NO result about any mechanism -- it certifies the APPARATUS, not a finding.

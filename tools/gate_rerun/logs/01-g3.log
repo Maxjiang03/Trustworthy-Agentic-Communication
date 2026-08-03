@@ -1,0 +1,16 @@
+GATE G-3 -- boundary-verification cost (EXP8B)
+==============================================================================
+criterion: median boundary_verification <= 5 ms on the row 9 platform
+G-3.H1 [MANDATORY] PASS -- pinned to the DETECTED performance cores [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] (efficiency classes [0, 1]); the mask was read from GetSystemCpuSetInformation, not assumed from a logical-processor range
+G-3.H2 [MANDATORY] PASS -- on AC power: True
+
+pairs timed: 1000 (4 batches x 250), warm-up discarded: 100
+median 2.6928 ms | p95 3.3852 ms | IQR 0.2641 ms
+per-batch medians (ms): 2.6710, 3.0324, 2.6574, 2.6658
+last-vs-first batch median drift: -0.2%
+G-3.C [MANDATORY] PASS -- MEDIAN boundary_verification = 2.6928 ms against the ADR 0025 threshold of 5 ms, fixed before any measurement existed. This is row 2's quantity -- `decide` alone -- and NOT row 1's `presentation + boundary_verification` segment
+G-3.T [info] PASS -- thermal: per-batch medians [2.671, 3.0324, 2.6574, 2.6658], drift -0.2%. Reported rather than averaged away; a systematically slower late batch is thermal and belongs in the report
+
+GATE G-3: PASS -- median 2.6928 ms <= 5 ms
+IA-3 moves to VERIFIED. Fixing a threshold was never verifying an assumption (ADR 0025); measuring against it on the sealed platform is.
+Headroom: the median is 2x below the bar. A failing world is therefore not marginal -- it would need the per-invocation verification to cost 2x more than it does, which the harness would report as a FAIL because the comparison is a plain `median <= threshold` on the same number printed above.

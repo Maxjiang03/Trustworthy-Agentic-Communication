@@ -1,0 +1,56 @@
+IDENTITY: Windows 25H2 build 26200.8875; 12th Gen Intel(R) Core(TM) i7-12700H; 14C/20T (12P/8E logical); 15.75 GiB; power scheme ¸ßÐÔÄÜ (da75b896-eea0-461c-a43a-73a73caf9f43)
+
+{
+  "os_version": "10.0.26200.8875",
+  "os_build": "26200.8875",
+  "display_version": "25H2",
+  "product_name": "Windows 10 Pro",
+  "cpu_model": "12th Gen Intel(R) Core(TM) i7-12700H",
+  "physical_cores": 14,
+  "logical_processors": 20,
+  "performance_cpus": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ],
+  "efficiency_cpus": [
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "ram_bytes": 16911523840,
+  "ram_type": "DDR4",
+  "power_scheme_guid": "da75b896-eea0-461c-a43a-73a73caf9f43",
+  "power_scheme_name": "\u9ad8\u6027\u80fd",
+  "on_ac": true,
+  "python_version": "3.13.5",
+  "sleep": {
+    "standby_ac_seconds": "600",
+    "hibernate_ac_seconds": "0",
+    "usb_selective_suspend_ac": "1"
+  },
+  "identity": "Windows 25H2 build 26200.8875; 12th Gen Intel(R) Core(TM) i7-12700H; 14C/20T (12P/8E logical); 15.75 GiB; power scheme \u9ad8\u6027\u80fd (da75b896-eea0-461c-a43a-73a73caf9f43)"
+}
+
+--- Windows Update state (read-only; no scan triggered) ---
+reboot_pending_windowsupdate=False
+reboot_pending_cbs=False
+hotfix=KB5101650 installed=07/23/2026
+hotfix=KB5100998 installed=07/23/2026
+hotfix=KB5120102 installed=07/15/2026
+CurrentBuild=26200 UBR=8875 DisplayVersion=25H2
+(row 9 was locked 2026-08-02; the latest hotfix predates it, so no update has landed since)

@@ -1,0 +1,22 @@
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+[PASS] G-6.A documented path emits exactly one MediationEvent: events=1 admitted=True correlation_id=9e84c0d9a87f34f9.. reason=ok(pilot) ts_ns=1785765138903768000 witness=1
+[PASS] G-6.B denied call: admitted=False event, tool-side witness untouched: isError=True events+1 reason=denied(pilot) witness=0 outbox=0
+    bypass[C1 FastMCP.call_tool]: returned; mediated=True (events 2->3, witness 1->2)
+    bypass[C2 ToolManager.call_tool]: returned; mediated=True (events 3->4, witness 2->3)
+    bypass[C3 Tool.run]: returned; mediated=True (events 4->5, witness 3->4)
+    bypass[C4 tool.fn direct]: returned; mediated=True (events 5->6, witness 4->5)
+    bypass[C5 post-install add_tool]: returned; mediated=True (events 6->7, witness 0->1)
+    bypass[C6 direct registry insertion]: returned; mediated=True (events 7->8, witness 0->1)
+    bypass[C7 request_handlers direct]: returned; mediated=True (events 8->9, witness 5->6)
+    bypass[C8 denied via ToolManager]: blocked=True; event=True; witness 0->0
+    bypass[C9 registry fns]: all mediated, no __wrapped__ = True
+[PASS] G-6.C every enumerated bypass path is mediated or blocked: C1 FastMCP.call_tool:ok; C2 ToolManager.call_tool:ok; C3 Tool.run:ok; C4 tool.fn direct:ok; C5 post-install add_tool:ok; C6 direct registry insertion:ok; C7 request_handlers direct:ok; C8 denied via ToolManager:ok; C9 no __wrapped__/unmediated fn in registry:ok
+[PASS] G-6.E raising tool: exactly one event, error surfaced, no duplicate: isError=True events 10->11 witness=1
+[PASS] G-6.D interposition removed: tool reached, ZERO events (non-vacuity): witness(mail)=1 outbox=1 witness(cal)=1 events=0
+
+G-6 spike: 5/5 checks passed

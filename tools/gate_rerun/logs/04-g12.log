@@ -1,0 +1,29 @@
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+Processing request of type ListToolsRequest
+Processing request of type ListToolsRequest
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+GATE G-12 -- oracle independence under fault injection (EXP5 STEP 6-8)
+==============================================================================
+G-12.L2 [MANDATORY] PASS -- all 4 oracle modules (artifacts.py, commitment.py, jcs_digest.py, predicates.py) import no src.sut module: True; they name none of the 13 SUT-supplied verdict fields (found: none); and they DO name the trusted-source fields ['C_sets', 'action', 'admitted', 'correlation_id', 'data_labels_touched', 'effect_id', 'intended_request_digest', 'is_benign', 'resource']: True, so the scan is not vacuous
+G-12.L2.W1 [MANDATORY] PASS -- counterfactual: a predicate reading `self_verdict` is caught by the same scan: True. Without this the scan could be passing because it finds nothing anywhere
+G-12.L3 [MANDATORY] PASS -- BLOCKED with an effect present -> fires: True; an HONEST block (blocked, no effect) -> silent: True; an honest ADMISSION with an effect -> silent: True. An alarm that fired on all three would be an alarm that is always on
+G-12.L4 [MANDATORY] PASS -- swap detected: True; duplicate detected: True; drop detected: True; and the UNCORRUPTED records read CONSISTENT: True, so the three detections are not a predicate that flags everything
+G-12.L5 [MANDATORY] PASS -- both worlds produce zero effects: True; the unreached tool reads 'unreached' (blocked, no ingress, no effect -- nothing ran and nothing is...) and the dropped record reads 'dropped' (an ingress row exists and no effect does. The tool was ENTERED, so 'zero effects...). Dropping the ingress rows TOO still reads 'dropped', caught against the MediationEvent, which lives in the harness process. The honest run reads 'consistent'
+G-12.L1 [MANDATORY] PASS -- direction 1 (claims BLOCKED, tool executes): the trusted record says admitted=True and the ledger holds 1 effect -- the lie is invisible to the oracle because the oracle never asked. direction 2 (claims ADMITTED, nothing runs): trusted record admitted=False, effects=0, linkage='unreached' -- an unreached tool, NOT a successful call. A gate testing only direction 1 would have tested half of it
+G-12.L1.W1 [MANDATORY] PASS -- non-vacuity: the honest run admits (True) and the direction-2 fault denies (False), so the injected faults genuinely changed what happened rather than only what was claimed
+G-12.L5.C [MANDATORY] PASS -- on records from REAL runs, not constructed ones: a dropped effect reads 'dropped' (an ingress row exists and no effect does. The tool was ENTERED, so 'ze...) and a genuinely unreached tool reads 'unreached'. Both have zero effects
+G-12.L4.C [MANDATORY] PASS -- 4 scenarios driven concurrently, each in its OWN SUT child process (real processes, not interleaved callbacks in one thread): 4 distinct correlation ids, every linkage CONSISTENT (True), and no invocation's ledger holds another's effect (True)
+
+GATE G-12: all mandatory checks passed
+
+THE FINDING TO CARRY: a DROPPED record and an unreached tool both produce ZERO EFFECTS, and Part I reads zero effects as no realized harm. They are told apart because the ledger carries ingress rows written at tool ENTRY by different instrument code from the effect rows, and the MediationEvent lives in a process the SUT cannot reach: admitted => ingress => effect is a chain whose every link has a different author. 'Zero effects' is read as 'no harm' ONLY when the earlier records are absent too.
+Scope: this gate establishes ORACLE INDEPENDENCE. It does not re-establish complete mediation (G-6) or ledger immutability (G-7); it does not establish cost (IA-3 stays [UNVERIFIED-IA] for G-3), multi-process replay (IA-9, G-9) or the DPoP taxonomy (G-14).

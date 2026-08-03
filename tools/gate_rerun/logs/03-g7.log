@@ -1,0 +1,18 @@
+Processing request of type CallToolRequest
+Processing request of type ListToolsRequest
+Processing request of type CallToolRequest
+Processing request of type CallToolRequest
+platform: win32 (the ledger enforcement mechanism requires win32)
+[PASS] G-7.A one call -> ToolIngressEvent + EffectEvent, correlation intact: ingress=1 effect=1 cid=317d5e903697daaa.. digest=d813c355cc20dcee.. (H_JCS, ADR 0012; recorder-side)
+    attack[append open('a')]: blocked=True (PermissionError(None))
+    attack[truncate open('w')]: blocked=True (PermissionError(None))
+    attack[binary append open('ab')]: blocked=True (PermissionError(None))
+    attack[delete os.remove]: blocked=True (PermissionError(32))
+    attack[post-chmod append]: blocked=True (PermissionError)
+[PASS] G-7.B SUT cannot write/append/delete; harness write path alive: append open('a'):blocked; truncate open('w'):blocked; binary append open('ab'):blocked; delete os.remove:blocked; post-chmod append:blocked; writer.append ok=True
+[PASS] G-7.C in-place modification rejected, entries byte-identical: open('r+b') -> PermissionError(None); bytes unchanged=True
+[PASS] G-7.D ledger survives SUT lying (self-report 'blocked', effect recorded): self_report=blocked ledger_effects=1 -> lie detected from the ledger alone (no SUT verdict read)
+[PASS] G-7.E denied call -> ZERO new ledger entries (non-vacuity): isError=True ledger 5->5 boundary_event=denied
+    (control: file appendable after writer.close() = True -- the immutability came from the live exclusive handle, not an attribute)
+
+G-7 spike: 5/5 checks passed
