@@ -1081,137 +1081,137 @@
       [
         "gt-f4-declassified",
         "B-cap",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B0",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B1",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B2-broad-noexchange",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B2-exchange-broad",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B2-exchange-task",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B2-exchange-task-DPoP",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B3",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B3+",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B-cap",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B0",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B1",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B2-broad-noexchange",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B2-exchange-broad",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B2-exchange-task",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B2-exchange-task-DPoP",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B3",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B3+",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B-cap",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B0",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B1",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B2-broad-noexchange",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B2-exchange-broad",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B2-exchange-task",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B2-exchange-task-DPoP",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B3",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B3+",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756795, 62s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ]
     ]
   },
@@ -1459,137 +1459,137 @@
       [
         "gt-f4-declassified",
         "B-cap",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B0",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B1",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B2-broad-noexchange",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B2-exchange-broad",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B2-exchange-task",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B2-exchange-task-DPoP",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B3",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-declassified",
         "B3+",
-        "the declassification was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the declassification was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B-cap",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B0",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B1",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B2-broad-noexchange",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B2-exchange-broad",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B2-exchange-task",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B2-exchange-task-DPoP",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B3",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f4-sensitive-egress",
         "B3+",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B-cap",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B0",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B1",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B2-broad-noexchange",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B2-exchange-broad",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B2-exchange-task",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B2-exchange-task-DPoP",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B3",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ],
       [
         "gt-f5-approved",
         "B3+",
-        "the approval_artifact was minted at 1785756733 and the cell was judged at 1785756796, 63s apart, which exceeds the frozen freshness window \u0394=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
+        "the approval_artifact was minted at 1785762061 and the cell was judged at 1785762123, 62s apart, which exceeds the frozen freshness window Delta=60s (frozen_parameters row 3, ADR 0027). The boundary checks that artifact with `is_fresh(now, iat)`, so this cell would record how long the campaign took to reach it and not what the mechanism did. UNSCORABLE, never scored"
       ]
     ]
   }

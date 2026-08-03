@@ -79,6 +79,20 @@ differ**, so the snapshot is stable and the identity above is not an artefact of
 | artifacts Δ+1 stale, **guard present** | **0** | **18** | nothing scored |
 | artifacts Δ+1 stale, **guard removed** | 18 | 0 | **12 flip, 6 `false_block`** |
 
+**Which run these three rows describe, because a second run in this directory reports different
+numbers and both are right.** The rows above are `tests/test_campaign_clock.py`'s campaigns, whose
+scenario set is **the two benign controls only** — 2 × 9 arms = 18 cells, every one carrying a
+Δ-bound artifact, so every one refuses.
+
+`tools/clock_fix/evidence/campaign-cells-straddled-guard-on.json` runs a **wider** set —
+`snapshot_cells.py`'s F4/F5 pass takes all four F4/F5 scenarios, 4 × 9 = 36 — and reports **9 scored
+/ 27 refused** per configuration. The nine still scored are `gt-f5-unapproved-high-risk` × nine arms:
+that fixture carries **no approval artifact** (its missing approval *is* the fixture), so it holds no
+Δ-bound artifact for the guard to find.
+
+The precise statement, true of both runs: **the guard refuses exactly the cells carrying a straddled
+artifact, and no others.** Quote that rather than either raw count.
+
 The refusal, as recorded in `unscorable`:
 
 ```
@@ -95,6 +109,12 @@ gt-f4-declassified  B-cap
 618207ef167636489e645f11b1105ddb24eab155dd1cf04b99294205f4cbdbe6  (pre-fix code, 61 s stale)
 618207ef167636489e645f11b1105ddb24eab155dd1cf04b99294205f4cbdbe6  campaign-cells-straddled-guard-off.json
 ```
+
+`campaign-cells-straddled-guard-on.json` was **regenerated** when the phase-1 token guard landed. It
+had been captured before the refusal message was made ASCII and carried 54 reasons containing a
+literal `Δ` that the code no longer emits — a committed record disagreeing with its own code. The
+refused-cell and scored-cell **sets** are unchanged across both that refresh and the guard's move to
+before the run: 4/32, 27/9 and 27/9 in the three passes, identical.
 
 So the guard is the only thing standing between the campaign and those twelve wrong cells. The
 healthy row is the non-vacuity check: the same eighteen cells score cleanly on one clock, so the

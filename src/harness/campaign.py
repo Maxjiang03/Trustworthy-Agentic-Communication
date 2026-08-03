@@ -31,6 +31,8 @@ Building the entry point is not running the confirmatory campaign (red lines
 1–2).
 """
 
+import base64
+import binascii
 import json
 import os
 import platform
@@ -369,7 +371,111 @@ def artifact_instants(artifacts: Mapping[str, Any]) -> tuple[tuple[str, int], ..
     return tuple(found)
 
 
-def clock_refusal(*, artifacts: Mapping[str, Any], judged_at: int, delta: int) -> str:
+# A window that nothing can be inside, used when a credential announces itself
+# as time-bound and then cannot be read. Absence of a readable window is not
+# evidence of a valid one — the approval path already fails closed the same way.
+UNREADABLE = (2**62, -(2**62))
+
+
+def _jwt_window(value: Any) -> "tuple[int | None, int | None] | None":
+    """`(nbf, exp)` from a JWT payload, **UNVERIFIED**, or `None` if not a JWT.
+
+    Deliberately no signature check (forbidden action 4). This guard decides
+    **scorability**, never **admission**: verifying here would gate the
+    measurement on the very verifier under measurement, and a harness that
+    accepted the SUT's arithmetic about its own credential would be reading the
+    thing it is supposed to bound. `nbf` is optional exactly as the SUT's
+    verifier treats it (`claims.get("nbf")`); `exp` is not — a token that
+    announces no expiry cannot be shown to cover anything.
+    """
+    if not isinstance(value, str) or value.count(".") != 2:
+        return None
+    header_b64, payload_b64, signature_b64 = value.split(".")
+    if not (header_b64 and payload_b64 and signature_b64):
+        return None
+    # Decide JWT-or-not on the HEADER, then fail closed on the payload. Counting
+    # dots is not enough: `https://as.aasc.local` has exactly two, and treating
+    # every issuer URL and endpoint in the setup as an unreadable credential
+    # would have refused every cell in the healthy case -- a guard that refuses
+    # everything measures nothing. Found by running STEP 1's enumeration rather
+    # than by reasoning about it, which is why the spec asked for it as a test.
+    try:
+        header = json.loads(base64.urlsafe_b64decode(header_b64 + "=" * (-len(header_b64) % 4)))
+    except (ValueError, TypeError, binascii.Error):
+        return None
+    if not isinstance(header, dict) or "alg" not in header:
+        return None
+    try:
+        claims = json.loads(base64.urlsafe_b64decode(payload_b64 + "=" * (-len(payload_b64) % 4)))
+        if not isinstance(claims, dict):
+            raise ValueError("a JWT payload that is not an object")
+        return (
+            int(claims["nbf"]) if "nbf" in claims else None,
+            int(claims["exp"]),
+        )
+    except (ValueError, KeyError, TypeError, binascii.Error):
+        return UNREADABLE
+
+
+def _x509_window(value: Any) -> "tuple[int, int] | None":
+    """`(notBefore, notAfter)` from a PEM certificate, **UNVERIFIED**.
+
+    No chain building and no trust decision — the same rule as above. Included
+    because STEP 1's enumeration found it: the AS's self-signed TLS certificate
+    is minted at start-up with a one-day window and handed to every `B2` arm,
+    which makes it a **second** time-bound credential and therefore the same
+    defect, however much longer its window is.
+    """
+    if not isinstance(value, str) or "-----BEGIN CERTIFICATE-----" not in value:
+        return None
+    try:
+        from cryptography import x509
+
+        certificate = x509.load_pem_x509_certificate(value.encode("ascii"))
+        return (
+            int(certificate.not_valid_before_utc.timestamp()),
+            int(certificate.not_valid_after_utc.timestamp()),
+        )
+    except Exception:  # noqa: BLE001 - unreadable is not evidence of valid
+        return UNREADABLE
+
+
+def credential_windows(
+    credentials: Mapping[str, Any],
+) -> "tuple[tuple[str, int | None, int | None], ...]":
+    """Every **time-bound** credential in a setup dict, as `(name, nbf, exp)`.
+
+    **Found, not listed.** A hardcoded field name would cover today's
+    enumeration and silently miss tomorrow's: the whole failure this closes was
+    a credential nobody had enumerated. Detection is by shape — JWT-shaped, or
+    PEM-certificate-shaped — so a third time-bound credential added to any
+    setup is picked up by existing code, and
+    `tests/test_credential_enumeration.py` pins the resulting set so that
+    growth is visible rather than absorbed.
+
+    Everything else the harness injects is untimed by construction: frozen JSON
+    documents, raw Ed25519 key material, derived secrets, ports, strings and
+    booleans. HTC, INV and DPoP proofs carry windows but are minted **inside**
+    the cell at its own instant and never appear here.
+    """
+    found: list[tuple[str, int | None, int | None]] = []
+    for name in sorted(credentials):
+        value = credentials[name]
+        window = _jwt_window(value)
+        if window is None:
+            window = _x509_window(value)
+        if window is not None:
+            found.append((name, window[0], window[1]))
+    return tuple(found)
+
+
+def clock_refusal(
+    *,
+    artifacts: Mapping[str, Any],
+    judged_at: int,
+    delta: int,
+    credentials: Mapping[str, Any] | None = None,
+) -> str:
     """`""` if this cell may be scored, else the reason it may not.
 
     **The straddle, fail-closed.** A cell whose artifact was minted at one
@@ -382,7 +488,42 @@ def clock_refusal(*, artifacts: Mapping[str, Any], judged_at: int, delta: int) -
 
     A refused cell is **unscorable**, exactly as an `NA` cell is: not a `B`,
     not a `false_block`, not a result at all.
+
+    **The second check: validity coverage.** Δ is the wrong instrument for a
+    credential the harness did not mint at task time. Phase-1 access tokens are
+    minted **once, at AS start-up**, live 300 s by a configuration default that
+    no frozen row bounds, and are reused by every cell of a pass — so the
+    exposure clock starts *earlier than the campaign's own start*. An expired
+    one produced two different behaviours and only one of them was visible:
+    the capability arms denied through `ConjunctFailed` and were **scored
+    `false_block = True` on the benign control**, with `unscorable = 0` and
+    `reference_allow` still `True`; the `B2` arms raised `B2ConfigurationError`
+    out of `provision` and aborted the pass. One defect, two behaviours, one of
+    them silent — and a strong arm that blocks the benign control leaves the F1
+    headline with no contrast at all.
+
+    So a cell whose credential does not **cover** the instant it is judged at is
+    refused, and one expired token now produces one outcome for every arm.
+
+    **This check must run BEFORE the cell runs**, which is why the caller
+    passes the instant it is about to hand the runner rather than reading one
+    back off the finished run: the `B2` half raises inside `provision`, so a
+    post-run guard would never see it. There is still no second clock — the
+    value passed is the same one `run_scenario` is given as `now`, and
+    `run.observed.iat` is that value.
     """
+    for name, not_before, expires_at in credential_windows(credentials or {}):
+        if (not_before is not None and judged_at < not_before) or (
+            expires_at is not None and judged_at >= expires_at
+        ):
+            return (
+                f"the {name} is valid over [{not_before}, {expires_at}) and the cell is judged "
+                f"at {judged_at}, which that window does not cover. The credential is minted "
+                "ONCE, before the pass, so this records how long the campaign has been running "
+                "and not what the mechanism did -- and it is asymmetric across arms, scored "
+                "silently by the capability arms and raised loudly by the OAuth ones. "
+                "UNSCORABLE, never scored"
+            )
     for name, iat in artifact_instants(artifacts):
         separation = abs(judged_at - iat)
         if separation > delta:
@@ -754,6 +895,23 @@ def run_campaign(
                 oauth_actor=tuple(sealed["oauth_actor"]),
                 policy_version=frozen_parameters.expected_h_policy(),
             )
+            # BEFORE the run, and it has to be. The credential half of this
+            # guard catches an arm that raises out of `provision`, which happens
+            # inside `run_scenario`, so a post-run check would never see it --
+            # and the whole point is that one expired credential produces ONE
+            # outcome regardless of which arm holds it. `cell_instant` is the
+            # value handed to the runner below as `now`, and `run.observed.iat`
+            # IS that value, so this is the instant the cell is judged at and
+            # not a second reading of the clock.
+            refusal = clock_refusal(
+                artifacts=artifacts,
+                credentials=setup,
+                judged_at=cell_instant,
+                delta=delta,
+            )
+            if refusal:
+                unscorable.append((scenario_id, arm_name, refusal))
+                continue
             try:
                 run = runner.run_scenario(
                     scenario_id,
@@ -773,10 +931,6 @@ def run_campaign(
             # judged after the run reads it, so there is no second value that
             # could disagree -- construction, not convention.
             judged_at = int(run.observed.iat)
-            refusal = clock_refusal(artifacts=artifacts, judged_at=judged_at, delta=delta)
-            if refusal:
-                unscorable.append((scenario_id, arm_name, refusal))
-                continue
             config = OracleConfig(
                 policy=policy,
                 trusted_label_issuers=label_issuers,
@@ -838,6 +992,7 @@ __all__ = [
     "artifact_instants",
     "build_run_record",
     "clock_refusal",
+    "credential_windows",
     "check_configuration_families",
     "check_frozen_rows",
     "configuration_scenarios",
