@@ -23,7 +23,6 @@ Platform-independent.
 import ast
 import dataclasses
 import json
-import time
 from pathlib import Path
 
 import pytest
@@ -146,10 +145,21 @@ class TestTheCacheIsAdr0027s:
             and node.func.attr == "sleep"
         ]
         assert calls == []
-        # Negative arm: the scan can see `time.time`, which this file does use
-        # for a run instant -- so the absence of `sleep` is a finding, not a
-        # scan that matches nothing.
-        assert "time.time" in mine
+        # Negative arm: the same walk, for a call this file certainly makes, so
+        # the empty result above is a FINDING and not a scan that matches
+        # nothing. It used to be `assert "time.time" in mine` -- which stopped
+        # being a negative arm the moment this module took its instant from the
+        # token's own window instead of a wall clock, and would have failed
+        # loudly rather than quietly weakening. Matched on the walk rather than
+        # on the text so it cannot see its own comment.
+        consumed = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "consume"
+        ]
+        assert consumed, "the scan finds no attribute call at all, so it proves nothing"
 
 
 # ---------------------------------------------------------------------------
@@ -182,9 +192,50 @@ def setup(runner, running_as):
     )
 
 
+def _token_window(token: str) -> tuple[int, int]:
+    """`(iat, exp)` read from the access token's own claims, **unverified**.
+
+    Unverified on purpose: this is a test reading the artifact under test to
+    find an instant inside its window, never a verification path. The same
+    helper `tests/test_b_cap.py` uses, for the same reason.
+    """
+    import base64
+
+    payload = token.split(".")[1]
+    claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+    return int(claims["iat"]), int(claims["exp"])
+
+
+def _instant(setup) -> int:
+    """ONE instant for a construction, taken from the token's own window.
+
+    **The straddle this removes, located rather than guessed.** `running_as` is
+    a MODULE-scoped fixture, so the AS mints `phase1_tokens` once, when the
+    module starts, with a 300 s lifetime (`default_lifetime_seconds`). Reading
+    `int(time.time())` inside a test is then a SECOND clock, separated from the
+    mint by however long the module has been running -- and
+    `oauth_resource_authorization_ok` verifies that token at the instant the
+    test injects. Under the full suite pinned to one CPU with three busy loops
+    the separation crossed 300 s and the FIRST submission was refused with
+    `b3_oauth_resource_authorization` / `exp: token has expired`, which is
+    exactly what the pre-seal flake hunt observed and attributed to Delta.
+
+    Measured directly: at this instant the arm admits; at `iat + 301` it returns
+    `(False, 'b3_oauth_resource_authorization')`.
+
+    Taken from `iat` rather than from a clock, so the window cannot drift out
+    from under the test however long the AS has been up. **No window is
+    widened**: the token's lifetime is left exactly where it was, which is the
+    point -- widening it would hide the defect rather than remove it.
+    """
+    issued_at, expires_at = _token_window(setup["access_token"])
+    assert issued_at < expires_at, "the token has no window to be inside"
+    return issued_at
+
+
 def _armed(arm, setup, now=None, invocation_id="cid-replay-probe"):
     visible = _visible("gt-benign")
-    now = int(time.time()) if now is None else now
+    now = _instant(setup) if now is None else now
     arm.provision(setup)
     credentials = arm.delegate(
         HopContext(
@@ -217,6 +268,66 @@ def _armed(arm, setup, now=None, invocation_id="cid-replay-probe"):
 ARGS = {"resource": "notes/project", "content": "x"}
 
 
+class TestTheInstantComesFromTheTokenNotFromAClock:
+    """**The straddle this module used to carry, and the world it fails in.**
+
+    A fix nobody has watched fail is a fix nobody has tested (§6.2). These
+    construct the failing world explicitly: the same arm, the same setup, judged
+    at an instant OUTSIDE the module-scoped token's window — which is what a
+    wall-clock read becomes once the module has been running long enough.
+    """
+
+    def test_the_instant_is_inside_the_tokens_own_window(self, setup):
+        issued_at, expires_at = _token_window(setup["access_token"])
+        assert issued_at <= _instant(setup) <= expires_at
+
+    def test_the_token_lifetime_is_UNCHANGED(self, setup):
+        """No window was widened to make this work. 300 s is what the AS's
+        `default_lifetime_seconds` gives, and it stays there — widening it
+        would have hidden the straddle rather than removed it."""
+        issued_at, expires_at = _token_window(setup["access_token"])
+        assert expires_at - issued_at == 300
+
+    def test_OUTSIDE_the_window_the_first_submission_is_REFUSED(self, setup):
+        """The failing world, and it names the observed failure exactly.
+
+        The pre-seal flake hunt recorded run 000 as
+        `test_the_replay_is_constructed_WITHIN_delta` failing on
+        `assert arm.decide(...)[0] is True`, and attributed it to Delta. It was
+        not Delta: past the token's `exp` the refusal is
+        `b3_oauth_resource_authorization`, and the FIRST submission — the one
+        that must be admitted before a replay can be tested — never lands.
+        """
+        _issued_at, expires_at = _token_window(setup["access_token"])
+        arm, _ = _armed(B3PlusArm(), setup, now=expires_at + 1)
+        admitted, reason = arm.decide("notes.write", ARGS)
+        assert (admitted, reason) == (False, "b3_oauth_resource_authorization")
+        assert "expired" in arm.audit_log[-1]["detail"]
+
+    def test_INSIDE_the_window_it_is_admitted(self, setup):
+        """Negative arm: the refusal above is about the window, not about the
+        arm refusing everything."""
+        arm, _ = _armed(B3PlusArm(), setup)
+        assert arm.decide("notes.write", ARGS) == (True, "b3_admitted")
+
+    def test_no_test_in_this_module_reads_the_wall_clock(self):
+        """Structural, and parsed rather than grepped so it cannot match its
+        own prose. One instant per construction, taken from the window."""
+        tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+        clock_reads = [
+            node.lineno
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "time"
+        ]
+        assert clock_reads == [], (
+            f"a wall-clock read at line(s) {clock_reads}: this module's tokens are minted by a "
+            "MODULE-scoped AS fixture, so a second clock here is separated from the mint by "
+            "however long the module has been running"
+        )
+
+
 class TestTheCellB3PlusExistsFor:
     def test_b3_admits_a_bit_identical_replay(self, setup):
         """SS E.4: `F3 dpop-captured-proof-replay` is `B3` = **A**.
@@ -245,7 +356,7 @@ class TestTheCellB3PlusExistsFor:
         OUTSIDE `Delta` would be blocked by `B3` too -- on freshness, not on
         duplication -- collapsing the distinction this cell measures.
         """
-        now = int(time.time())
+        now = _instant(setup)
         arm, _ = _armed(B3PlusArm(), setup, now=now)
         assert freshness.is_fresh(now, now)
         assert arm.decide("notes.write", ARGS)[0] is True
@@ -259,7 +370,7 @@ class TestTheCellB3PlusExistsFor:
         this way would measure INV freshness and report it as duplicate
         detection.
         """
-        now = int(time.time())
+        now = _instant(setup)
         arm, _ = _armed(B3Arm(), setup, now=now)
         assert arm.decide("notes.write", ARGS)[0] is True
         arm._staged = dataclasses.replace(arm._staged, now_epoch=now + 61)
