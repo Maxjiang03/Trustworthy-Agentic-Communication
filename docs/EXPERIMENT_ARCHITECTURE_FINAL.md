@@ -761,4 +761,4 @@ None is described as done. They are the agenda between here and a sealed v0.5, a
 
 ---
 
-*End of consolidated Experiment Architecture (implementation candidate). Claude Code: run Part G along the DAG; stop and apply the fallback at any failing gate; do not author or execute the confirmatory corpus; do not generate v0.5. Nothing here is sealed, and no implementation assumption is a verified fact until its gate passes.*
+*End of consolidated Experiment Architecture (implementation candidate). Part G is run along the DAG; work stops and the fallback applies at any failing gate; the confirmatory corpus is neither authored nor executed here; v0.5 is not generated. Nothing here is sealed, and no implementation assumption is a verified fact until its gate passes.*

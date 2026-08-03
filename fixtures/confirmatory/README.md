@@ -10,7 +10,7 @@ The confirmatory corpus is produced only by the sealed corpus generator
 disjointness from `fixtures/pilot/` is verified on scenario-specification and
 seed content hashes (Part H step 5) — never on token bytes, which are not
 reproducible across mints. Biscuit tokens are minted at campaign runtime from
-the sealed inputs. See also CLAUDE.md red lines 1–2.
+the sealed inputs. See also PROJECT_RULES.md red lines 1–2.
 
 **Seed-disclosure warning (ADR 0007).** Publishing the corpus seeds publishes
 every private key derived from them. This corpus is a **testbed artifact

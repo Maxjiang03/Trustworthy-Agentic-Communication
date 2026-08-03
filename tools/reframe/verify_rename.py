@@ -7,12 +7,20 @@ those two together mean *a gate*, and this adjudicates nothing.
 
 For every file the reframe touched, reverse-substituting `PROJECT_RULES.md` back
 to `CLAUDE.md` must reproduce the **pre-change bytes exactly** — with a closed
-list of five exceptions. Anything else is a failure and this exits non-zero.
+list of six exceptions. Anything else is a failure and this exits non-zero.
 
 That property is stronger than reading a diff, because it does not depend on
-anyone's care: a stray character anywhere in fifty-seven files, in a file the
-reviewer skimmed or one they never opened, fails it. Six exceptions instead of
-five fails it too — a rounding is a failure here, not a rounding.
+anyone's care: a stray character anywhere in sixty-odd files, in a file the
+reviewer skimmed or one they never opened, fails it. A **seventh** exception
+fails it too, and the correct response to one is to stop rather than to
+enumerate it: six were authorised, so a seventh means something changed that was
+not.
+
+**The baseline stays at `3d2473a`, the pre-reframe state, across every commit
+of the reframe.** Re-baselining to the intermediate commit would split the claim
+across two scripts and two commits, and a claim that needs two artifacts to
+state is a claim someone will eventually state wrongly. Held here, one command
+establishes the whole of it.
 
 ## Why it compares git blobs rather than working-tree bytes
 
@@ -89,6 +97,16 @@ EXCEPTIONS: tuple[tuple[str, bytes, bytes], ...] = (
         "docs/EXPERIMENT_ARCHITECTURE_FINAL.md",
         b"# Part G \xe2\x80\x94 Feasibility smoke-gate checklist (Claude Code runs these)",
         b"# Part G \xe2\x80\x94 Feasibility smoke-gate checklist (run these)",
+    ),
+    # The fifth addressee line, found by the sweep that followed the first four
+    # and reworded once its author confirmed the `four` was an undercount. Every
+    # instruction and its force survive; only the addressee goes.
+    (
+        "docs/EXPERIMENT_ARCHITECTURE_FINAL.md",
+        b"Claude Code: run Part G along the DAG; stop and apply the fallback at any failing gate;"
+        b" do not author or execute the confirmatory corpus; do not generate v0.5.",
+        b"Part G is run along the DAG; work stops and the fallback applies at any failing gate;"
+        b" the confirmatory corpus is neither authored nor executed here; v0.5 is not generated.",
     ),
 )
 

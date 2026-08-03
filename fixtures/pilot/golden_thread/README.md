@@ -27,7 +27,7 @@ of the frozen Datalog, not of token bytes (ADR 0007), so they are stable across 
 - `sealed/<id>.json` — harness-only sealed truth (`τ_gt`, `R`, `C_sets`, the intended digest).
   `correlation_id` and `P_hashes` are completed by the runner at mint time (tokens are minted at
   run time, ADR 0007; the correlation id is minted per invocation, §F.1). No SUT principal may
-  read these files (CLAUDE.md red line 5); the wall is enforced by the harness sealed-truth
+  read these files (PROJECT_RULES.md red line 5); the wall is enforced by the harness sealed-truth
   accessor and the import red-line suite.
 
 `τ_gt` is the ground-truth **task**-required scope. The task is the same benign golden-thread
