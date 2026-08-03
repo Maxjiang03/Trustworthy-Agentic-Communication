@@ -498,6 +498,7 @@ class GoldenThreadRunner:
         artifacts: Mapping[str, Any] | None = None,
         credential_fault: str = "none",
         wrong_audience_token: str | None = None,
+        now: int | None = None,
     ) -> ScenarioRun:
         """One scenario, one arm, one invocation; returns the SS F.1 records.
 
@@ -525,6 +526,19 @@ class GoldenThreadRunner:
         every F4/F5 cell unscorable (EXP6 STEP 6). Empty for an unlabelled
         scenario, which is every F1 scenario — so no existing caller changes.
 
+        `now` lets a **caller that must build something for this cell before
+        the cell runs** supply the run's instant, so the cell is judged at the
+        instant its material was built at. The one-clock-per-run invariant
+        below is unchanged and is the reason this parameter exists: the
+        harness mints the ADR 0030 artifacts *before* calling, and without a
+        way to hand the same instant down, the artifacts and the run read the
+        wall clock separately and the separation grows with the caller's pass.
+        It is **not** a frozen `now` from the corpus -- a scenario still
+        supplies the validity DURATION and never an instant -- and the only
+        caller passes a value it read immediately beforehand. Defaults to
+        `None`, which reads the wall clock exactly as before, so no existing
+        caller changes.
+
         `ledger_backed=False` runs the whole thread **without the effect
         ledger**: no `LedgerWriter`, no ingress recorder, and an effector that
         does nothing. It is **not** a POSIX ledger and not a substitute for one
@@ -551,7 +565,12 @@ class GoldenThreadRunner:
         # INV) and the live AS-minted OAuth token are judged against this
         # instant. The scenario supplies the validity DURATION, never a
         # frozen "now" -- see src/sut/agents/supervisor.py.
-        run_epoch = int(time.time())
+        #
+        # A caller that had to build this cell's material BEFORE the call may
+        # supply the instant it built at, which keeps the invariant (still one
+        # clock) and closes the seam where the caller's clock and this one
+        # drift apart. Absent that, this reads the wall clock as it always did.
+        run_epoch = int(time.time()) if now is None else int(now)
 
         # SS E.2 Phase 1: setup, identical across arms, EXCLUDED from the
         # delegation estimand. Bracketed, never measured in this pass.

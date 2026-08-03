@@ -337,6 +337,68 @@ def check_configuration_families(
         )
 
 
+def artifact_instants(artifacts: Mapping[str, Any]) -> tuple[tuple[str, int], ...]:
+    """Every **Δ-bound** `iat` the harness minted into one cell, by name.
+
+    Two of the three ADR 0030 artifacts are judged against Δ — the boundary
+    calls `freshness.is_fresh(now, iat)` on the declassification and on the
+    approval, symmetrically (`|now - iat| <= Δ`). The third, a `LabelAssertion`,
+    is deliberately **not**: §A.6 puts labels at ingestion, *before* task-time
+    issuance, so `mint_for_scenario` gives them `iat = now - 86_400` on purpose
+    and only their own `iat`/`exp` window binds them. Including them here would
+    refuse every labelled cell for a property the boundary never checks.
+
+    Read from the minted objects rather than from whatever instant a caller
+    thought it minted at: what the guard must compare is the artifact this cell
+    actually carried.
+    """
+    found: list[tuple[str, int]] = []
+    declassification = artifacts.get("declassification")
+    if isinstance(declassification, Mapping) and "iat" in declassification:
+        found.append(("declassification", int(declassification["iat"])))
+    approval = artifacts.get("approval_artifact")
+    if approval:
+        try:
+            payload = json.loads(bytes(approval).decode("utf-8"))["payload"]
+            found.append(("approval_artifact", int(payload["iat"])))
+        except (ValueError, KeyError, TypeError):  # pragma: no cover - defensive
+            # An artifact whose instant cannot be read is not evidence that it
+            # is fresh. Naming it with a sentinel makes the guard refuse the
+            # cell rather than score it on an unread window.
+            found.append(("approval_artifact", -(2**62)))
+    return tuple(found)
+
+
+def clock_refusal(*, artifacts: Mapping[str, Any], judged_at: int, delta: int) -> str:
+    """`""` if this cell may be scored, else the reason it may not.
+
+    **The straddle, fail-closed.** A cell whose artifact was minted at one
+    instant and judged at another more than Δ away is not a measurement of the
+    mechanism: it measures how long the campaign took to reach that cell. The
+    defect this closes was silent in both directions — the arm blocks with its
+    own conjunct's reason code, which is what a working mechanism looks like,
+    and the oracle was judged at the same stale instant, so `reference_allow`
+    agreed and nothing contradicted anything.
+
+    A refused cell is **unscorable**, exactly as an `NA` cell is: not a `B`,
+    not a `false_block`, not a result at all.
+    """
+    for name, iat in artifact_instants(artifacts):
+        separation = abs(judged_at - iat)
+        if separation > delta:
+            # ASCII, as the boundary's own refusals are: this string is read
+            # off consoles whose code page is not UTF-8.
+            return (
+                f"the {name} was minted at {iat} and the cell was judged at {judged_at}, "
+                f"{separation}s apart, which exceeds the frozen freshness window Delta="
+                f"{delta}s "
+                "(frozen_parameters row 3, ADR 0027). The boundary checks that artifact with "
+                "`is_fresh(now, iat)`, so this cell would record how long the campaign took to "
+                "reach it and not what the mechanism did. UNSCORABLE, never scored"
+            )
+    return ""
+
+
 def check_ledger_available(*, ledger_backed: bool, ledger_dir: Path | None) -> None:
     """ADR 0014: the effect ledger does **not** degrade.
 
@@ -590,7 +652,7 @@ def run_campaign(
     run_mode: str = "pilot",
     ledger_backed: bool = False,
     corpus_root: Path = PILOT_CORPUS,
-    now: int | None = None,
+    artifact_instant: int | None = None,
     wrong_audience_token: str | None = None,
 ) -> CampaignResult:
     """Run every applicable cell once and score it from evidence.
@@ -604,6 +666,33 @@ def run_campaign(
     every such cell is routed through `matrix_grouping.Cell`, which refuses one
     recorded without it — the rule lives there, and this goes through it rather
     than around it (§E.4's `A†` footnote, gate G-15).
+
+    **One clock per cell.** This module used to read `int(time.time())` once for
+    the whole pass and mint every scenario's artifacts, build every
+    `OracleConfig` and evaluate every credential at it, while `run_scenario`
+    read its own `run_epoch` per cell and never received it. The separation grew
+    with the pass, and at 61 s — one cell running a minute into a run — twelve
+    of eighteen F4/F5 control cells flipped from admitted to blocked, six of
+    them scored `false_block`. It could not surface: the oracle was judged at
+    the stale instant too, so `reference_allow` agreed with itself.
+
+    So the campaign now **adopts the cell's clock rather than imposing its own**.
+    The wall clock is read once per cell, immediately before the run, and handed
+    to `run_scenario` as `now`, so the cell is judged at the instant its
+    artifacts were built at. Everything computed *after* the run —
+    `OracleConfig` and `credential_result` — reads `run.observed.iat`, the
+    runner's own epoch, rather than a campaign copy of it: not a convention that
+    they agree, but no second value to disagree with. The rejected alternative
+    was freezing the cell to a campaign-wide instant, which `run_scenario`'s
+    one-clock-per-run invariant forbids for a good reason — the AS mints against
+    the real wall clock, and a cell frozen behind it would make a live token
+    look unexpired, the same straddle in the plane where F3 lives.
+
+    `artifact_instant` pins the instant the artifacts are minted at while the
+    cell still runs on its own clock. **Nothing in production passes it**: it
+    reconstructs precisely the defect above, so that `clock_refusal` — the
+    fail-closed guard that routes a straddled cell to `unscorable` — has a world
+    in which it is watched refusing real cells rather than asserted to work.
     """
     import time
 
@@ -624,7 +713,7 @@ def run_campaign(
     check_single_process_campaign(run_mode=run_mode, sut_mode=sut_mode)
     check_ledger_available(ledger_backed=ledger_backed, ledger_dir=runner._ledger_dir)
 
-    instant = int(time.time()) if now is None else int(now)
+    delta = frozen_parameters.delta_seconds()  # frozen row 3, never a literal
     label_issuers, approvers = label_artifacts.trusted_sets(seed)
     policy = frozen_policy.build(frozen_policy.load_document())
     token_config = TokenVerifierConfig(
@@ -645,27 +734,26 @@ def run_campaign(
         # happens not to verify, never a flag saying it is under attack.
         fault = credential_faults.validate(str(sealed.get("credential_fault", "none")))
         not_applicable = set(sealed.get("not_applicable", {}).get("arms", ()))
-        config = OracleConfig(
-            policy=policy,
-            trusted_label_issuers=label_issuers,
-            trusted_approvers=approvers,
-            task_id=visible["task_id"],
-            now=instant,
-        )
-        artifacts = label_artifacts.mint_for_scenario(
-            seed,
-            visible,
-            now=instant,
-            resource_owner=tuple(sealed["resource_owner"]),
-            oauth_actor=tuple(sealed["oauth_actor"]),
-            policy_version=frozen_parameters.expected_h_policy(),
-        )
         for arm_name, (factory, setup) in factories.items():
             if arm_name in not_applicable:
                 # NA is read from the sealed record and the cell is NOT run: an
                 # NA cell is not a result and must never be scored as one.
                 unscorable.append((scenario_id, arm_name, "NA per the sealed record"))
                 continue
+            # ONE clock for this cell, read immediately before it runs and
+            # handed to the runner, so the cell is JUDGED at the instant its
+            # artifacts were BUILT at. Minting has to happen first -- the
+            # artifacts travel into the invocation -- which is exactly why
+            # `run_scenario` takes the instant rather than reading its own.
+            cell_instant = int(time.time())
+            artifacts = label_artifacts.mint_for_scenario(
+                seed,
+                visible,
+                now=cell_instant if artifact_instant is None else int(artifact_instant),
+                resource_owner=tuple(sealed["resource_owner"]),
+                oauth_actor=tuple(sealed["oauth_actor"]),
+                policy_version=frozen_parameters.expected_h_policy(),
+            )
             try:
                 run = runner.run_scenario(
                     scenario_id,
@@ -676,11 +764,27 @@ def run_campaign(
                     artifacts=artifacts,
                     credential_fault=fault,
                     wrong_audience_token=wrong_audience_token,
+                    now=cell_instant,
                 )
             except RunnerError as exc:
                 unscorable.append((scenario_id, arm_name, f"the run did not complete: {exc}"))
                 continue
-            cred = credential_result(run.observed, token_config, now=instant)
+            # The RUNNER's own epoch, not the campaign's copy of it. Everything
+            # judged after the run reads it, so there is no second value that
+            # could disagree -- construction, not convention.
+            judged_at = int(run.observed.iat)
+            refusal = clock_refusal(artifacts=artifacts, judged_at=judged_at, delta=delta)
+            if refusal:
+                unscorable.append((scenario_id, arm_name, refusal))
+                continue
+            config = OracleConfig(
+                policy=policy,
+                trusted_label_issuers=label_issuers,
+                trusted_approvers=approvers,
+                task_id=visible["task_id"],
+                now=judged_at,
+            )
+            cred = credential_result(run.observed, token_config, now=judged_at)
             verdict = score_cell(
                 run,
                 sealed,
@@ -731,7 +835,9 @@ __all__ = [
     "CellVerdict",
     "PreconditionFailed",
     "RunRecord",
+    "artifact_instants",
     "build_run_record",
+    "clock_refusal",
     "check_configuration_families",
     "check_frozen_rows",
     "configuration_scenarios",
