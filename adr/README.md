@@ -12,7 +12,7 @@ Rules of the log:
 
 - The authoritative design is `docs/EXPERIMENT_ARCHITECTURE_FINAL.md`
   (ADR 0001). An ADR that changes the design must be accompanied by an update
-  to that document — never silently diverge (CLAUDE.md).
+  to that document — never silently diverge (PROJECT_RULES.md).
 - Every Part G gate fallback and every seal-time parameter choice
   (`docs/frozen_parameters.md`) becomes an ADR (design Part J.1 item 4,
   Part J.2 item 9). This is the audit trail against deciding after seeing

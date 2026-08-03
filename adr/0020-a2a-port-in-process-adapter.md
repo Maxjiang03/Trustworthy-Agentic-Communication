@@ -71,7 +71,7 @@ and the boundary checks, which the port preserves; the claim boundary is stated,
   EXP1 forbidden action 8. Rejected outright.
 - **Vendor or reimplement a subset of the SDK's wire protocol.** A half-faithful wire is worse
   than a declared port: it would *look* like the SDK surface while diverging in undisclosed
-  ways, exactly the silent-divergence failure mode CLAUDE.md forbids. The port makes the
+  ways, exactly the silent-divergence failure mode PROJECT_RULES.md forbids. The port makes the
   divergence explicit and total.
 
 ## Status

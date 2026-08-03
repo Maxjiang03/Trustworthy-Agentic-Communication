@@ -196,7 +196,7 @@ what it judges, which is the discipline ADR 0009 already applies to `H_JCS`. A s
 would violate that; a shared **document** does not. The harness owns the canonical copy and the
 digest because the harness is what must load and hash it (Part H step 3), and the SUT receives the
 same bytes as **start-up configuration** supplied by the runner — never by import, so
-`src/sut/` still imports nothing from `src/harness/` (CLAUDE.md red line 6). Placing it in
+`src/sut/` still imports nothing from `src/harness/` (PROJECT_RULES.md red line 6). Placing it in
 `src/sut/` would have inverted that: the instrument would then read its adjudication standard out
 of the measured tree.
 

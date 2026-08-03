@@ -31,7 +31,7 @@ Rules that travel with this:
 2. **Tokens are runtime-only.** The start-up line's port/JWK/certificate remain public by
    construction; the Phase-1 tokens are **not** — the stdout pipe is held by the spawning
    runner alone (ADR 0015 rule 1), and the tokens are never written to disk, never committed,
-   and never echoed into `results/` (CLAUDE.md red line 8). The `__main__` docstring records
+   and never echoed into `results/` (PROJECT_RULES.md red line 8). The `__main__` docstring records
    that the line now carries bearer-sensitive material.
 3. **Phase 1 stays identical across arms and outside the delegation estimand** (§E.2): every
    registered client receives its base token through this same path before agents act, whatever

@@ -49,7 +49,7 @@ makes that impossible.
 | 6 | Setting row 5 or row 9 | Row 5 is deferred by decision (ADR 0028); row 9 is read at seal time |
 | 7 | Building an F3 replay fixture **outside `Δ`** | ADR 0027's fixture constraint. Outside `Δ`, `B3` blocks on **freshness**, not duplication, and `B3⁺`'s entire cell collapses — in the direction that flatters this work |
 | 8 | Letting a **new** check make an existing arm's distinguishing capability unobservable | The standing hazard of this project, four times over. See STEP 15 |
-| 9 | Drafting `PRE_REGISTRATION.md`, creating `fixtures/confirmatory/`, sealing, or running a campaign | CLAUDE.md red lines 1–2 |
+| 9 | Drafting `PRE_REGISTRATION.md`, creating `fixtures/confirmatory/`, sealing, or running a campaign | PROJECT_RULES.md red lines 1–2 |
 | 10 | Any import of `src/harness/` from `src/sut/`; of `src/sut/oauth_as/` from a non-AS `src/sut/` module or from `src/harness/`; reuse of a harness implementation as the SUT-side one | Red line 6, ADR 0015 rules 3–4, D13/D21 |
 | 11 | Letting a SUT principal read `τ_gt`, `IntendedInvocation`, or any sealed object | §A.3, red line 5 |
 | 12 | Secrets or minted tokens on disk, in the repository, or in `results/`; `git push --force`; history rewrite | Red lines 7–8 |

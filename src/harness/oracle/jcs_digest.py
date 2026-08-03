@@ -15,7 +15,7 @@ Byte layout (must reproduce byte-for-byte in any independent implementation):
              (rfc8785==0.1.4, ADR 0005)
     H_JCS  = lowercase_hex( SHA-256( TAG || VERSION || u32be(len(C)) || C ) )
 
-Trust rule (D21, CLAUDE.md red line 4): this module is ORACLE-side. The
+Trust rule (D21, PROJECT_RULES.md red line 4): this module is ORACLE-side. The
 SUT-side computation must be written independently later; the oracle never
 consumes a SUT-computed digest. Everything fails closed: an unsupported
 version raises, and out-of-model input propagates the pinned library's typed

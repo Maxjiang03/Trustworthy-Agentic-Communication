@@ -1,7 +1,7 @@
 # Minimal pinned runtime (reproducibility requirement, design Part J.1).
 FROM python:3.11-slim
 
-# Determinism control: fixed hash seed (design Part J.1 / CLAUDE.md Setup).
+# Determinism control: fixed hash seed (design Part J.1 / PROJECT_RULES.md Setup).
 ENV PYTHONHASHSEED=0
 
 # Pinned uv — same version family used to produce uv.lock.

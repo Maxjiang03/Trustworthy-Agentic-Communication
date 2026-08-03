@@ -14,7 +14,7 @@ three call sites are trusted to remember. It is deliberately named for the
 window rather than for any one of its consumers, and it holds nothing else.
 
 **Why a SUT-side constant rather than an injected one.** `src/sut/` may never
-import `src/harness/` (CLAUDE.md red line 6), so the frozen document cannot be
+import `src/harness/` (PROJECT_RULES.md red line 6), so the frozen document cannot be
 read from here. The value is declared once on this side and a harness test
 asserts it equals what `docs/frozen_parameters.md` records -- the same
 agreement-not-shared-code pattern ADR 0016 drew for `Omega`/`Gamma` and

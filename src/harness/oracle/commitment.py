@@ -13,7 +13,7 @@ public key, and its algorithm; chain position is enforced by signature-chain
 verification (block i's signature must verify under the key carried in block
 i-1), which this module performs before extracting any identifier.
 
-Trust rule (D21, CLAUDE.md red line 4): every function here starts from RAW
+Trust rule (D21, PROJECT_RULES.md red line 4): every function here starts from RAW
 token bytes plus the root public key and recomputes everything itself. None
 accepts a parsed object, a digest, or any value computed by a system under
 test. Everything fails closed.

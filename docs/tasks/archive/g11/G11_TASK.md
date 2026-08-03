@@ -38,7 +38,7 @@ launch prompt**. If either differs, **STOP and report** — do not act on a part
 | 6 | Implementing G-3's timing/equivalence-margin work (IA-3), G-13's `Allowed(AT_i) = C_i`, the F4/F5 reference monitor (G-15), the DPoP taxonomy (G-14), the approval-artifact **arm**, or any arm/agent/adapter | Non-goals; each is owned elsewhere. IA-3 explicitly stays `[UNVERIFIED-IA]` for G-3 |
 | 7 | Setting `frozen_parameters.md` rows 1–7, 9, 10, or the `task_authorization_policy` | Only the registry is frozen here (STEP 6); the `may_act`/F2 policy stays UNSET and F2 `wrong_principal` stays unscored |
 | 8 | Marking G-11 or the G-4 follow-on PASS if any mutation was not genuinely exercised | STEP 8 |
-| 9 | `git push --force`, history rewrite, credentials in the repo | CLAUDE.md red lines 7–8 |
+| 9 | `git push --force`, history rewrite, credentials in the repo | PROJECT_RULES.md red lines 7–8 |
 
 If a step cannot be completed as written, **stop and report the blocker**. Do not substitute a
 weaker version and report it as done.

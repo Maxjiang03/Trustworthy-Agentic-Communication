@@ -38,7 +38,7 @@ launch prompt**. If either differs, **STOP and report** — do not act on a part
 | 6 | Writing arm implementations, the AS, HTC/INV, agents, protocol adapters, or the oracle | G-2 is an authorizer-semantics gate; it needs tokens and an authorizer, nothing downstream |
 | 7 | Sealing a token, or relying on seal in any check | ADR 0002: this design never seals; G-2 must not smuggle it back |
 | 8 | Running or adjudicating any other gate (G-4, G-11, …) | One gate at a time |
-| 9 | `git push --force`, history rewrite, credentials in the repo | CLAUDE.md red lines 7–8 |
+| 9 | `git push --force`, history rewrite, credentials in the repo | PROJECT_RULES.md red lines 7–8 |
 
 If a step cannot be completed as written, **stop and report the blocker**. Do not substitute a
 weaker version and report it as done. In particular, if a criterion turns out **not to be honestly

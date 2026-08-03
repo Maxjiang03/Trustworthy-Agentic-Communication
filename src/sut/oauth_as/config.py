@@ -1,6 +1,6 @@
 """Start-up configuration for the AS. Everything frozen arrives as **data**.
 
-The AS never imports the harness (CLAUDE.md red line 6), so the frozen ontology
+The AS never imports the harness (PROJECT_RULES.md red line 6), so the frozen ontology
 `Omega` reaches it the way ADR 0016 prescribes -- as start-up configuration
 supplied by the runner, not by importing `src/harness/authorizer/`. The same is
 true of the AS public key at the boundary: sealed configuration, never a

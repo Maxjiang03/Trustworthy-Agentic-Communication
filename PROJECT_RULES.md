@@ -1,4 +1,4 @@
-# CLAUDE.md — Project Overview & Working Rules
+# Project Rules — Overview & Working Rules
 
 ## What this is
 Trustworthy Agentic Communication: a pre-registered, reproducible testbed that measures authorization-scope propagation and its cost at the A2A→MCP boundary (the cross-protocol confused-deputy problem, TV23). MSc Cybersecurity dissertation, University of Glasgow.
@@ -71,7 +71,7 @@ Not yet authored. Per Part H, the pre-registration is written and sealed only AF
 5. `τ_gt` is oracle-only; no system-under-test principal may read it.
 6. `src/sut/` must never import from `src/harness/`. The dependency is one-way.
 7. Never `git push --force`; never rewrite remote history.
-8. No credentials, tokens, or secrets in the repo or in code. If a push needs auth you cannot access, STOP and ask the author.
+8. No credentials, tokens, or secrets in the repo or in code. If a push needs auth that is unavailable, STOP and ask the author.
 
 ## Layout
 `src/sut/` measured system · `src/harness/` instrument · `docs/` design + threat model + frozen parameters · `adr/` one file per decision · `fixtures/pilot` vs `fixtures/confirmatory` strictly disjoint.

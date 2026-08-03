@@ -10,7 +10,7 @@ independent implementations (D13/D21, the discipline ADR 0009 applies to
 oracle recompute `Allowed(P_i; Gamma, kappa, Omega)` over it. The SUT receives
 the document as start-up configuration (bytes/path supplied by the runner),
 never by importing this package - `src/sut/` must never import `src/harness/`
-(CLAUDE.md red line 6).
+(PROJECT_RULES.md red line 6).
 
 `H(Gamma)` construction (frozen by ADR 0016; the same tagged, versioned,
 length-delimited family as ADR 0003 `commitment.py` and ADR 0009

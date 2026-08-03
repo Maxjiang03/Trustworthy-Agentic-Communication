@@ -55,7 +55,7 @@ are duplicated here as wire-level protocol facts, the way the boundary
 duplicates token validation rather than importing it. Its client secret and
 its actor-assertion key arrive as injected start-up configuration, derived
 harness-side by `src/harness/key_material` from the sealed seed; neither
-touches disk (CLAUDE.md red line 8).
+touches disk (PROJECT_RULES.md red line 8).
 
 At the boundary the arm presents `AT_n` as a bearer token and the decision is
 `src/sut/authz/boundary.py` **unchanged** -- `verify_access_token`,

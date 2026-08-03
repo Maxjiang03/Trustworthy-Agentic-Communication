@@ -2,7 +2,7 @@
 
 **Read this file completely, then execute it exactly, in order. Stop at the end and wait for Commander review.**
 
-**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` (Parts A–J). **Working rules:** `CLAUDE.md`. If anything in this spec conflicts with either, STOP and report the conflict with the primary-source citation; do not improvise a resolution.
+**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` (Parts A–J). **Working rules:** `PROJECT_RULES.md`. If anything in this spec conflicts with either, STOP and report the conflict with the primary-source citation; do not improvise a resolution.
 
 ---
 
@@ -10,7 +10,7 @@
 
 1. Print `wc -l SMOKE_G8_G5_TASK.md` and `sha256sum SMOKE_G8_G5_TASK.md`. Compare both against the values given in the launch prompt. On mismatch: STOP and report truncation — do not proceed.
 2. Confirm the working tree is clean and on `main`, at or after commit `b385e6d` (G-1 = PASS). If G-1 is not PASS on the status board, STOP.
-3. Read, in this order: `CLAUDE.md`; `smoke/README.md` (status board + DAG); `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` Part B (decision register), Part F §F.2 and §F.4 (IA table), Part G rows G-5 and G-8; `adr/0002` and `adr/0003` (style precedent for library-choice ADRs); `smoke/g1/REPORT.md` (report format precedent).
+3. Read, in this order: `PROJECT_RULES.md`; `smoke/README.md` (status board + DAG); `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` Part B (decision register), Part F §F.2 and §F.4 (IA table), Part G rows G-5 and G-8; `adr/0002` and `adr/0003` (style precedent for library-choice ADRs); `smoke/g1/REPORT.md` (report format precedent).
 4. Evidence grades are mandatory throughout: `[VERIFIED]` (checked against a primary source, cite it), `[DESIGN]` (project decision, cite the ADR), `[UNVERIFIED-IA]` (assumption awaiting its gate). **Never state an `[UNVERIFIED-IA]` as fact.** Verify every RFC claim against the RFC text itself and cite section numbers; several load-bearing "facts" in earlier passes turned out wrong until checked against primary sources.
 
 ---

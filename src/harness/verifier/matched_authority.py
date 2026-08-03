@@ -5,7 +5,7 @@ SS E.2 defines the instrument: *an independent harness verifier recomputes
 and every strong baseline*. This module is that verifier. It is the
 **instrument**, so it lives under `src/harness/` and recomputes everything it
 checks from **raw presented evidence** -- never from a value a system under
-test computed (D13/D21, CLAUDE.md red line 4).
+test computed (D13/D21, PROJECT_RULES.md red line 4).
 
 **How the reading of `AT_i` is settled.** The Part G row writes `Allowed(AT_i)`,
 but SS E.2 applies the same sentence to *every strong baseline* -- including the

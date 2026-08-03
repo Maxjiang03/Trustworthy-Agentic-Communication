@@ -440,7 +440,7 @@ the `requested_expires_in` extension, the `identifier` rule), and everything §9
 - **Seed custody is the isolation boundary.** Anyone holding the campaign seed can derive the AS
   signing key; the guarantee is that the runner gives it to no agent process.
 - **Client secrets are derived, not stored.** No secret appears in the repository or in the AS
-  configuration file (CLAUDE.md red line 8).
+  configuration file (PROJECT_RULES.md red line 8).
 - **The AS is single-tenant and stateless apart from nonces.** No revocation list, no replay cache
   (B3⁺'s `jti` cache is **G-9**), no rate limiting.
 

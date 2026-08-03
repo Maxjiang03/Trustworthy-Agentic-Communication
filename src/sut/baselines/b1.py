@@ -25,7 +25,7 @@ skipped cell.
 `ApiKeyEvidence` carries `raw_key_ref`, a *reference* -- so the id travels into
 the observed evidence and the secret never does. The secret itself is injected
 as start-up configuration, derived harness-side from the sealed seed, and
-touches no disk (CLAUDE.md red line 8). A wrong secret under a valid id is
+touches no disk (PROJECT_RULES.md red line 8). A wrong secret under a valid id is
 still distinguishable in the record, which a bare "which key was used" label
 would not be.
 

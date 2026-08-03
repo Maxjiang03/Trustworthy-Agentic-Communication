@@ -33,7 +33,7 @@ not act on a partial spec.
 | 7 | Upgrading IA-4 from `[UNVERIFIED-IA]`; marking G-4 PASS on the smoke board | Adjudication is Phase 2, on the built AS |
 | 8 | Touching `src/sut/`, `src/harness/`, `fixtures/confirmatory/`, Part H, `docs/PRE_REGISTRATION.md`, or any existing gate report | Out of scope; `src/harness/` changes belong to Phase 2 under the STEP 7 ADR |
 | 9 | Starting G-2, G-11, G-13, G-14, or any other gate | One gate at a time |
-| 10 | `git push --force`, history rewrite, credentials in the repo | CLAUDE.md red lines 7–8 |
+| 10 | `git push --force`, history rewrite, credentials in the repo | PROJECT_RULES.md red lines 7–8 |
 
 If any step cannot be completed as written, **stop and report the blocker**. Do not substitute a
 weaker version of a step and report it as done.
@@ -186,10 +186,10 @@ The layout has two homes — `src/sut/` (measured) and `src/harness/` (instrumen
 neither comfortably. It is a counterparty service whose round-trip cost is *inside* the measured
 quantity, yet the harness must not issue the credentials it later adjudicates.
 
-Write an ADR that decides the placement and records the reasoning, honouring: CLAUDE.md red line
+Write an ADR that decides the placement and records the reasoning, honouring: PROJECT_RULES.md red line
 6 (`src/sut/` never imports `src/harness/`); the independence discipline that the oracle never
 consumes SUT-computed values; and STEP 6 item 4's process/key isolation. If the decision requires
-amending the layout paragraph in `README.md` or `CLAUDE.md`, make that amendment in the **same
+amending the layout paragraph in `README.md` or `PROJECT_RULES.md`, make that amendment in the **same
 commit** as the ADR. If you conclude the choice is genuinely close, present both options with the
 trade-off and **stop for the Commander's decision** rather than picking silently.
 

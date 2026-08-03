@@ -4,7 +4,7 @@ Every test has a positive arm and a negative arm so no assertion can pass
 vacuously. Under test: the committed documents match a deterministic
 regeneration; the authority sets in the sealed truth are what the frozen
 authorizer computes (never hand-written); the SUT-visible/sealed separation
-holds; and `fixtures/confirmatory/` stays empty (CLAUDE.md red line 1).
+holds; and `fixtures/confirmatory/` stays empty (PROJECT_RULES.md red line 1).
 """
 
 import importlib.util

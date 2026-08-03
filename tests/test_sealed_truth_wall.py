@@ -1,4 +1,4 @@
-"""The sealed-truth wall (CLAUDE.md red line 5; SS A.3; EXP1 STEP 8 item 5).
+"""The sealed-truth wall (PROJECT_RULES.md red line 5; SS A.3; EXP1 STEP 8 item 5).
 
 The test the specification demands: one that FAILS if a SUT module can reach
 sealed truth. `test_sut_module_is_refused` constructs a real module whose

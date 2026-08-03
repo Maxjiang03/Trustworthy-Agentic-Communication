@@ -43,7 +43,7 @@ Create exactly this structure. Placeholder Python modules contain **only** a mod
 
 ```
 TrustworthyAgent/
-├── CLAUDE.md                       # project overview + working rules (exact content in STEP 3)
+├── PROJECT_RULES.md                       # project overview + working rules (exact content in STEP 3)
 ├── BOOTSTRAP_TASK.md               # this file — provenance record; commit it
 ├── README.md                       # short: what this is, current phase, setup commands, pointer to docs/
 ├── LICENSE                         # MIT, copyright holder: Yixian Jiang
@@ -97,10 +97,10 @@ TrustworthyAgent/
 
 ---
 
-## STEP 3 — Create `CLAUDE.md` with exactly this content
+## STEP 3 — Create `PROJECT_RULES.md` with exactly this content
 
 ```markdown
-# CLAUDE.md — Project Overview & Working Rules
+# PROJECT_RULES.md — Project Overview & Working Rules
 
 ## What this is
 Trustworthy Agentic Communication: a pre-registered, reproducible testbed that measures authorization-scope propagation and its cost at the A2A→MCP boundary (the cross-protocol confused-deputy problem, TV23). MSc Cybersecurity dissertation, University of Glasgow.
@@ -231,7 +231,7 @@ Stage in coherent groups; commit each with a clear message, for example:
 1. `chore: initialize repository skeleton and package layout`
 2. `build: add pinned Python 3.11 environment (pyproject, uv.lock, Dockerfile)`
 3. `ci: add pre-commit (ruff) and GitHub Actions pytest workflow`
-4. `docs: add CLAUDE.md, move architecture doc into docs/, add threat model, pre-registration stub, frozen-parameters stub`
+4. `docs: add PROJECT_RULES.md, move architecture doc into docs/, add threat model, pre-registration stub, frozen-parameters stub`
 5. `docs: add ADR log and initial architecture-decision record`
 6. `test: add placeholder test so CI is green`
 

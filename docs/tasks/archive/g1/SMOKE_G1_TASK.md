@@ -4,20 +4,20 @@
 
 This session runs **one gate only: G-1**. It is the first feasibility spike in the Part G DAG (`G-1 / G-5 / G-8 → G-6 / G-7 → G-2 / G-4 / G-11 → …`). G-1 decides whether the **entire capability track** is buildable in Python, or whether a fallback changes the technology stack.
 
-**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md`. **Working rules:** `CLAUDE.md`.
+**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md`. **Working rules:** `PROJECT_RULES.md`.
 
 ---
 
 ## STEP 0 — Orient
 
-1. Read `CLAUDE.md` in full (red lines, evidence grades, commit convention).
+1. Read `PROJECT_RULES.md` in full (red lines, evidence grades, commit convention).
 2. Read these sections of `docs/EXPERIMENT_ARCHITECTURE_FINAL.md`:
    - **§A.0.1** — canonical types: `SignedBlock_i`, `P_i` (signed-block prefix, **excluding the mutable proof tail**), `C_i`, `Ω`, `Γ`, `κ`. **The hashing rule matters most: every capability-state hash hashes a `P_i` prefix, never the token with its mutable proof tail.**
    - **§A.6.1** — the three distinct checks: `crypto_chain_ok`, `authorizer_policy_ok`, effective authorization. **G-1 tests only `crypto_chain_ok`.**
    - **§F.2** — HTC / INV, which bind `H(P_{i−1})`, `H(SignedBlock_i)`, `H(P_n)`.
    - **§F.4** — `IA-1` (the assumption this gate tests).
    - **Part G** — the gate table, the DAG, and the **gate-outcome policy** (fallbacks).
-3. Report the line counts of `CLAUDE.md` and `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` so we can confirm nothing was truncated.
+3. Report the line counts of `PROJECT_RULES.md` and `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` so we can confirm nothing was truncated.
 
 ---
 
@@ -31,7 +31,7 @@ This session runs **one gate only: G-1**. It is the first feasibility spike in t
 | **Do NOT test monotonicity** (`C_i ⊆ C_{i−1}`) | That is G-2. G-1 tests the library's mechanics, not the Datalog semantics. |
 | **Do NOT pin the library in `pyproject.toml` before the gate passes** | Pinning an unverified library would state an `[UNVERIFIED-IA]` as fact. Use an **ephemeral** install for the spike (STEP 3). |
 | **Do NOT touch `fixtures/confirmatory/`** | Red line 1. |
-| **Do NOT unilaterally change the design** | If G-1 forces a design change, record an **ADR** and **update the architecture document** in the same commit. Never diverge silently (CLAUDE.md). |
+| **Do NOT unilaterally change the design** | If G-1 forces a design change, record an **ADR** and **update the architecture document** in the same commit. Never diverge silently (PROJECT_RULES.md). |
 | **Do NOT `git push --force`** | Red line 7. |
 
 ---
@@ -106,7 +106,7 @@ Note: Biscuit chains blocks with **single-use keypairs**, so token bytes will di
 
 **Why this exists.** §A.0.1 requires `HTC.parent_prefix_hash = H(P_{i−1})`, `HTC.child_block_hash = H(SignedBlock_i)`, and `INV.capability_hash = H(P_n)`, where `P_i` is the **signed-block prefix excluding the mutable proof tail**. The proof tail (the trailing single-use secret, or the seal signature) **changes on every append and on seal**. If we can only hash the whole serialized token, then `H(P_0)` computed before appending will differ from `H(P_0)` re-derived after appending, and the HTC parent binding cannot work as specified.
 
-**This sub-check is an expansion of G-1 beyond the row currently in the architecture document.** It is legitimate — the design depends on it — but per CLAUDE.md it **must not be a silent divergence**: record it in the ADR and update the Part G G-1 row in `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` (STEP 8).
+**This sub-check is an expansion of G-1 beyond the row currently in the architecture document.** It is legitimate — the design depends on it — but per PROJECT_RULES.md it **must not be a silent divergence**: record it in the ADR and update the Part G G-1 row in `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` (STEP 8).
 
 **Procedure:**
 
@@ -170,7 +170,7 @@ Structure it so it can be lifted into the dissertation's feasibility subsection:
 - Run `uv lock` and commit the updated `uv.lock`.
 - If the library needs a Rust toolchain to build (no wheels), update the `Dockerfile` and the CI workflow, and note the cost in the ADR.
 
-**Architecture-document update (mandatory, per CLAUDE.md "never diverge silently"):**
+**Architecture-document update (mandatory, per PROJECT_RULES.md "never diverge silently"):**
 - Update the **Part G G-1 row** so its pass criterion includes the prefix-identity check (G-1.F) and the seal-terminality check (G-1.G).
 - Update **§F.4 IA-1** to reflect its post-gate status.
 - **On CONDITIONAL PASS**, add the proposed `H(P_i)` definition to **§A.0.1** *only after the author approves it* — if the author has not yet approved, leave the document unchanged and flag the pending decision in the report and the ADR.

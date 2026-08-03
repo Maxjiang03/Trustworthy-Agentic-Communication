@@ -14,7 +14,7 @@ Phase 2 builds. The repository has two homes — `src/sut/` (the measured system
   require that the oracle share no implementation with anything it judges.
 
 The layout rule already in force is asymmetric: `src/sut/` must never import `src/harness/`, and
-the harness *may* import `sut` (`README.md` §Layout; CLAUDE.md red line 6). That asymmetry is what
+the harness *may* import `sut` (`README.md` §Layout; PROJECT_RULES.md red line 6). That asymmetry is what
 makes the placement question sharp — a harness-side verifier could import an AS that lives under
 either tree unless a rule forbids it.
 
@@ -61,12 +61,12 @@ pass criteria**, explicitly not a criterion change (ADR 0008).
 
 ## Consequences
 
-- `README.md` §Layout and CLAUDE.md §Layout are amended in the **same commit** as this ADR to
-  name `src/sut/oauth_as/` and carry rules 3 and 4. CLAUDE.md red line 6 is **unchanged**; this
+- `README.md` §Layout and PROJECT_RULES.md §Layout are amended in the **same commit** as this ADR to
+  name `src/sut/oauth_as/` and carry rules 3 and 4. PROJECT_RULES.md red line 6 is **unchanged**; this
   ADR adds a constraint in its family, it does not edit the red-line list.
 - Placing the AS in the measured tree also states the evidential status of its output correctly:
   an `AT` is **SUT-produced evidence the oracle recomputes over**, never a value the oracle
-  trusts (CLAUDE.md red line 4, §F.1).
+  trusts (PROJECT_RULES.md red line 4, §F.1).
 - Phase 2 adds an import-boundary test for rules 3 and 4 alongside the runtime forge test (A4 in
   `DESIGN.md` §10).
 - No directory is created in this pass: Phase 1 writes **no AS code**, not even a skeleton.

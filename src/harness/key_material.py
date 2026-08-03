@@ -113,7 +113,7 @@ def identity_private_jwk(seed: bytes, principal: str) -> "dict[str, str]":
 
     Runtime-only, runner-held, in memory: like every other value this module
     derives, it MUST never be written to disk, committed, or echoed into
-    `results/` (CLAUDE.md red line 8, ADR 0021 rule 2).
+    `results/` (PROJECT_RULES.md red line 8, ADR 0021 rule 2).
     """
     private = identity_private(seed, principal)
     raw = private.private_bytes(
@@ -161,7 +161,7 @@ def b1_api_key(seed: bytes, key_id: str) -> str:
 
     Runtime-only, runner-held, in memory: derived here and injected as
     start-up configuration, never written to disk, the repository, or
-    `results/` (CLAUDE.md red line 8). `B1` compares it for equality and
+    `results/` (PROJECT_RULES.md red line 8). `B1` compares it for equality and
     reads nothing else, which is the arm.
     """
     raw = HKDF(

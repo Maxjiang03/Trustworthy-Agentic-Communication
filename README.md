@@ -25,7 +25,7 @@ pass that built the apparatus.)*
 ## Authoritative design
 
 `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` is the single source of truth. Working rules for
-contributors (human or AI) are in `CLAUDE.md`; decisions are recorded in `adr/`.
+contributors (human or AI) are in `PROJECT_RULES.md`; decisions are recorded in `adr/`.
 
 ## Setup
 

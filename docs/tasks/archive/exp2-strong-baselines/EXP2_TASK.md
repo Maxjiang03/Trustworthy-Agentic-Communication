@@ -39,10 +39,10 @@ prompt**. If either differs, **STOP and report** — do not act on a partial spe
 | 6 | Modifying `omega_gamma_v1.json`, `identity_registry_v1.json`, `frozen_config.py`, `H(Γ)`, `H(R)`, or `frozen_parameters.md` rows 8 and 11 | ADR 0016/0019. A defect found here → **STOP** and write a corrective ADR |
 | 7 | Setting `frozen_parameters.md` rows 1, 2, 3, 5, 7 or 9, or inventing a `task_authorization_policy` | Only rows 4, 6 and 10 are decided in this pass, and their values are **given** in STEP 3 — do not choose your own. Row 5 stays UNSET, so F2 `wrong_principal` stays unscored |
 | 8 | Building F3, F4 or F5 fixtures, the shared reference monitor, or `authz_context_hash` | Rows 4/6/10 being frozen enables the **refusal** half of the two policy conjuncts. Scoring F4/F5 additionally needs labelled fixtures and G-15, and `authz_context_hash` stays ADR 0009 category (c) |
-| 9 | Creating or populating `fixtures/confirmatory/`, drafting `docs/PRE_REGISTRATION.md`, sealing, or running a campaign | CLAUDE.md red lines 1–2; Part H |
+| 9 | Creating or populating `fixtures/confirmatory/`, drafting `docs/PRE_REGISTRATION.md`, sealing, or running a campaign | PROJECT_RULES.md red lines 1–2; Part H |
 | 10 | Any import of `src/harness/` from `src/sut/`; of `src/sut/oauth_as/` from a non-AS `src/sut/` module or from `src/harness/`; or reuse of a harness implementation as the SUT-side one | Red line 6, ADR 0015 rules 3–4, D13/D21. The block-1 AST suite already enforces the first three — keep it passing rather than working around it |
-| 11 | Putting a client secret, an actor assertion, a seed or a minted token on disk, in the repository, or in `results/` | CLAUDE.md red line 8. Runtime-only, runner-held, in memory |
-| 12 | `git push --force`, history rewrite | CLAUDE.md red line 7 |
+| 11 | Putting a client secret, an actor assertion, a seed or a minted token on disk, in the repository, or in `results/` | PROJECT_RULES.md red line 8. Runtime-only, runner-held, in memory |
+| 12 | `git push --force`, history rewrite | PROJECT_RULES.md red line 7 |
 
 If a step cannot be completed as written, **stop and report the blocker**. Do not substitute a
 weaker version and report it as done.

@@ -3,7 +3,7 @@
 Implements `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` SS F.2 and SS F.2.1. The
 verifier is the **instrument**, so it lives under `src/harness/`: it recomputes
 every digest it checks from raw evidence and never consumes a value a system
-under test computed (D13/D21, CLAUDE.md red line 4).
+under test computed (D13/D21, PROJECT_RULES.md red line 4).
 
 Why the HTC exists at all `[VERIFIED]`: Biscuit's per-block signatures use
 single-use keypairs that prove blocks are correctly chained, and only the

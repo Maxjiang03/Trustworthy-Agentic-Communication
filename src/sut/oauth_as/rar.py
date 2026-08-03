@@ -22,7 +22,7 @@ Two rules here are load-bearing and easy to get quietly wrong:
   the RFC-sanctioned way to express it (SS 2 allows several entries of one type).
 
 `Omega` arrives as **start-up configuration** supplied by the runner, never by
-importing the harness (`src/sut/` must never import `src/harness/`, CLAUDE.md
+importing the harness (`src/sut/` must never import `src/harness/`, PROJECT_RULES.md
 red line 6; ADR 0016's data-not-code discipline).
 """
 

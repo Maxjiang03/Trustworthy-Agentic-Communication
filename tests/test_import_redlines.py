@@ -1,4 +1,4 @@
-"""The automated import red-line suite (CLAUDE.md red line 6; ADR 0015 rules 3-4).
+"""The automated import red-line suite (PROJECT_RULES.md red line 6; ADR 0015 rules 3-4).
 
 Until this pass, red line 6 was convention; from this pass onward there is
 real code on both sides that could cross it, so the rule is now executable:

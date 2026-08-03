@@ -4,7 +4,7 @@
 
 **Context.** Gate G-7 PASSed on the measurement box, but the enforcement mechanism is Win32 share-mode locking and `LedgerWriter.__init__` raises on any other platform. On Linux this makes six tests in `tests/test_effect_ledger.py` **fail hard** and `smoke/g7/spike.py` exit 1, so the `ubuntu-latest` CI workflow is red and no third party can independently re-verify G-7 by cloning the repository — the project's standard verification practice. The Commander's decision (option **丙**) is: **accept Windows as the measurement platform now, record it as a first-class architectural decision rather than a report footnote, restore CI, and defer the POSIX variant to after submission.** This pass implements that decision and opens the G-4 construction spike; it runs **no gate**.
 
-**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md`. **Working rules:** `CLAUDE.md`. Evidence grades mandatory on load-bearing statements.
+**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md`. **Working rules:** `PROJECT_RULES.md`. Evidence grades mandatory on load-bearing statements.
 
 ---
 
@@ -12,7 +12,7 @@
 
 1. Print `wc -l LEDGER_PLATFORM_TASK.md` and `sha256sum LEDGER_PLATFORM_TASK.md`; compare with the launch prompt. On mismatch: STOP and report truncation.
 2. Confirm a clean tree on `main` at or after `ab0c0fb` (G-1/G-5/G-6/G-7/G-8 PASS; ADRs 0001–0013 present).
-3. Read: `CLAUDE.md`; `adr/template.md`; `adr/0008` (the precedent for a decision that changes scheduling without changing criteria); `smoke/g7/REPORT.md` in full; `src/harness/effect_ledger.py`; `tests/test_effect_ledger.py`; `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` Part H, §F.4 row IA-7, §J (validity threats); `docs/frozen_parameters.md`; `.github/workflows/ci.yml`.
+3. Read: `PROJECT_RULES.md`; `adr/template.md`; `adr/0008` (the precedent for a decision that changes scheduling without changing criteria); `smoke/g7/REPORT.md` in full; `src/harness/effect_ledger.py`; `tests/test_effect_ledger.py`; `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` Part H, §F.4 row IA-7, §J (validity threats); `docs/frozen_parameters.md`; `.github/workflows/ci.yml`.
 
 ---
 

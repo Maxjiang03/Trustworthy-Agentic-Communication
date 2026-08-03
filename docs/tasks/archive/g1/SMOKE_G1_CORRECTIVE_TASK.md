@@ -2,7 +2,7 @@
 
 **Read this file completely, then execute it exactly. Stop at the end and wait for Commander review.**
 
-**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md`. **Working rules:** `CLAUDE.md`.
+**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md`. **Working rules:** `PROJECT_RULES.md`.
 
 ---
 

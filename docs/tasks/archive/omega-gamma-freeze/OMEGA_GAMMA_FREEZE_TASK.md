@@ -29,7 +29,7 @@ launch prompt**. If either differs, **STOP and report** — do not act on a part
 | 4 | Reducing, deferring, or marking out-of-scope any arm, gate, attack family, or claim | Full scope is retained; this task is not a triage |
 | 5 | Touching `docs/PRE_REGISTRATION.md`, Part H step order, `fixtures/confirmatory/`, or any existing gate report | Out of scope |
 | 6 | Inventing an `Ω` element whose necessity you cannot state, or one with no corresponding MCP tool | See STEP 3; a phantom element propagates into the AS, the ledger, the oracle, and every result table |
-| 7 | `git push --force`, history rewrite, credentials in the repo | CLAUDE.md red lines 7–8 |
+| 7 | `git push --force`, history rewrite, credentials in the repo | PROJECT_RULES.md red lines 7–8 |
 
 If a step cannot be completed as written, **stop and report the blocker**. Do not substitute a
 weaker version and report it as done.

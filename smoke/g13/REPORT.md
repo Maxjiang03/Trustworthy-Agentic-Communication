@@ -57,7 +57,7 @@ agreement evidence rather than tautology.
 
 Every set the gate compares is computed from **raw presented evidence** — the `ObservedRequest`
 the harness recorded at the boundary — and compared against the **sealed** `C_i`, which no system
-under test can read (CLAUDE.md red lines 4 and 5). No arm's return value is trusted anywhere.
+under test can read (PROJECT_RULES.md red lines 4 and 5). No arm's return value is trusted anywhere.
 
 ## 3. The equalities, computed (G-13.L1)
 

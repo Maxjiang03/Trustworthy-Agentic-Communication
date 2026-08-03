@@ -16,7 +16,7 @@ plumbing, and D21 asks for an *independent implementation*, not a shared one.
 2. It verifies with `matched_authority.verify_token`, the harness's own RFC 9068
    §4 reimplementation built for **G-13** and deliberately not shared with the
    boundary (D13/D21). `src/harness/` may never import `src/sut/oauth_as/`
-   (CLAUDE.md), so the two implementations cannot converge by accident.
+   (PROJECT_RULES.md), so the two implementations cannot converge by accident.
 3. It resolves the actor by §A.5.1's rule — **outermost** `act.sub`, else
    `client_id`; RFC 8693 §4.1 makes nested actors audit history, never
    authority — and returns it as the `(iss, actor)` pair §F.1 shapes

@@ -94,7 +94,7 @@ def derive_tls_key(seed: bytes) -> Ed25519PrivateKey:
 def derive_client_secret(seed: bytes, client_id: str) -> str:
     """Client secrets derived at run time from sealed seeds, never in the repository.
 
-    SS 5.1 (`client_secret_basic`) and CLAUDE.md red line 8.
+    SS 5.1 (`client_secret_basic`) and PROJECT_RULES.md red line 8.
     """
     return b64u(_derive(seed, _INFO_CLIENT_SECRET + b":" + client_id.encode("ascii")))
 

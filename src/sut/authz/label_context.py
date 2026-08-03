@@ -2,7 +2,7 @@
 
 `src/harness/verifier/label_context.py` is the instrument's implementation. This
 is the measured system's, written **independently** from ADR 0030's stated byte
-layout rather than by importing the harness (CLAUDE.md red line 6, D13/D21), and
+layout rather than by importing the harness (PROJECT_RULES.md red line 6, D13/D21), and
 `tests/test_label_context_agreement.py` pins that the two agree byte for byte on
 every construction. Agreement is required; shared code is not.
 

@@ -209,7 +209,7 @@ def _evidence_from(presentation: Mapping[str, Any]) -> EvidenceBundle:
     if "api_key_id" in presentation:
         # `raw_key_ref` is a REFERENCE (SS F.1). `B1` presents the key id here
         # and compares the secret in-process, so no shared secret enters any
-        # record the oracle reads (CLAUDE.md red line 8).
+        # record the oracle reads (PROJECT_RULES.md red line 8).
         api_key = ApiKeyEvidence(kind="api_key", raw_key_ref=presentation["api_key_id"])
     return EvidenceBundle(oauth=oauth, capability=capability, api_key=api_key, inv_only=None)
 
@@ -394,7 +394,7 @@ class GoldenThreadRunner:
         AS's documented derivations rather than imported (ADR 0015 rule 4 bars
         the harness from importing `src/sut/oauth_as/`), and both are
         runtime-only: derived here, in memory, handed to the arm, never written
-        to disk, the repository, or `results/` (CLAUDE.md red line 8).
+        to disk, the repository, or `results/` (PROJECT_RULES.md red line 8).
 
         `ladder_grant` names which SS E.1 row the arm occupies, and decides
         BOTH which of the delegating client's base tokens it receives and what
@@ -462,7 +462,7 @@ class GoldenThreadRunner:
         """`B2-exchange-task-DPoP`'s material: the exchange arm's plus a proof key.
 
         The DPoP holder key is derived from the sealed seed and injected in
-        memory, never written anywhere (CLAUDE.md red line 8). It is a
+        memory, never written anywhere (PROJECT_RULES.md red line 8). It is a
         DIFFERENT key from the AS's signing key and from any actor-assertion
         key -- `smoke/g4/DESIGN.md` SS 7.3 warns the DPoP holder and the HTC
         holder must never be conflated, so the label is stated rather than

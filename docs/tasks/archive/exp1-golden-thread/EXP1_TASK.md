@@ -36,14 +36,14 @@ prompt**. If either differs, **STOP and report** — do not act on a partial spe
 | 2 | Modifying `src/harness/authorizer/omega_gamma_v1.json`, `identity_registry_v1.json`, `frozen_config.py`, `Γ`, `Ω`, `H(Γ)`, `H(R)`, or `frozen_parameters.md` rows 8 and 11 | ADR 0016/0019 froze them. A defect found here → **STOP** and write a corrective ADR; never silently patch frozen bytes |
 | 3 | Setting `frozen_parameters.md` rows 1–7, 9, 10, or inventing a `task_authorization_policy`, label policy, sink policy, high-risk set, or freshness window `Δ` | Each is a seal-time decision needing its own ADR. Rows 4/6/10 UNSET is precisely why F4/F5 stay unscored (STEP 12) |
 | 4 | **Measuring, benchmarking, or reporting any latency, throughput or overhead number** | Row 2 (the G-3 threshold) and row 1 (the equivalence margin) are UNSET and **must** be fixed from external engineering need *before any timing measurement* (Part H step 2, Part J.2). Instrumentation seams are in scope; numbers are not |
-| 5 | Creating or populating `fixtures/confirmatory/`, drafting `docs/PRE_REGISTRATION.md`, sealing, or running anything called a campaign | CLAUDE.md red lines 1–2; Part H |
-| 6 | Any import of `src/harness/` from `src/sut/`; any import of `src/sut/oauth_as/` from a non-AS `src/sut/` module or from `src/harness/` | CLAUDE.md red line 6 and ADR 0015 rules 3–4. The instrument must never share an implementation with what it adjudicates (D13/D21) |
+| 5 | Creating or populating `fixtures/confirmatory/`, drafting `docs/PRE_REGISTRATION.md`, sealing, or running anything called a campaign | PROJECT_RULES.md red lines 1–2; Part H |
+| 6 | Any import of `src/harness/` from `src/sut/`; any import of `src/sut/oauth_as/` from a non-AS `src/sut/` module or from `src/harness/` | PROJECT_RULES.md red line 6 and ADR 0015 rules 3–4. The instrument must never share an implementation with what it adjudicates (D13/D21) |
 | 7 | Reusing `src/harness/verifier/holder_binding.py`, `oracle/jcs_digest.py`, `oracle/commitment.py`, `verifier/at_digest.py`, or `authorizer/allowed.py` **as the SUT-side implementation** — by import, copy-with-edit, or shared helper module | D21: the SUT-side signer and boundary verifier must be **independent** of the harness verifier. G-13 owns this obligation and will check it. Independent means separately written, not merely separately filed |
 | 8 | Pinning `a2a-sdk`/`a2a-python`, or any new dependency, in `pyproject.toml` | ADR 0004: **a pin never precedes its gate**. The A2A SDK's gate has not run (STEP 3) |
 | 9 | A tool that performs a real side effect — sending mail, writing outside a temp dir, network egress | Every effector is a sandboxed stub that records an **intent** and returns, as in `smoke/g7/spike.py` |
-| 10 | Letting any SUT principal read `τ_gt`, `IntendedInvocation`, or any sealed-truth object | §A.3 and CLAUDE.md red line 5; enforced structurally in STEP 8 |
+| 10 | Letting any SUT principal read `τ_gt`, `IntendedInvocation`, or any sealed-truth object | §A.3 and PROJECT_RULES.md red line 5; enforced structurally in STEP 8 |
 | 11 | Implementing `B1`, `B2×5`, `B-cap`, `B3⁺`, the jti cache, the attack suite, the oracle scoring pipeline, or the nine-arm orchestrator | Out of scope. Build the **seams** they plug into, not the arms |
-| 12 | `git push --force`, history rewrite, credentials or minted tokens committed to the repo | CLAUDE.md red lines 7–8 |
+| 12 | `git push --force`, history rewrite, credentials or minted tokens committed to the repo | PROJECT_RULES.md red lines 7–8 |
 
 If a step cannot be completed as written, **stop and report the blocker**. Do not substitute a
 weaker version and report it as done.
@@ -176,7 +176,7 @@ boundary check. It forwards, and it must be honestly incapable of doing anything
    mismatch, before any scenario runs.
 3. Assemble the `ObservedRequest` from **raw** evidence — raw bytes, raw arguments — so the oracle
    can recompute every digest itself. No SUT-computed verdict and no SUT-computed digest enters any
-   record the oracle reads (§F.1, CLAUDE.md red line 4).
+   record the oracle reads (§F.1, PROJECT_RULES.md red line 4).
 4. The mediation `decide` callable invokes the **arm's** boundary decision and records the outcome.
    State this correctly in the code comment: Part I's *"NOT the SUT"* is about the **provenance of
    the record**, which is the trusted mediation layer, not about who made the decision — the
@@ -296,7 +296,7 @@ report that the seams exist and are unmeasured, and that IA-3 stays `[UNVERIFIED
 
 ## STEP 15 — Say plainly what this apparatus does not yet do
 
-Update `README.md`'s "Current phase" and `CLAUDE.md`'s "Current phase" — both still say
+Update `README.md`'s "Current phase" and `PROJECT_RULES.md`'s "Current phase" — both still say
 implementation has not begun, which stops being true in this pass. Update `smoke/README.md` **only**
 to note that the apparatus the waiting gates need now exists; do **not** touch a gate's status,
 report, or ADR column. Correct any statement elsewhere that becomes untrue, and where a statement

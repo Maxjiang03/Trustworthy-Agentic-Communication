@@ -4,7 +4,7 @@
 
 **These are the construct-validity gates.** Part G is explicit: if G-6 or G-7 fails, the construct validity of the whole study is at risk and interposition must be re-architected before any confirmatory work — highest priority. A FAIL here is a **valuable result delivered on time**, not a setback. Do not soften a partial result into a pass, do not narrow a check until it passes, and do not re-architect on the fly to rescue a failing gate: write the FAIL report with the evidence, stop, and let the Commander decide.
 
-**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` (Parts A–J). **Working rules:** `CLAUDE.md`. Evidence grades (`[VERIFIED]` / `[DESIGN]` / `[UNVERIFIED-IA]`) mandatory on load-bearing statements. If this spec conflicts with either document, STOP and report with the citation.
+**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` (Parts A–J). **Working rules:** `PROJECT_RULES.md`. Evidence grades (`[VERIFIED]` / `[DESIGN]` / `[UNVERIFIED-IA]`) mandatory on load-bearing statements. If this spec conflicts with either document, STOP and report with the citation.
 
 ---
 
@@ -12,7 +12,7 @@
 
 1. Print `wc -l SMOKE_G6_G7_TASK.md` and `sha256sum SMOKE_G6_G7_TASK.md`; compare with the launch prompt. On mismatch: STOP and report truncation.
 2. Confirm a clean tree on `main` at or after `da1c9c9` (G-1/G-5/G-8 all PASS; ADRs 0001–0010 present).
-3. Read: `CLAUDE.md`; `smoke/README.md`; `adr/0003`, `adr/0004`, `adr/0009`; `src/harness/schema.py` in full; `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` §A.0.1, §F.1, §F.2, §F.4, Part G (rows G-6/G-7 and the failure-policy paragraph), Part I; `smoke/g1/REPORT.md` and `smoke/g8/REPORT.md` as report-format precedent.
+3. Read: `PROJECT_RULES.md`; `smoke/README.md`; `adr/0003`, `adr/0004`, `adr/0009`; `src/harness/schema.py` in full; `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` §A.0.1, §F.1, §F.2, §F.4, Part G (rows G-6/G-7 and the failure-policy paragraph), Part I; `smoke/g1/REPORT.md` and `smoke/g8/REPORT.md` as report-format precedent.
 
 ---
 
@@ -81,7 +81,7 @@ At most eight tests, each with positive and negative arms: admitted call emits o
 
 **Assumption under test:** IA-7 — an immutable external effect ledger plus a `ToolIngressEvent` recorder can be interposed at the tool, **independent of agent self-report** (§F.4). **Pass criterion (Part G):** both recorded independently of any SUT self-report; `correlation_id` matches the harness-minted value.
 
-The word carrying the weight is **independent**. There is a real architectural tension to resolve here and report explicitly: the recorder must sit at the tool, yet `src/sut/` may not import harness code (`CLAUDE.md` red line). Determine a mechanism that satisfies both — external process, wrapper installed by the harness, append-only channel, or another approach — and **document the mechanism and its trust argument in the report**. Do not invent a design the architecture document forbids; if no mechanism satisfies both constraints, that is a FAIL and a finding.
+The word carrying the weight is **independent**. There is a real architectural tension to resolve here and report explicitly: the recorder must sit at the tool, yet `src/sut/` may not import harness code (`PROJECT_RULES.md` red line). Determine a mechanism that satisfies both — external process, wrapper installed by the harness, append-only channel, or another approach — and **document the mechanism and its trust argument in the report**. Do not invent a design the architecture document forbids; if no mechanism satisfies both constraints, that is a FAIL and a finding.
 
 ### 4a. Spike — `smoke/g7/spike.py`, runnable via `make gate GATE=g7`
 

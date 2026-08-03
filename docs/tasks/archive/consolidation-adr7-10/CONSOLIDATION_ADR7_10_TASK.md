@@ -4,7 +4,7 @@
 
 This is a **decisions-and-consolidation pass**, not a gate pass. It converts four adjudicated Commander decisions into ADRs, one small oracle-side module, and same-commit document updates. **No gate is run.** The four decisions below are **given**: record and implement them, do not re-open, re-derive, or re-litigate them. If executing one reveals a factual contradiction with a primary source or the architecture document, STOP and report with the citation rather than adapting the decision.
 
-**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` (Parts A–J). **Working rules:** `CLAUDE.md`. Evidence grades (`[VERIFIED]` / `[DESIGN]` / `[UNVERIFIED-IA]`) are mandatory on load-bearing statements, as in ADRs 0002–0006.
+**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` (Parts A–J). **Working rules:** `PROJECT_RULES.md`. Evidence grades (`[VERIFIED]` / `[DESIGN]` / `[UNVERIFIED-IA]`) are mandatory on load-bearing statements, as in ADRs 0002–0006.
 
 ---
 
@@ -12,7 +12,7 @@ This is a **decisions-and-consolidation pass**, not a gate pass. It converts fou
 
 1. Print `wc -l CONSOLIDATION_ADR7_10_TASK.md` and `sha256sum CONSOLIDATION_ADR7_10_TASK.md`; compare both with the launch prompt. On mismatch: STOP and report truncation.
 2. Confirm a clean tree on `main` at or after `9541407` (G-8 and G-5 both PASS on the board). If either is not PASS, STOP.
-3. Read: `CLAUDE.md`; `adr/template.md`; `adr/0003` (corrective-pass precedent) and `adr/0005`/`adr/0006` (recent style); `src/harness/oracle/commitment.py` in full (the new module must match its conventions); `smoke/g8/REPORT.md` §9 (the recorded `H_JCS` gap); `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` §A.0.1, §F.2, §F.4, Part G, Part H, Part I; `docs/frozen_parameters.md`.
+3. Read: `PROJECT_RULES.md`; `adr/template.md`; `adr/0003` (corrective-pass precedent) and `adr/0005`/`adr/0006` (recent style); `src/harness/oracle/commitment.py` in full (the new module must match its conventions); `smoke/g8/REPORT.md` §9 (the recorded `H_JCS` gap); `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` §A.0.1, §F.2, §F.4, Part G, Part H, Part I; `docs/frozen_parameters.md`.
 
 ---
 

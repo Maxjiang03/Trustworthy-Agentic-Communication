@@ -4,7 +4,7 @@
 
 Gate G-1 was correctly reported **FAIL** because check **G-1.G** (seal is terminal) could not be executed: `biscuit-python==0.4.0` exposes no seal API. You did the right thing — you did not rationalise a PASS, you did not implement a fallback, and you stopped for a decision. This file carries that decision.
 
-**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md`. **Working rules:** `CLAUDE.md`.
+**Authoritative design:** `docs/EXPERIMENT_ARCHITECTURE_FINAL.md`. **Working rules:** `PROJECT_RULES.md`.
 
 ---
 

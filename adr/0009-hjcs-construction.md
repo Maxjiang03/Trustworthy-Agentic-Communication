@@ -87,7 +87,7 @@ the first of the three fields has been settled.)*
 
 `src/harness/oracle/jcs_digest.py` is **oracle-side**. The SUT-side computation must be written
 **independently later** (when the B3 arm's INV signer is built); the oracle must **never**
-consume a SUT-computed digest (§F.1; CLAUDE.md red line 4). The Part I F3 predicate always
+consume a SUT-computed digest (§F.1; PROJECT_RULES.md red line 4). The Part I F3 predicate always
 recomputes `H_JCS(obs.raw_arguments)` from raw bytes.
 
 ## Status

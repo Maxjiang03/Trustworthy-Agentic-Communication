@@ -4,12 +4,12 @@
 **Author:** Yixian Jiang (3154807J), MSc Cybersecurity, University of Glasgow
 **Supervisor:** Professor Shahid Raza
 **Consolidates:** `DESIGN_REVISION_v0.4.1.md` + all corrections in `DESIGN_REVISION_v0.4.1a_ERRATA.md`, folded into one authoritative document.
-**Status:** **Implementation candidate — NOT sealable.** This is the specification Claude Code follows to run the feasibility smoke tests in Part G. **No confirmatory experiment, no sealing, and no v0.5** until every in-scope Part G gate passes. No statement here may be described as "proven by specification"; every implementation assumption is enumerated in §F.4 with the gate that must confirm it.
+**Status:** **Implementation candidate — NOT sealable.** This is the specification the implementation follows to run the feasibility smoke tests in Part G. **No confirmatory experiment, no sealing, and no v0.5** until every in-scope Part G gate passes. No statement here may be described as "proven by specification"; every implementation assumption is enumerated in §F.4 with the gate that must confirm it.
 **Evidence grades used throughout:** **[VERIFIED]** = checked against a primary source (RFC / protocol spec / Biscuit spec or FAQ) this session; **[DESIGN]** = a project decision, internally consistent but not externally mandated; **[UNVERIFIED-IA]** = a property a library or environment must have, not yet confirmed in code (see §F.4).
 
 ---
 
-## Part 0 — How to read this document (for Claude Code)
+## Part 0 — How to read this document (for the implementer)
 
 1. **Do not implement past a failing gate.** Part G defines a dependency DAG. If a gate fails, stop on that branch and apply the fallback in the gate-outcome policy; record it as an ADR entry.
 2. **The pilot corpus is the only corpus you may run.** The confirmatory corpus does not exist yet and must not be authored or executed during smoke tests (§A.8, Part H).
@@ -526,7 +526,7 @@ The retry-vs-duplicate trade-off is why bit-identical replay is a *residual* in 
 
 ---
 
-# Part G — Feasibility smoke-gate checklist (Claude Code runs these)
+# Part G — Feasibility smoke-gate checklist (run these)
 
 **No v0.5, no sealing, no confirmatory corpus until every in-scope gate passes on the pilot corpus.** Each gate is a minimal runnable test, not an experiment.
 

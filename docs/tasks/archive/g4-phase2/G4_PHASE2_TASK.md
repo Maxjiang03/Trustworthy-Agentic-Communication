@@ -40,7 +40,7 @@ launch prompt**. If either differs, **STOP and report** — do not act on a part
 | 8 | Implementing G-13's `Allowed(AT_i) = C_i` verification, or the `R ⊆ C_n` boundary rule beyond what limb L2 needs | G-2's report flagged `R ⊆ C_n` as untested and owned by G-13. Phase 2 must not annex it |
 | 9 | Pinning `authlib`, or editing the `# PENDING GATE` block | DESIGN §3: the probe rejected it. Nothing new is pinned unless a dependency is genuinely required — see STEP 3 |
 | 10 | Marking G-4 PASS if any adjudicable limb was not genuinely exercised | See STEP 7 |
-| 11 | `git push --force`, history rewrite, credentials in the repo | CLAUDE.md red lines 7–8 |
+| 11 | `git push --force`, history rewrite, credentials in the repo | PROJECT_RULES.md red lines 7–8 |
 
 If a step cannot be completed as written, **stop and report the blocker**. Do not substitute a
 weaker version and report it as done.

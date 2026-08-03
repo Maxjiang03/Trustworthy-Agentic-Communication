@@ -454,7 +454,7 @@ class TestMirroredDerivationAgreement:
         self, as_document, setup, running_as
     ):
         """`ASProcess` writes the config document to a temp file; secrets must
-        not be in it (CLAUDE.md red line 8, `smoke/g4/DESIGN.md` SS 5.1)."""
+        not be in it (PROJECT_RULES.md red line 8, `smoke/g4/DESIGN.md` SS 5.1)."""
         serialized = json.dumps(as_document)
         assert setup["client_secret"] not in serialized
         assert setup["actor_identity_private_jwk"]["d"] not in serialized

@@ -12,7 +12,7 @@ dist/
 .venv/
 venv/
 
-# Secrets / local environment — never commit credentials (CLAUDE.md red line 8)
+# Secrets / local environment — never commit credentials (PROJECT_RULES.md red line 8)
 .env
 .env.*
 

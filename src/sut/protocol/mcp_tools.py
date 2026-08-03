@@ -12,7 +12,7 @@ callable taking tool/action/resource/recipient/arguments) and never sees the
 ledger writer behind it: the ledger process owns the only write path into the
 ledger file (gate G-7), so a SUT that lies in its self-report still cannot
 amend or delete what was recorded. This module imports nothing from
-`src/harness/` (CLAUDE.md red line 6).
+`src/harness/` (PROJECT_RULES.md red line 6).
 
 Interposition wiring (recorder, then mediation boundary outermost, so a
 denied call reaches neither the recorder nor the tool) is the HARNESS's job

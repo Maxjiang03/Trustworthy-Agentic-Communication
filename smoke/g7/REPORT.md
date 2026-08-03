@@ -14,7 +14,7 @@
 
 ## 2. The architectural tension and the mechanism that resolves it
 
-The recorder must sit **at the tool**, yet `src/sut/` may not import harness code (CLAUDE.md
+The recorder must sit **at the tool**, yet `src/sut/` may not import harness code (PROJECT_RULES.md
 red line 6). Resolution: the recorder and the effector interface are **installed by the
 harness** at server-build time (the same wrap-at-fn discipline as G-6), and the ledger itself
 is held by a **separate ledger process** — the SUT neither imports harness code nor can reach

@@ -38,10 +38,10 @@ prompt**. If either differs, **STOP and report**.
 | 5 | **Letting a broad arm narrow, or a strong arm broaden** (STEP 9) | A `B2-exchange-broad` that accidentally enforced `C_1` would destroy the arm whose entire job is to isolate the exchange round trip **from** narrowing, and would silently contradict §E.4 |
 | 6 | Weakening any arm, or giving any arm avoidable per-hop cost — a new TLS context or connection per hop, name resolution instead of the literal `127.0.0.1`, keys re-parsed per request, disk I/O on the request path | Both directions bias. The `B2` anti-bias suite already exists; the three new OAuth-family arms inherit **every** one of its requirements |
 | 7 | Building F3, F4 or F5 fixtures, the shared reference monitor, `authz_context_hash`, or the attack suite | Later blocks. Building `B2-DPoP` and `B3⁺` is building **arms**, not the families that exercise them |
-| 8 | Drafting `docs/PRE_REGISTRATION.md`, creating `fixtures/confirmatory/`, sealing, or running a campaign | CLAUDE.md red lines 1–2. ADR 0028's pre-registration obligation is **recorded**, not discharged |
+| 8 | Drafting `docs/PRE_REGISTRATION.md`, creating `fixtures/confirmatory/`, sealing, or running a campaign | PROJECT_RULES.md red lines 1–2. ADR 0028's pre-registration obligation is **recorded**, not discharged |
 | 9 | Any import of `src/harness/` from `src/sut/`; of `src/sut/oauth_as/` from a non-AS `src/sut/` module or from `src/harness/`; reuse of a harness implementation as the SUT-side one | Red line 6, ADR 0015 rules 3–4, D13/D21 |
 | 10 | A standalone-capability (`oauth_authn = 0`) arm in the formal matrix | §E.1/E6 permits it only as a separate exploratory arm, and none is wanted here |
-| 11 | Secrets, minted tokens or holder keys on disk, in the repository, or in `results/` | CLAUDE.md red line 8 |
+| 11 | Secrets, minted tokens or holder keys on disk, in the repository, or in `results/` | PROJECT_RULES.md red line 8 |
 | 12 | `git push --force`, history rewrite | Red line 7 |
 
 If a step cannot be completed as written, **stop and report the blocker**. Do not substitute a

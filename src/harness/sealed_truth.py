@@ -1,6 +1,6 @@
 """The sealed-truth wall: `tau_gt` and every sealed object live behind this accessor.
 
-CLAUDE.md red line 5 / SS A.3: `tau_gt` is oracle-only; **no system-under-test
+PROJECT_RULES.md red line 5 / SS A.3: `tau_gt` is oracle-only; **no system-under-test
 principal may read it**. Two mechanisms enforce that, layered:
 
 1. **Structural** (the guarantee): `src/sut/` must never import `src/harness/`
