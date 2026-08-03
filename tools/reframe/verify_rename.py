@@ -56,7 +56,13 @@ DIRECTORY_RENAMES = {"docs/workplan/": "docs/tasks/"}
 # closed list for the same reason the exceptions are one: "it is new" must be a
 # claim the proof checks, not an excuse it accepts. An addition outside this
 # list fails.
-ADDED = frozenset({"tools/reframe/verify_rename.py", "tools/reframe/verify_ast.py"})
+ADDED = frozenset(
+    {
+        "tools/reframe/verify_rename.py",
+        "tools/reframe/verify_ast.py",
+        "tools/reframe/REPORT.md",
+    }
+)
 
 # ---------------------------------------------------------------------------
 # THE FIVE EXCEPTIONS. Closed list, quoted in full, both sides.
