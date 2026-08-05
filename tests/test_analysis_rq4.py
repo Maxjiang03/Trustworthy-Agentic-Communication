@@ -17,6 +17,10 @@ project rule that a check never observed failing is not known to work:
 * a span absent from a repetition — refused rather than averaged over what is
   present, and a span absent from EVERY repetition likewise;
 * a pair whose §E.5 rows do not differ — refused (no bit for the exchange);
+* a single-bit pair STRADDLING the exchange partition — downgraded to a
+  composite with the unmodelled round trip named on the record, both
+  directions, while the nine clean increments stay increments (ADR 000X,
+  dated addition: limit 1's reach, enforced);
 * a pair involving `B1` — refused with the ADR 0035 reason;
 * a mixed-phase pool — unbuildable: an out-of-vocabulary phase is refused and
   the two real phases are never pooled into one series;
@@ -517,3 +521,147 @@ class TestRowSevenFraming:
 
         t_full, _ = frozen_parameters.llm_turn_denominators()
         assert t_full in _numeric_literals(f"x = {t_full}")
+
+
+# ---------------------------------------------------------------------------
+# the exchange-partition guard — limit 1's reach, enforced (ADR 000X addition)
+# ---------------------------------------------------------------------------
+class TestTheExchangePartitionGuard:
+    """At ecaef48, `B2-broad-noexchange` ↔ `B2-exchange-task` read as a clean
+    `contain` increment while only one of the two performs an online AS
+    exchange — an entire round trip inside a single-bit label, in the
+    direction that flatters this project's own hypothesis (it inflates the
+    OAuth arm's apparent mechanism cost). The guard downgrades exactly that
+    shape and must not touch anything else."""
+
+    def test_both_directions_of_the_straddling_pair_are_downgraded(self):
+        for treatment, control in (
+            ("B2-exchange-task", "B2-broad-noexchange"),
+            ("B2-broad-noexchange", "B2-exchange-task"),
+        ):
+            difference = L.e5_bit_difference(treatment, control)
+            assert difference.label == "composite-delta"
+            assert difference.mechanism is None
+            # §E.5's truth is kept: one bit differs, and it is named — the
+            # downgrade adds what no bit describes rather than faking a bit.
+            assert difference.differing_bits == ("contain",)
+            assert len(difference.unmodelled) == 1
+            assert "exchange round trip" in difference.unmodelled[0]
+
+    def test_the_delta_record_itself_carries_the_unmodelled_factor(self):
+        """Downgraded, not refused: the arithmetic still runs and the number
+        is reportable — the record just says what is inside it."""
+        rows = _five("B2-exchange-task", _values(), delegation_ms=9.0) + _five(
+            "B2-broad-noexchange", _values()
+        )
+        delta = L.arm_pair_delta(
+            rows,
+            treatment_arm="B2-exchange-task",
+            control_arm="B2-broad-noexchange",
+            span="delegation",
+            seed=SEED,
+        )
+        assert (delta.label, delta.mechanism) == ("composite-delta", None)
+        assert delta.point_estimate_ms == pytest.approx(9.0 - 7.0)
+        assert "exchange round trip" in delta.unmodelled[0]
+        assert any("exchange round trip" in item for item in delta.as_dict()["unmodelled"])
+
+    def test_exchange_to_exchange_pairs_are_unaffected(self):
+        for treatment, control, bit in (
+            ("B2-exchange-task", "B2-exchange-broad", "contain"),
+            ("B2-exchange-task-DPoP", "B2-exchange-task", "htc/holder"),
+        ):
+            difference = L.e5_bit_difference(treatment, control)
+            assert (difference.label, difference.mechanism) == ("mechanism-increment", bit)
+            assert difference.unmodelled == ()
+        # The third exchange-to-exchange pair was already a two-bit composite
+        # at ecaef48 and stays exactly that, untagged: both arms exchange, so
+        # nothing about it is unmodelled.
+        difference = L.e5_bit_difference("B2-exchange-task-DPoP", "B2-exchange-broad")
+        assert (difference.label, difference.mechanism) == ("composite-delta", None)
+        assert set(difference.differing_bits) == {"htc/holder", "contain"}
+        assert difference.unmodelled == ()
+
+    def test_the_seven_non_exchange_increments_are_unaffected(self):
+        pairs = [("B3+", "B3", "jti")] + [
+            (row, "B3", bit)
+            for row, bit in (
+                ("B3 −attenuation (unsafe control, §E.6)", "authorizer"),
+                ("B3 −holder", "htc/holder"),
+                ("B3 −invoke", "invoke"),
+                ("B3 −contain", "contain"),
+                ("B3 −context", "context"),
+                ("B3 −approval", "approval"),
+            )
+        ]
+        for treatment, control, bit in pairs:
+            difference = L.e5_bit_difference(treatment, control)
+            assert (difference.label, difference.mechanism) == ("mechanism-increment", bit)
+            assert difference.unmodelled == ()
+
+    def test_the_partition_is_total_over_e5_with_no_arm_invented(self):
+        """Every §E.5 row is classified, none beyond them exists, the True
+        side is exactly the three RFC 8693 arms — and the partition is NOT a
+        bitmask column: §E.5 still carries no exchange bit."""
+        assert set(L.PERFORMS_AS_EXCHANGE) == set(L.E5_BITMASK)
+        assert {row for row, exchanges in L.PERFORMS_AS_EXCHANGE.items() if exchanges} == {
+            "B2-exchange-broad",
+            "B2-exchange-task",
+            "B2-exchange-task-DPoP",
+        }
+        assert not any("exchange" in column for column in L.E5_BITMASK_COLUMNS)
+
+    def test_exactly_two_ordered_pairs_carry_the_tag_and_nine_increments_remain(self):
+        """Exhaustive over all 15×15 ordered pairs: the tag sits on exactly
+        the two straddling directions, every surviving increment is one of
+        the nine pinned pairs, and no returned record outside the straddle
+        carries anything unmodelled — so the guard caught its two pairs and
+        touched nothing else."""
+        tagged: set[tuple[str, str]] = set()
+        increments: set[frozenset[str]] = set()
+        for treatment in L.E5_BITMASK:
+            for control in L.E5_BITMASK:
+                try:
+                    difference = L.e5_bit_difference(treatment, control)
+                except L.AnalysisError:
+                    continue
+                if difference.unmodelled:
+                    tagged.add((treatment, control))
+                    assert difference.label == "composite-delta"
+                else:
+                    assert difference.unmodelled == ()
+                if difference.label == "mechanism-increment":
+                    assert difference.unmodelled == ()
+                    increments.add(frozenset((treatment, control)))
+        assert tagged == {
+            ("B2-exchange-task", "B2-broad-noexchange"),
+            ("B2-broad-noexchange", "B2-exchange-task"),
+        }
+        assert increments == {
+            frozenset({"B2-exchange-broad", "B2-exchange-task"}),
+            frozenset({"B2-exchange-task", "B2-exchange-task-DPoP"}),
+            frozenset({"B3", "B3⁺"}),
+            frozenset({"B3", "B3 −attenuation (unsafe control, §E.6)"}),
+            frozenset({"B3", "B3 −holder"}),
+            frozenset({"B3", "B3 −invoke"}),
+            frozenset({"B3", "B3 −contain"}),
+            frozenset({"B3", "B3 −context"}),
+            frozenset({"B3", "B3 −approval"}),
+        }
+
+    def test_removing_an_arm_from_the_partition_reopens_the_straddle(self, monkeypatch):
+        """The negative arm: flip `B2-exchange-task` out of the exchange side
+        and the straddling pair reads as a clean increment again — ecaef48's
+        exact behaviour — so the downgrade genuinely flows from the partition
+        entry and the straddling test above would fail without it."""
+        monkeypatch.setitem(L.PERFORMS_AS_EXCHANGE, "B2-exchange-task", False)
+        difference = L.e5_bit_difference("B2-exchange-task", "B2-broad-noexchange")
+        assert difference.label == "mechanism-increment"  # the would-have-failed world
+        assert difference.unmodelled == ()
+
+    def test_an_arm_absent_from_the_partition_fails_closed(self, monkeypatch):
+        """Totality is enforced at lookup, not assumed: an arm the partition
+        does not classify cannot be labelled at all."""
+        monkeypatch.delitem(L.PERFORMS_AS_EXCHANGE, "B2-exchange-task")
+        with pytest.raises(L.AnalysisError, match="exchange partition"):
+            L.e5_bit_difference("B2-exchange-task", "B2-broad-noexchange")

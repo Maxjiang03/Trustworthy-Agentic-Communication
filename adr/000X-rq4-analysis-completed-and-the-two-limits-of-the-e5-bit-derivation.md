@@ -101,10 +101,63 @@ matched ablations, each a single bit off `B3` by construction (confirmed mechani
 transcription). `B-cap → B3` differs in **four** bits (`htc/holder`, `invoke`, `context`,
 `approval`) and is reported only as a composite; it is **not** "the cost of invocation binding".
 
+## Addition, 2026-08-05 — limit 1's reach, enforced by the exchange-partition guard
+
+The Decision above enforced limit 1 only where the bit difference already fell to a refusal
+(identical rows) and left its **reach** — a single-bit pair straddling the unmodelled exchange —
+as prose. The Commander's decision: **close it in code, not in prose.**
+
+**The finding, verified by enumerating all 15 rows.** Exactly one unordered pair (both ordered
+directions) was returned as a clean `mechanism-increment` while straddling the exchange:
+`B2-broad-noexchange ↔ B2-exchange-task`, one cell apart via `contain`. The bit is named
+correctly; what is not named is the **online AS round trip that only one of the two arms
+performs** — on a localhost AS plausibly the dominant term, so "the cost of task-scoping is
+X ms" would be wrong by a round trip. The error direction matters: it **inflates an OAuth arm's
+apparent mechanism cost and makes the capability arms look relatively cheaper** — it fails
+toward this project's own hypothesis, the pattern the standing bias check exists for. Every
+other increment is safe: `B2-exchange-broad → B2-exchange-task` and
+`B2-exchange-task → B2-exchange-task-DPoP` are exchange-to-exchange, and `B3 → B3⁺` plus the
+six ablations are non-exchange throughout. (The third exchange-to-exchange pair,
+`B2-exchange-broad ↔ B2-exchange-task-DPoP`, was already a two-bit composite and is untouched.)
+
+`[DESIGN]` **The guard.** `PERFORMS_AS_EXCHANGE` in `analysis/latency.py` declares the exchange
+partition explicitly: a **total** classification of every §E.5 row — `B2-exchange-broad`,
+`B2-exchange-task` and `B2-exchange-task-DPoP` perform an online AS exchange per delegation;
+every other row does not. It is **transcribed from §E.1/§E.2** and **deliberately not derived
+from §E.5**, because §E.5 having no bit for the exchange *is* limit 1; it lives beside the
+bitmask, never as an invented column in it, and the existing test asserting no exchange column
+exists keeps passing. When exactly one arm of a single-bit pair is in the partition,
+`e5_bit_difference` **downgrades the label to `composite-delta`** (`mechanism = None`,
+`differing_bits` keeps §E.5's truth) and **names the unmodelled round trip on the record
+itself** — a new `unmodelled` field carried by `BitDifference` and `ArmPairDelta`, empty for
+every pair the bitmask fully describes. **Downgraded, not refused**: the delta remains a
+meaningful arm-pair comparison the dissertation may report with the caveat; the problem was the
+label, not the arithmetic. An arm the partition does not classify **fails closed** at lookup.
+
+**Watched failing, as committed tests** (`TestTheExchangePartitionGuard`): both directions of
+the straddling pair downgrade with the round trip named on the record; the two
+exchange-to-exchange increments and all seven non-exchange increments still read
+`mechanism-increment` with `unmodelled` empty; an exhaustive sweep of all 15×15 ordered pairs
+finds the tag on **exactly two** ordered pairs and **exactly nine** surviving increment pairs;
+the negative arm flips `B2-exchange-task` out of the partition and the straddling pair reads
+`mechanism-increment` again — ecaef48's behaviour reproduced, proving the downgrade flows from
+the partition entry; and deleting the entry makes the pair refuse (totality enforced at lookup,
+so a future §E.5 row is unlabellable until classified, the ADR 0035 obligation applied to this
+enumeration too).
+
+**The claim boundary, stated explicitly** (this widens the second Consequences bullet below to
+the ablations, by dated note rather than rewrite): the dissertation **may** state the isolated
+cost of **DPoP holder binding**, of the **jti replay cache**, and of **each of the six §E.6
+ablations**; it **may not** state a per-mechanism cost for the **exchange**, for **`B1`'s
+secret verification**, or for **anything read off a pair that straddles the exchange
+partition**.
+
 ## Status
 
 accepted — 2026-08-05 (the RQ4 analysis layer; placeholder letter, the number is the Commander's;
-the two derivation limits are findings recorded for the Commander, not corrections)
+the two derivation limits are findings recorded for the Commander, not corrections. Dated
+addition, same day, on the Commander's decision: limit 1's reach is enforced by the
+exchange-partition guard rather than left to the reader)
 
 ## Consequences
 

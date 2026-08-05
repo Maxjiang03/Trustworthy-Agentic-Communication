@@ -45,7 +45,10 @@ rules re-applied per span. `arm_pair_delta` differences two arms under the
 derivation can actually support, refusing the pairs it is known not to
 describe (identical rows — §E.5 carries no bit for the RFC 8693 exchange —
 and any pair involving `B1`, whose static shared secret has no bit either,
-ADR 0035). `llm_turn_fraction` is `frozen_parameters` row 7's secondary
+ADR 0035), and **downgrading to a composite, with the round trip named on
+the record**, any single-bit pair that straddles the exchange partition
+(`PERFORMS_AS_EXCHANGE` — limit 1's reach, enforced rather than left to the
+reader). `llm_turn_fraction` is `frozen_parameters` row 7's secondary
 framing. All of it is **descriptives**: the only equivalence decision in this
 study remains row 1's, above.
 """
@@ -604,20 +607,60 @@ E5_ROW_FOR_ARM: dict[str, str] = {
     "B3+": "B3⁺",
 }
 
+# The exchange partition: which arms perform an ONLINE AS exchange during
+# delegation, keyed by §E.5 row label and TOTAL over `E5_BITMASK` — every row
+# is classified, and `e5_bit_difference` fails closed on one that is not.
+# TRANSCRIBED FROM §E.1/§E.2 (the ladder's arm definitions: the three RFC 8693
+# arms call the AS per delegation; every other arm does not —
+# `B2-broad-noexchange` holds a Phase 1 broad token and the capability arms
+# attenuate purely locally). DELIBERATELY NOT DERIVED FROM §E.5: §E.5 carrying
+# no bit for the exchange IS limit 1 (ADR 000X), so this partition lives
+# BESIDE the bitmask, never as an invented column in it — the test asserting
+# no exchange column exists must keep passing. A single-bit pair straddling
+# this partition is downgraded to a composite with the round trip named on
+# the record: on a localhost AS the round trip is plausibly the dominant
+# term, and unlabelled it would inflate the OAuth arm's apparent mechanism
+# cost — an error toward this project's own hypothesis.
+PERFORMS_AS_EXCHANGE: dict[str, bool] = {
+    "B0": False,
+    "B1": False,
+    "B2-broad-noexchange": False,
+    "B2-exchange-broad": True,
+    "B2-exchange-task": True,
+    "B2-exchange-task-DPoP": True,
+    "B-cap": False,
+    "B3": False,
+    "B3⁺": False,
+    "B3 −attenuation (unsafe control, §E.6)": False,
+    "B3 −holder": False,
+    "B3 −invoke": False,
+    "B3 −contain": False,
+    "B3 −context": False,
+    "B3 −approval": False,
+}
+
 
 @dataclass(frozen=True)
 class BitDifference:
     """What the §E.5 bit derivation supports for one arm pair.
 
     `label` is `"mechanism-increment"` (exactly one bit differs; `mechanism`
-    names it) or `"composite-delta"` (more than one bit differs; `mechanism`
-    is `None` and every differing bit is named). The refused cases never
-    construct this object.
+    names it) or `"composite-delta"` (more than one bit differs — or the pair
+    straddles the exchange partition; `mechanism` is `None` and every
+    differing bit is named). The refused cases never construct this object.
+
+    `unmodelled` names what the pair's delta contains that NO differing bit
+    describes — today exactly one possible entry, the online AS exchange
+    round trip, carried by a single-bit pair that straddles
+    `PERFORMS_AS_EXCHANGE`. Empty for every pair the bitmask fully describes,
+    so a caller reading the record alone sees the caveat exactly where it
+    applies.
     """
 
     label: str
     differing_bits: tuple[str, ...]
     mechanism: str | None
+    unmodelled: tuple[str, ...] = ()
 
 
 def e5_bit_difference(treatment_arm: str, control_arm: str) -> BitDifference:
@@ -635,13 +678,19 @@ def e5_bit_difference(treatment_arm: str, control_arm: str) -> BitDifference:
       the one authentication mechanism it has is invisible to the bitmask and
       no bit difference against it describes what actually changes.
 
-    A one-bit label names the BIT, not everything that changed: because no
-    column carries the exchange, a pair in which one arm exchanges and the
-    other does not (e.g. `B2-broad-noexchange` → `B2-exchange-task`) still
-    carries the unmodelled round trip inside its delta. That limit is a
-    finding about the design, recorded in ADR 000X, not repaired here.
+    Limit 1 reaches past the refusals, and its reach is ENFORCED here rather
+    than left to the reader (ADR 000X, dated addition): a single-bit pair in
+    which exactly one arm performs the online AS exchange
+    (`PERFORMS_AS_EXCHANGE`, transcribed from §E.1/§E.2 — not from §E.5,
+    which has no bit to derive it from) is **downgraded to a composite** with
+    the round trip named in `unmodelled`. Not refused: the delta is still a
+    meaningful arm-pair comparison the dissertation may report with the
+    caveat — it is just not an isolated mechanism cost, and at ecaef48 it
+    read as one (`B2-broad-noexchange` → `B2-exchange-task`, one bit apart
+    via `contain`, an entire AS round trip inside).
     """
     rows: dict[str, tuple[str, ...]] = {}
+    exchanges: dict[str, bool] = {}
     for name in (treatment_arm, control_arm):
         row_label = E5_ROW_FOR_ARM.get(name, name)
         if row_label not in E5_BITMASK:
@@ -650,7 +699,15 @@ def e5_bit_difference(treatment_arm: str, control_arm: str) -> BitDifference:
                 "no bit derivation exists for this pair. The bitmask is a transcription; a new "
                 "arm is added to §E.5 first, never here"
             )
+        if row_label not in PERFORMS_AS_EXCHANGE:
+            raise AnalysisError(
+                f"{name!r} (§E.5 row {row_label!r}) is not classified in the exchange "
+                "partition PERFORMS_AS_EXCHANGE. The partition is total over §E.5's rows, "
+                "and an unclassified arm cannot be labelled: whether its deltas straddle "
+                "the unmodelled exchange round trip would be a guess (fail closed, ADR 000X)"
+            )
         rows[name] = E5_BITMASK[row_label]
+        exchanges[name] = PERFORMS_AS_EXCHANGE[row_label]
     if "B1" in (treatment_arm, control_arm):
         raise AnalysisError(
             "a pair involving B1 is refused: §E.5's ten columns carry no bit for B1's static "
@@ -674,6 +731,19 @@ def e5_bit_difference(treatment_arm: str, control_arm: str) -> BitDifference:
             "between them is a real quantity, but not one this derivation can attribute"
         )
     if len(differing) == 1:
+        if exchanges[treatment_arm] != exchanges[control_arm]:
+            exchanging = treatment_arm if exchanges[treatment_arm] else control_arm
+            return BitDifference(
+                "composite-delta",
+                differing,
+                None,
+                unmodelled=(
+                    f"online AS exchange round trip: {exchanging!r} performs an RFC 8693 "
+                    "exchange per delegation and the other arm does not, and §E.5 carries "
+                    "no bit for it (ADR 000X, limit 1) — this delta is not an isolated "
+                    "mechanism cost",
+                ),
+            )
         return BitDifference("mechanism-increment", differing, differing[0])
     return BitDifference("composite-delta", differing, None)
 
@@ -688,6 +758,10 @@ class ArmPairDelta:
     (ADR 0026), so this object carries **no verdict and no margin**, and a
     composite delta must never be relabelled with a single mechanism's name:
     that would report a composite as an isolated cost.
+
+    `unmodelled` rides along from `BitDifference`: non-empty exactly when the
+    pair straddles the exchange partition, so this record alone tells a
+    reader the delta contains an AS round trip no differing bit describes.
     """
 
     treatment_arm: str
@@ -697,6 +771,7 @@ class ArmPairDelta:
     label: str
     differing_bits: tuple[str, ...]
     mechanism: str | None
+    unmodelled: tuple[str, ...]
     point_estimate_ms: float
     ci: Interval
     confidence: float
@@ -713,6 +788,7 @@ class ArmPairDelta:
             "label": self.label,
             "differing_bits": list(self.differing_bits),
             "mechanism": self.mechanism,
+            "unmodelled": list(self.unmodelled),
             "point_estimate_ms": self.point_estimate_ms,
             "ci_low_ms": self.ci.low,
             "ci_high_ms": self.ci.high,
@@ -767,6 +843,7 @@ def arm_pair_delta(
         label=difference.label,
         differing_bits=difference.differing_bits,
         mechanism=difference.mechanism,
+        unmodelled=difference.unmodelled,
         point_estimate_ms=statistics.median(treatment) - statistics.median(control),
         ci=ci,
         confidence=confidence,
@@ -847,6 +924,7 @@ __all__ = [
     "E5_ROW_FOR_ARM",
     "MEASURED_SEGMENT",
     "MEASURED_SEGMENT_SPANS",
+    "PERFORMS_AS_EXCHANGE",
     "PHASES",
     "REFUSAL_PATH_SCENARIO",
     "RQ4_SPANS",
