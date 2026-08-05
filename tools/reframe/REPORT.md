@@ -175,17 +175,26 @@ exception**.
 
 ## Re-running the proofs
 
-Both hold their baseline at **`3d2473a`**, the pre-reframe state, so **one command establishes the
-whole reframe** rather than one commit of it. Re-baselining would split the claim across two
-artifacts, and a claim that needs two artifacts to state is a claim someone will eventually state
-wrongly.
+**Each proof is a statement about the range `3d2473a..a667ce3`** — baseline at the pre-reframe
+state, default revision **hard-pinned to `a667ce3`**, the reframe's closing commit. One command
+establishes the whole reframe rather than one commit of it; re-baselining would split the claim
+across two artifacts, and a claim that needs two artifacts to state is a claim someone will
+eventually state wrongly.
 
 ```
-uv run python tools/reframe/verify_rename.py     # bytes:  exits non-zero on any unlisted difference
-uv run python tools/reframe/verify_ast.py        # syntax: exits non-zero on any executable change
+uv run python tools/reframe/verify_rename.py     # bytes:  3d2473a..a667ce3; non-zero on any unlisted difference
+uv run python tools/reframe/verify_ast.py        # syntax: 3d2473a..a667ce3; non-zero on any executable change
 ```
 
-Both accept `--rev` (default `HEAD`; `""` reads the index) and `--baseline`.
+Both accept `--rev` (default `a667ce3`; `""` reads the index) and `--baseline`.
+
+**Development after `a667ce3` is outside both proofs' scope by construction, not by oversight.**
+The proven property — the reframe changed nothing but the name and six enumerated lines — says
+nothing about later commits, so pointing either script at a later HEAD asks a question it does not
+answer: it turned red on the first ordinary development commits (the RQ4 work) for exactly that
+reason. The closed EXCEPTIONS and ADDED lists are never extended to cover later work — that would
+make the proofs claim commits they do not verify, and every future commit would need enumerating
+until someone forgets and the proof fails silently.
 
 **Results at the closing commit:**
 

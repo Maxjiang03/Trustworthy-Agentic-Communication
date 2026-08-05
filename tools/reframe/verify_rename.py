@@ -22,6 +22,21 @@ across two scripts and two commits, and a claim that needs two artifacts to
 state is a claim someone will eventually state wrongly. Held here, one command
 establishes the whole of it.
 
+## This is a statement about a RANGE: `3d2473a..a667ce3`
+
+The property proven — the reframe changed nothing but the name and six
+enumerated lines — is true of that range and says **nothing about anything
+after it**, so the default revision is **hard-pinned to `a667ce3`**, the
+reframe's closing commit. Development after `a667ce3` is outside this proof's
+scope **by construction, not by oversight**: comparing a moving HEAD turns the
+proof red on the first ordinary development commit (it did, at the RQ4
+commits), and a red result at a later HEAD means the script was pointed at the
+wrong question — not that the reframe stopped being clean. For the same
+reason, the closed EXCEPTIONS and ADDED lists are **never extended to cover
+later work**: that would make the proof claim commits it does not verify, and
+every future commit would need enumerating until someone forgets and it fails
+silently.
+
 ## Why it compares git blobs rather than working-tree bytes
 
 `core.autocrlf` is on for this checkout, so the working tree holds CRLF and the
@@ -29,8 +44,8 @@ object database holds LF. Comparing a working-tree file against a stored blob
 would report a difference on every line of every file and prove nothing. Both
 sides are therefore read with `git show`, which yields the stored bytes on each.
 
-    uv run python tools/reframe/verify_rename.py            # against HEAD
-    uv run python tools/reframe/verify_rename.py --rev @    # explicit
+    uv run python tools/reframe/verify_rename.py               # the range, 3d2473a..a667ce3
+    uv run python tools/reframe/verify_rename.py --rev <sha>   # an intermediate reframe commit
 """
 
 import argparse
@@ -43,6 +58,11 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # The commit the reframe was performed against. Pinned, not inferred: the proof
 # is a statement about a specific pair of states.
 BASELINE = "3d2473a"
+
+# The reframe's closing commit — the range's end, and the default revision.
+# Pinned for the same reason BASELINE is: the proof spans BASELINE..RANGE_END
+# and a later revision is a different question (see the module docstring).
+RANGE_END = "a667ce3"
 
 OLD_NAME = b"CLAUDE.md"
 NEW_NAME = b"PROJECT_RULES.md"
@@ -170,7 +190,11 @@ def _apply_exceptions(path: str, data: bytes) -> bytes:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="reverse-substitution proof for the reframe")
-    parser.add_argument("--rev", default="HEAD", help="the revision to check (default HEAD)")
+    parser.add_argument(
+        "--rev",
+        default=RANGE_END,
+        help=f"the revision to check (default {RANGE_END}, the reframe range's end)",
+    )
     parser.add_argument("--baseline", default=BASELINE)
     args = parser.parse_args()
 

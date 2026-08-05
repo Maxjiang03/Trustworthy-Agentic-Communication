@@ -15,8 +15,16 @@ A rename that touched a statement, an import or a literal fails here even if the
 byte proof passed, because the byte proof's exception list could in principle
 have been widened to admit one. These two are checked against each other.
 
-    uv run python tools/reframe/verify_ast.py            # against HEAD
-    uv run python tools/reframe/verify_ast.py --rev ""   # against the INDEX
+**This is a statement about a RANGE, `3d2473a..a667ce3`**, so the default
+revision is **hard-pinned to `a667ce3`**, the reframe's closing commit — the
+same pin, for the same reason, as `verify_rename.py`. Development after
+`a667ce3` is outside this proof's scope **by construction, not by oversight**:
+a moving HEAD turns it red on the first ordinary development commit, and a red
+result at a later HEAD means the script was pointed at the wrong question. The
+closed ADDED list is never extended to cover later work.
+
+    uv run python tools/reframe/verify_ast.py               # the range, 3d2473a..a667ce3
+    uv run python tools/reframe/verify_ast.py --rev <sha>   # an intermediate reframe commit
 """
 
 import argparse
@@ -27,6 +35,9 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "3d2473a"
+# The reframe's closing commit — the range's end, and the default revision
+# (see the module docstring; kept in step with `verify_rename.py`).
+RANGE_END = "a667ce3"
 PLACEHOLDER = "<docstring elided for this comparison>"
 
 # Path renames, new -> old. Kept in step with `verify_rename.py`.
@@ -90,7 +101,11 @@ def _normalised(source: bytes) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="AST equality proof for the reframe")
-    parser.add_argument("--rev", default="HEAD")
+    parser.add_argument(
+        "--rev",
+        default=RANGE_END,
+        help=f"the revision to check (default {RANGE_END}, the reframe range's end)",
+    )
     parser.add_argument("--baseline", default=BASELINE)
     args = parser.parse_args()
 
