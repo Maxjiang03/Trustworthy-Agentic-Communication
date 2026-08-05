@@ -527,7 +527,7 @@ class TestRowSevenFraming:
 # the exchange-partition guard — limit 1's reach, enforced (ADR 000X addition)
 # ---------------------------------------------------------------------------
 class TestTheExchangePartitionGuard:
-    """At ecaef48, `B2-broad-noexchange` ↔ `B2-exchange-task` read as a clean
+    """At c3b6ebb, `B2-broad-noexchange` ↔ `B2-exchange-task` read as a clean
     `contain` increment while only one of the two performs an online AS
     exchange — an entire round trip inside a single-bit label, in the
     direction that flatters this project's own hypothesis (it inflates the
@@ -575,7 +575,7 @@ class TestTheExchangePartitionGuard:
             assert (difference.label, difference.mechanism) == ("mechanism-increment", bit)
             assert difference.unmodelled == ()
         # The third exchange-to-exchange pair was already a two-bit composite
-        # at ecaef48 and stays exactly that, untagged: both arms exchange, so
+        # at c3b6ebb and stays exactly that, untagged: both arms exchange, so
         # nothing about it is unmodelled.
         difference = L.e5_bit_difference("B2-exchange-task-DPoP", "B2-exchange-broad")
         assert (difference.label, difference.mechanism) == ("composite-delta", None)
@@ -651,7 +651,7 @@ class TestTheExchangePartitionGuard:
 
     def test_removing_an_arm_from_the_partition_reopens_the_straddle(self, monkeypatch):
         """The negative arm: flip `B2-exchange-task` out of the exchange side
-        and the straddling pair reads as a clean increment again — ecaef48's
+        and the straddling pair reads as a clean increment again — c3b6ebb's
         exact behaviour — so the downgrade genuinely flows from the partition
         entry and the straddling test above would fail without it."""
         monkeypatch.setitem(L.PERFORMS_AS_EXCHANGE, "B2-exchange-task", False)

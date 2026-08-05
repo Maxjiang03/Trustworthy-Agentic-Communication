@@ -685,7 +685,7 @@ def e5_bit_difference(treatment_arm: str, control_arm: str) -> BitDifference:
     which has no bit to derive it from) is **downgraded to a composite** with
     the round trip named in `unmodelled`. Not refused: the delta is still a
     meaningful arm-pair comparison the dissertation may report with the
-    caveat — it is just not an isolated mechanism cost, and at ecaef48 it
+    caveat — it is just not an isolated mechanism cost, and at c3b6ebb it
     read as one (`B2-broad-noexchange` → `B2-exchange-task`, one bit apart
     via `contain`, an entire AS round trip inside).
     """

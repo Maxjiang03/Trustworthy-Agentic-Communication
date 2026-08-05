@@ -140,7 +140,7 @@ exchange-to-exchange increments and all seven non-exchange increments still read
 `mechanism-increment` with `unmodelled` empty; an exhaustive sweep of all 15×15 ordered pairs
 finds the tag on **exactly two** ordered pairs and **exactly nine** surviving increment pairs;
 the negative arm flips `B2-exchange-task` out of the partition and the straddling pair reads
-`mechanism-increment` again — ecaef48's behaviour reproduced, proving the downgrade flows from
+`mechanism-increment` again — c3b6ebb's behaviour reproduced, proving the downgrade flows from
 the partition entry; and deleting the entry makes the pair refuse (totality enforced at lookup,
 so a future §E.5 row is unlabellable until classified, the ADR 0035 obligation applied to this
 enumeration too).
