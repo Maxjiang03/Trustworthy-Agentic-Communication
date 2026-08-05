@@ -178,3 +178,5 @@ exchange-partition guard rather than left to the reader)
 - `docs/EXPERIMENT_ARCHITECTURE_FINAL.md` is **not** amended by this ADR: the two absences are
   recorded here as findings for the Commander, who decides whether §E.5 gains a note, the
   pre-registration carries the constraint, or both.
+
+*Note, 2026-08-05: this ADR's two commits changed SHA in a message-only rewrite that removed one attribution trailer from each — `ecaef48` → `c3b6ebb` and `9c29f91` → `4b936db`; trees and message bodies are unchanged, and `4b936db`'s own message still cites the old `ecaef48`, which cannot be repaired without destroying the property that made the rewrite verifiable.*
